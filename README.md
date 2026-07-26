@@ -64,6 +64,47 @@ DB_PORT=5432          # optional, defaults to 5432
 `python backend/manage.py migrate` again against it. The same migrations apply
 to both backends; nothing in the models is SQLite-specific.
 
+## API
+
+Browsable at http://127.0.0.1:8000/api/ once the server is running. Log in for
+the merchant-only endpoints at `/api-auth/login/` or `/admin/`.
+
+| Method | Endpoint | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/establishments/` | public | Browse; filters: `city`, `type`, `search` |
+| `GET` | `/api/establishments/{id}/` | public | Detail with its spaces |
+| `GET` | `/api/establishments/{id}/availability/` | public | Slot grid; params: `date` (required), `party_size` |
+| `POST` | `/api/reservations/` | public | Book a slot — always created `pending` |
+| `GET` | `/api/reservations/{id}/` | public | Check one booking by id |
+| `GET` | `/api/reservations/` | merchant | Filters: `establishment`, `status`, `date` |
+| `POST` | `/api/reservations/{id}/confirm/` | merchant | Accept a booking |
+| `POST` | `/api/reservations/{id}/cancel/` | merchant | Turn it down, freeing the slot |
+
+Booking a slot:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/reservations/ \
+  -H 'Content-Type: application/json' \
+  -d '{"space": 1, "customer_name": "Mariama Diallo",
+       "customer_phone": "+224 620 00 00 00",
+       "datetime": "2026-08-01T19:00:00Z", "party_size": 2}'
+```
+
+### How availability works
+
+`Reservation` stores only a start time, so every booking is treated as running
+for `RESERVATION_DURATION_MINUTES` (default 120). Two bookings on one space
+clash when those windows overlap, which is what blocks double-booking. Slots are
+offered on an `AVAILABILITY_SLOT_MINUTES` grid (default 30) between
+`AVAILABILITY_WINDOW_START` and `AVAILABILITY_WINDOW_END` — all in
+`config/settings.py`.
+
+Those three are global because `Establishment.opening_hours` is still free text
+and cannot be parsed. They become per-establishment once it is structured.
+
+A cancelled reservation frees its slot; pending, confirmed and completed all
+hold it.
+
 ## Tests and linting
 
 ```bash
@@ -118,6 +159,11 @@ backend/
 ## Current state
 
 - Models + admin for Establishment, Space, Reservation
-- No API endpoints yet (`api/` and `payments/` are registered but empty)
-- Payment/deposit fields deliberately left off Reservation until the payments
-  round
+- Read API for establishments, availability for a date, and reservation
+  create/confirm/cancel
+- **No real auth yet.** "Merchant" endpoints require any authenticated Django
+  user, which today means a superuser. There is no customer/merchant user model
+  and no per-establishment scoping, so any logged-in user can see and act on
+  every establishment's reservations. That lands with the merchant app.
+- `payments/` is still an empty app; payment/deposit fields are deliberately off
+  Reservation until then

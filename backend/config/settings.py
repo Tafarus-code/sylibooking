@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 
     # Third party
     'rest_framework',
+    'rest_framework.authtoken',
 
     # Local
     'establishments',
@@ -164,6 +165,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Token first: it is what the Flutter merchant app uses. Session auth
+        # stays for the browsable API and /admin/.
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     # Per-view permissions decide what is public; see api/views.py. There is no

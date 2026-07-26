@@ -1,0 +1,26 @@
+name: merchant_app
+description: "Sylibooking merchant app — see today's reservations, confirm or cancel."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+  shared_preferences: ^2.3.3
+  shared_client:
+    path: ../shared_client
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  # Widget tests stub the network with http's MockClient.
+  http: ^1.2.2
+
+flutter:
+  uses-material-design: true

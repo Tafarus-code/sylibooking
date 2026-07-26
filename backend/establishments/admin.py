@@ -15,6 +15,7 @@ class EstablishmentAdmin(admin.ModelAdmin):
     list_display = ['name', 'type', 'city', 'created_at']
     list_filter = ['type', 'city']
     search_fields = ['name', 'address']
+    filter_horizontal = ['staff']
     inlines = [SpaceInline]
 
 

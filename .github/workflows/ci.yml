@@ -73,6 +73,34 @@ jobs:
         working-directory: backend
         run: python manage.py test --verbosity=2
 
+  flutter:
+    name: Flutter (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [shared_client, merchant_app]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
   test-postgres:
     name: Tests (PostgreSQL / DJANGO_ENV=production)
     runs-on: ubuntu-latest

@@ -254,6 +254,9 @@ class ReservationMerchantTests(APITestBase):
     def setUp(self):
         super().setUp()
         self.staff = User.objects.create_user('merchant', password='not-a-real-pw')
+        # Reservations are scoped to the venues a user staffs; see
+        # api/test_auth.py for the cross-establishment isolation tests.
+        self.lounge.staff.add(self.staff)
         self.reservation = self.book()
 
     def test_listing_requires_authentication(self):

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -47,6 +48,15 @@ class Establishment(models.Model):
         help_text=(
             'Free text for now, e.g. "Mon-Thu 18:00-02:00, Fri-Sun 16:00-04:00". '
             'Becomes structured data once availability logic needs to parse it.'
+        ),
+    )
+    staff = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='establishments',
+        help_text=(
+            'Users who may see and manage this establishment\'s reservations '
+            'in the merchant app.'
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)

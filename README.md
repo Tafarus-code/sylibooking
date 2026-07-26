@@ -71,12 +71,15 @@ the merchant-only endpoints at `/api-auth/login/` or `/admin/`.
 
 | Method | Endpoint | Auth | Purpose |
 | --- | --- | --- | --- |
+| `POST` | `/api/auth/login/` | public | Username + password → token |
+| `POST` | `/api/auth/logout/` | merchant | Invalidate the caller's token |
+| `GET` | `/api/auth/me/` | merchant | Who am I, and which venues do I staff |
 | `GET` | `/api/establishments/` | public | Browse; filters: `city`, `type`, `search` |
 | `GET` | `/api/establishments/{id}/` | public | Detail with its spaces |
 | `GET` | `/api/establishments/{id}/availability/` | public | Slot grid; params: `date` (required), `party_size` |
 | `POST` | `/api/reservations/` | public | Book a slot — always created `pending` |
 | `GET` | `/api/reservations/{id}/` | public | Check one booking by id |
-| `GET` | `/api/reservations/` | merchant | Filters: `establishment`, `status`, `date` |
+| `GET` | `/api/reservations/` | merchant | Filters: `establishment`, `status`, `date`, `date_from`, `date_to` |
 | `POST` | `/api/reservations/{id}/confirm/` | merchant | Accept a booking |
 | `POST` | `/api/reservations/{id}/cancel/` | merchant | Turn it down, freeing the slot |
 
@@ -104,6 +107,35 @@ and cannot be parsed. They become per-establishment once it is structured.
 
 A cancelled reservation frees its slot; pending, confirmed and completed all
 hold it.
+
+## Merchant app (Flutter)
+
+`apps/merchant_app` — sign in, see today's or the next seven days' bookings,
+confirm or cancel. `apps/shared_client` holds the API models and HTTP client
+that both apps will share.
+
+```bash
+cd backend && python manage.py runserver     # the app needs the API running
+cd apps/merchant_app && flutter run
+```
+
+The app defaults to `http://10.0.2.2:8000/api` on Android (the emulator's route
+to the host) and `http://127.0.0.1:8000/api` elsewhere. Point it somewhere else
+at build time:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.20:8000/api
+```
+
+### Giving an account access to a venue
+
+The app shows only the reservations of establishments the signed-in user staffs.
+A brand new user sees an empty list until assigned:
+
+1. `python backend/manage.py createsuperuser` (or add a normal user in `/admin/`)
+2. In `/admin/` → Establishments → pick one → add the user under **Staff**
+
+Superusers see every establishment's bookings.
 
 ## Tests and linting
 

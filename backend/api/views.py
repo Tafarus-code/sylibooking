@@ -127,6 +127,13 @@ class ReservationViewSet(
             'space', 'space__establishment'
         ).all()
 
+        # Scope to the caller's own venues. Without this, any logged-in user
+        # would see every establishment's customer names and phone numbers.
+        # retrieve stays unscoped: a customer looks up their own booking by id.
+        user = self.request.user
+        if self.action != 'retrieve' and not user.is_superuser:
+            queryset = queryset.filter(space__establishment__staff=user)
+
         establishment = self.request.query_params.get('establishment')
         if establishment:
             queryset = queryset.filter(space__establishment_id=establishment)
@@ -135,13 +142,19 @@ class ReservationViewSet(
         if status_:
             queryset = queryset.filter(status=status_)
 
-        day = self.request.query_params.get('date')
-        if day:
+        for param, lookup in [
+            ('date', 'datetime__date'),
+            ('date_from', 'datetime__date__gte'),
+            ('date_to', 'datetime__date__lte'),
+        ]:
+            raw = self.request.query_params.get(param)
+            if not raw:
+                continue
             try:
-                queryset = queryset.filter(datetime__date=date_cls.fromisoformat(day))
+                queryset = queryset.filter(**{lookup: date_cls.fromisoformat(raw)})
             except ValueError:
                 raise ValidationError(
-                    {'date': f'"{day}" is not a valid YYYY-MM-DD date.'}
+                    {param: f'"{raw}" is not a valid YYYY-MM-DD date.'}
                 ) from None
 
         return queryset

@@ -5,4 +5,5 @@
 library;
 
 export 'src/api_client.dart';
+export 'src/booking_options.dart';
 export 'src/models.dart';

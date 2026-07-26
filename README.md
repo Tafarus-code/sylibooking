@@ -108,6 +108,25 @@ and cannot be parsed. They become per-establishment once it is structured.
 A cancelled reservation frees its slot; pending, confirmed and completed all
 hold it.
 
+## Customer app (Flutter)
+
+`apps/customer_app` — browse lounges and restaurants, pick a day, party size and
+time, and reserve. Pay-on-arrival only; nothing is charged.
+
+```bash
+cd backend && python manage.py runserver
+cd apps/customer_app && flutter run
+```
+
+There are no customer accounts: a booking is a name and a phone number. The app
+remembers the ids it created on the device and re-reads them from
+`/api/reservations/{id}/` for **My bookings**, so the status stays live. Clearing
+app data loses that list — the booking itself still stands at the venue.
+
+Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
+collapses the per-space availability grid into the times that are free, choosing
+the smallest space that seats the party so a couple does not take the VIP room.
+
 ## Merchant app (Flutter)
 
 `apps/merchant_app` — sign in, see today's or the next seven days' bookings,
@@ -158,6 +177,7 @@ nothing if you run it from the repo root — `cd backend` first.
 | `lint` | `ruff check` — style, unused imports, import order, Django-specific rules |
 | `test-sqlite` | Django checks, missing-migration detection, full test suite on SQLite |
 | `test-postgres` | Same suite against PostgreSQL 16 with `DJANGO_ENV=production` |
+| `flutter` | `flutter analyze --fatal-infos` and `flutter test` for each Dart package |
 
 Running the suite on both backends means the environment split in `settings.py`
 is exercised, not just assumed, and `makemigrations --check --dry-run` fails the
@@ -183,9 +203,13 @@ requests targeting `main` or `dev` — so a branch is green before it merges.
 backend/
   config/           Django settings, urls, wsgi/asgi
   establishments/   Establishment + Space models
-  reservations/     Reservation model
+  reservations/     Reservation model + availability logic
   payments/         empty for now — Payment model comes later
-  api/              empty for now — DRF serializers/viewsets come next
+  api/              DRF serializers, viewsets, token auth
+apps/
+  shared_client/    Dart API client + models, shared by both apps
+  merchant_app/     Flutter — sign in, see bookings, confirm/cancel
+  customer_app/     Flutter — browse, pick a slot, reserve
 ```
 
 ## Current state

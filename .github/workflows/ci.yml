@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [shared_client, merchant_app]
+        package: [shared_client, merchant_app, customer_app]
     defaults:
       run:
         working-directory: apps/${{ matrix.package }}

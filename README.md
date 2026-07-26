@@ -93,6 +93,17 @@ build if a model changes without a matching migration.
 No deploy workflow yet — there is no API surface to deploy, so CD gets added
 once endpoints exist and a host is chosen.
 
+## Branching
+
+```
+feat/… fix/… chore/…   →   dev   →   main
+```
+
+New work goes on a feature branch off `dev`, then merges into `dev`. `main` only
+receives work promoted from `dev`, so it stays releasable. CI runs on pushes to
+`main`, `dev` and any `feat/**`, `fix/**` or `chore/**` branch, plus on pull
+requests targeting `main` or `dev` — so a branch is green before it merges.
+
 ## Project layout
 
 ```

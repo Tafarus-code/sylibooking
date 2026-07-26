@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # A new push to the same branch cancels the previous, still-running check.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
+  # CI never touches real secrets: the key only has to exist for settings to load.
+  SECRET_KEY: ci-secret-key-not-used-outside-github-actions
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff check
+        run: ruff check --output-format=github .
+
+  test-sqlite:
+    name: Tests (SQLite / DJANGO_ENV=local)
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_ENV: local
+      DEBUG: 'False'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system checks
+        working-directory: backend
+        run: python manage.py check
+
+      - name: Fail if a model change has no migration
+        working-directory: backend
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests
+        working-directory: backend
+        run: python manage.py test --verbosity=2
+
+  test-postgres:
+    name: Tests (PostgreSQL / DJANGO_ENV=production)
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_ENV: production
+      DEBUG: 'False'
+      DB_NAME: sylibooking_test
+      DB_USER: sylibooking
+      DB_PASSWORD: sylibooking
+      DB_HOST: localhost
+      DB_PORT: '5432'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sylibooking_test
+          POSTGRES_USER: sylibooking
+          POSTGRES_PASSWORD: sylibooking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system checks
+        working-directory: backend
+        run: python manage.py check
+
+      - name: Verify migrations apply cleanly to a fresh database
+        working-directory: backend
+        run: python manage.py migrate
+
+      - name: Run tests
+        working-directory: backend
+        run: python manage.py test --verbosity=2

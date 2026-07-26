@@ -247,6 +247,13 @@ class SylibookingApi {
     return all;
   }
 
+  /// One booking by id. Public, so a customer with no account can check the
+  /// status of something they booked.
+  Future<Reservation> reservation(int id) async {
+    final json = await _get('/reservations/$id/');
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<Reservation> createReservation({
     required int spaceId,
     required String customerName,

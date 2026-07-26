@@ -156,3 +156,38 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Django REST Framework
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    # Per-view permissions decide what is public; see api/views.py. There is no
+    # customer/merchant user model yet, so "authenticated" currently means an
+    # admin logged in through /admin/ or the browsable API.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+}
+
+
+# Booking rules
+#
+# Reservation has no duration field: every booking is assumed to run for
+# RESERVATION_DURATION_MINUTES, which is what makes two bookings on one space
+# "overlap". Availability is offered on a fixed grid inside a fixed daily
+# window because Establishment.opening_hours is still free text and cannot be
+# parsed — once it becomes structured, these three become per-establishment.
+
+RESERVATION_DURATION_MINUTES = 120
+AVAILABILITY_SLOT_MINUTES = 30
+AVAILABILITY_WINDOW_START = '12:00'
+AVAILABILITY_WINDOW_END = '23:00'

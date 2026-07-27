@@ -41,6 +41,26 @@ python -c "from django.core.management.utils import get_random_secret_key as k; 
 | `SECRET_KEY` | — | Required in both environments |
 | `DEBUG` | `False` | Set `True` locally |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated |
+| `CORS_ALLOWED_ORIGINS` | empty | Production only, comma-separated. See below |
+
+### CORS (browser builds only)
+
+Running either app in Chrome makes every API call cross-origin, and the browser
+blocks it unless Django says otherwise:
+
+```
+Access to fetch at 'http://127.0.0.1:8000/api/auth/login/' from origin
+'http://localhost:58966' has been blocked by CORS policy
+```
+
+Locally this is handled for you — `DJANGO_ENV=local` allows any origin, because
+`flutter run -d chrome` serves from a new random port on every run. Android and
+iOS are not affected at all.
+
+In production the allowlist is explicit and fails closed: set
+`CORS_ALLOWED_ORIGINS=https://app.sylibooking.com` (comma-separated for several).
+Leaving it unset means no browser origin is permitted, which is the right
+default for an API serving only mobile builds.
 
 ## Switching to PostgreSQL
 

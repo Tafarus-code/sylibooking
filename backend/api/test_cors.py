@@ -13,7 +13,14 @@ from django.urls import reverse
 FLUTTER_ORIGIN = 'http://localhost:58966'
 
 
+@override_settings(CORS_ALLOW_ALL_ORIGINS=True, CORS_ALLOWED_ORIGINS=[])
 class CorsPreflightTests(TestCase):
+    """The development posture, pinned.
+
+    These must not read whichever DJANGO_ENV the suite happens to run under —
+    CI runs it twice, once as local and once as production.
+    """
+
     def preflight(self, path, origin=FLUTTER_ORIGIN, method='POST'):
         return self.client.options(
             path,

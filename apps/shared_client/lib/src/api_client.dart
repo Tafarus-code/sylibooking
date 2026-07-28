@@ -314,6 +314,90 @@ class SylibookingApi {
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 
+  // --- Reviews and photos -------------------------------------------------
+
+  Future<Page<Review>> reviews(int establishmentId, {int? page}) async {
+    final json = await _get('/establishments/$establishmentId/reviews/', {
+      if (page != null) 'page': '$page',
+    });
+    return Page.fromJson(json as Map<String, dynamic>, Review.fromJson);
+  }
+
+  /// Leave a review for a completed visit.
+  ///
+  /// [reservationReference] is the credential: customers have no accounts, so
+  /// holding the reference is what proves the visit happened. The server
+  /// rejects anything not completed, not at this venue, or already reviewed.
+  Future<Review> createReview({
+    required int establishmentId,
+    required String reservationReference,
+    required int rating,
+    String comment = '',
+  }) async {
+    final json = await _post('/establishments/$establishmentId/reviews/', {
+      'reservation_reference': reservationReference,
+      'rating': rating,
+      'comment': comment,
+    });
+    return Review.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Page<Photo>> photos(int establishmentId, {int? page}) async {
+    final json = await _get('/establishments/$establishmentId/photos/', {
+      if (page != null) 'page': '$page',
+    });
+    return Page.fromJson(json as Map<String, dynamic>, Photo.fromJson);
+  }
+
+  /// Upload a photo.
+  ///
+  /// Pass [reservationReference] as a customer, or authenticate as staff of
+  /// the establishment. [bytes] and [filename] come from the image picker.
+  Future<Photo> uploadPhoto({
+    required int establishmentId,
+    required List<int> bytes,
+    required String filename,
+    String? reservationReference,
+    String caption = '',
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      _uri('/establishments/$establishmentId/photos/'),
+    );
+    if (isAuthenticated) {
+      request.headers['Authorization'] = 'Token $token';
+    }
+    if (reservationReference != null) {
+      request.fields['reservation_reference'] = reservationReference;
+    }
+    if (caption.isNotEmpty) request.fields['caption'] = caption;
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: filename),
+    );
+
+    final json = await _send(() async {
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    });
+    return Photo.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant dashboard -------------------------------------------------
+
+  /// Takings, outstanding money, and bookings worth chasing.
+  ///
+  /// Defaults to the last 30 days server-side. Scoped to the caller's venues.
+  Future<PaymentDashboard> paymentDashboard({
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final json = await _get('/dashboard/payments/', {
+      if (from != null) 'date_from': formatDate(from),
+      if (to != null) 'date_to': formatDate(to),
+    });
+    return PaymentDashboard.fromJson(json as Map<String, dynamic>);
+  }
+
   void close() => _http.close();
 }
 

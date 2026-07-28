@@ -7,6 +7,7 @@ from .customer_views import (
     PaymentStatusView,
     ReservationByReferenceView,
 )
+from .dashboard import PaymentDashboardView
 from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
 
@@ -34,6 +35,11 @@ urlpatterns = [
         'reservations/ref/<uuid:reference>/payment/',
         PaymentStatusView.as_view(),
         name='reservation-payment-status',
+    ),
+    path(
+        'dashboard/payments/',
+        PaymentDashboardView.as_view(),
+        name='payment-dashboard',
     ),
     # Before the router, so these are not taken for viewset detail routes.
     path(

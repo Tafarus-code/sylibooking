@@ -238,6 +238,24 @@ Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
 collapses the per-space availability grid into the times that are free, choosing
 the smallest space that seats the party so a couple does not take the VIP room.
 
+## Merchant payments dashboard
+
+`GET /api/dashboard/payments/?date_from=&date_to=` — scoped to the caller's own
+venues, defaulting to the last 30 days. It answers the three questions a venue
+owner actually asks at the end of a shift: what did I take, what is still owed,
+and who do I chase.
+
+Two details worth knowing:
+
+- **Cash is counted but carries no figure.** Cash bookings write no `Payment`
+  row, so their count comes from reservations with no payment attached —
+  otherwise the busiest column on the dashboard would simply be missing. The
+  money column reads "at the till", because it never passes through us.
+- **"Needs chasing" ignores the reporting window.** A booking next month whose
+  payment failed is the one worth acting on today, so it appears regardless of
+  the dates selected. It lists only *upcoming*, still-pending bookings — chasing
+  money for a night that already passed is pointless.
+
 ## Merchant app (Flutter)
 
 `apps/merchant_app` — sign in, see today's or the next seven days' bookings,

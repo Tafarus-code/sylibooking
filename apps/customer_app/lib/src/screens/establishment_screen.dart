@@ -5,6 +5,9 @@ import 'package:shared_client/shared_client.dart';
 import '../booking_store.dart';
 import '../widgets/hours_section.dart';
 import '../widgets/menu_section.dart';
+import '../widgets/photos_section.dart';
+import '../widgets/rating_stars.dart';
+import '../widgets/reviews_section.dart';
 import 'booking_form_screen.dart';
 
 /// Pick a day, a party size, and a time.
@@ -36,12 +39,37 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
   bool _loading = true;
   String? _error;
 
+  List<Review> _reviews = const [];
+  List<Photo> _photos = const [];
+  bool _loadingExtras = true;
+
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _day = DateTime(now.year, now.month, now.day);
     _load();
+    _loadExtras();
+  }
+
+  /// Reviews and photos load alongside availability rather than blocking it:
+  /// a customer is here to book, and the social proof can arrive a moment
+  /// later without holding up the times.
+  Future<void> _loadExtras() async {
+    try {
+      final reviews = await widget.api.reviews(widget.establishment.id);
+      final photos = await widget.api.photos(widget.establishment.id);
+      if (!mounted) return;
+      setState(() {
+        _reviews = reviews.results;
+        _photos = photos.results;
+        _loadingExtras = false;
+      });
+    } on ApiException {
+      if (mounted) setState(() => _loadingExtras = false);
+    } on ApiUnreachableException {
+      if (mounted) setState(() => _loadingExtras = false);
+    }
   }
 
   Future<void> _load() async {
@@ -119,6 +147,10 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                     '${establishment.typeDisplay} · ${establishment.city}',
                     style: theme.textTheme.bodyLarge,
                   ),
+                  if (establishment.averageRating case final average?) ...[
+                    const SizedBox(height: 6),
+                    RatingStars(rating: average, size: 18),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     establishment.address,
@@ -140,10 +172,20 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                 ],
               ),
             ),
+            if (_photos.isNotEmpty || _loadingExtras) ...[
+              const SizedBox(height: 16),
+              PhotosSection(photos: _photos, loading: _loadingExtras),
+            ],
             if (establishment.hasMenu) ...[
               const Divider(height: 32),
               MenuSection(menu: establishment.menu),
             ],
+            const Divider(height: 32),
+            ReviewsSection(
+              establishment: establishment,
+              reviews: _reviews,
+              loading: _loadingExtras,
+            ),
             const Divider(height: 32),
             _SectionLabel('Party size'),
             _PartySizePicker(

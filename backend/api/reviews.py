@@ -221,7 +221,7 @@ class EstablishmentReviewsView(APIView):
         queryset = (
             Review.objects.filter(establishment=establishment, is_hidden=False)
             .select_related('reservation')
-            .order_by('-created_at')
+            .order_by('-created_at', '-id')
         )
 
         paginator = _Pagination()
@@ -254,7 +254,7 @@ class EstablishmentPhotosView(APIView):
         establishment = self.get_establishment(pk)
         queryset = Photo.objects.filter(
             establishment=establishment, is_hidden=False
-        ).order_by('-created_at')
+        ).order_by('-created_at', '-id')
 
         paginator = _Pagination()
         page = paginator.paginate_queryset(queryset, request, view=self)

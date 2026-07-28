@@ -140,6 +140,7 @@ class Reservation {
     required this.status,
     required this.statusDisplay,
     this.canCancel = false,
+    this.payment,
   });
 
   final int id;
@@ -165,6 +166,9 @@ class Reservation {
   /// — a booking that has started or already happened is the venue's to undo.
   final bool canCancel;
 
+  /// The most recent payment, or null for a cash-on-arrival booking.
+  final Payment? payment;
+
   factory Reservation.fromJson(Map<String, dynamic> json) => Reservation(
         id: json['id'] as int,
         reference: json['reference'] as String? ?? '',
@@ -179,6 +183,115 @@ class Reservation {
         status: ReservationStatus.parse(json['status'] as String?),
         statusDisplay: json['status_display'] as String? ?? '',
         canCancel: json['can_cancel'] as bool? ?? false,
+        payment: json['payment'] == null
+            ? null
+            : Payment.fromJson(json['payment'] as Map<String, dynamic>),
+      );
+}
+
+/// How a booking is being paid for. Mirrors `Payment.Provider`.
+enum PaymentProvider {
+  cashOnArrival,
+  orangeMoney,
+  mtnMoney,
+  unknown;
+
+  static PaymentProvider parse(String? value) => switch (value) {
+        'cash_on_arrival' => PaymentProvider.cashOnArrival,
+        'orange_money' => PaymentProvider.orangeMoney,
+        'mtn_money' => PaymentProvider.mtnMoney,
+        _ => PaymentProvider.unknown,
+      };
+
+  String get wireValue => switch (this) {
+        PaymentProvider.cashOnArrival => 'cash_on_arrival',
+        PaymentProvider.orangeMoney => 'orange_money',
+        PaymentProvider.mtnMoney => 'mtn_money',
+        PaymentProvider.unknown => '',
+      };
+
+  /// Settled through an external provider rather than in person, which is what
+  /// makes a booking confirm on payment instead of waiting for the merchant.
+  bool get isMobileMoney =>
+      this == PaymentProvider.orangeMoney || this == PaymentProvider.mtnMoney;
+}
+
+/// Mirrors `Payment.Status`.
+enum PaymentStatus {
+  pending,
+  completed,
+  failed,
+  unknown;
+
+  static PaymentStatus parse(String? value) => switch (value) {
+        'pending' => PaymentStatus.pending,
+        'completed' => PaymentStatus.completed,
+        'failed' => PaymentStatus.failed,
+        _ => PaymentStatus.unknown,
+      };
+
+  /// Still moving — worth polling again.
+  bool get isSettled =>
+      this == PaymentStatus.completed || this == PaymentStatus.failed;
+}
+
+class Payment {
+  const Payment({
+    required this.id,
+    required this.provider,
+    required this.providerDisplay,
+    required this.amount,
+    required this.status,
+    required this.statusDisplay,
+    this.providerReference,
+  });
+
+  final int id;
+  final PaymentProvider provider;
+  final String providerDisplay;
+
+  /// Guinean francs. Set server-side — the client never chooses what it owes.
+  final String amount;
+  final PaymentStatus status;
+  final String statusDisplay;
+  final String? providerReference;
+
+  factory Payment.fromJson(Map<String, dynamic> json) => Payment(
+        id: json['id'] as int,
+        provider: PaymentProvider.parse(json['provider'] as String?),
+        providerDisplay: json['provider_display'] as String? ?? '',
+        amount: '${json['amount'] ?? ''}',
+        status: PaymentStatus.parse(json['status'] as String?),
+        statusDisplay: json['status_display'] as String? ?? '',
+        providerReference: json['provider_reference'] as String?,
+      );
+}
+
+/// What the payment-status endpoint returns: the booking and its payment,
+/// both after the server has polled the provider.
+class PaymentStatusResult {
+  const PaymentStatusResult({
+    required this.reservation,
+    this.payment,
+    this.detail,
+  });
+
+  final Reservation reservation;
+
+  /// Null for a cash-on-arrival booking, which has nothing to settle.
+  final Payment? payment;
+  final String? detail;
+
+  bool get isPaid => payment?.status == PaymentStatus.completed;
+
+  factory PaymentStatusResult.fromJson(Map<String, dynamic> json) =>
+      PaymentStatusResult(
+        reservation:
+            Reservation.fromJson(json['reservation'] as Map<String, dynamic>),
+        payment: json['payment'] == null
+            ? null
+            : Payment.fromJson(json['payment'] as Map<String, dynamic>),
+        detail: json['detail'] as String?,
       );
 }
 

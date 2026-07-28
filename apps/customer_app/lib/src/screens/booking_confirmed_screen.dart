@@ -1,21 +1,128 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
-/// The receipt. Deliberately explicit that the venue still has to confirm.
-class BookingConfirmedScreen extends StatelessWidget {
+/// The receipt.
+///
+/// A cash booking is a request the venue still has to accept. A booking paid
+/// by mobile money is already confirmed — unless the payment has not settled
+/// yet, in which case this screen polls until it does.
+class BookingConfirmedScreen extends StatefulWidget {
   const BookingConfirmedScreen({
     super.key,
+    required this.api,
     required this.reservation,
     required this.establishment,
   });
 
+  final SylibookingApi api;
   final Reservation reservation;
   final Establishment establishment;
 
   @override
+  State<BookingConfirmedScreen> createState() => _BookingConfirmedScreenState();
+}
+
+class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
+  static const _pollInterval = Duration(seconds: 3);
+  static const _maxPolls = 10;
+
+  late Reservation _reservation = widget.reservation;
+  Payment? _payment;
+  Timer? _poll;
+  int _polls = 0;
+  bool _gaveUp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _payment = widget.reservation.payment;
+    if (_needsPolling) _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  /// Only a mobile money payment that has not settled is worth waiting on.
+  bool get _needsPolling {
+    final payment = _payment;
+    return payment != null && !payment.status.isSettled;
+  }
+
+  void _startPolling() {
+    _poll = Timer.periodic(_pollInterval, (_) async {
+      if (!mounted) return;
+      if (_polls >= _maxPolls) {
+        // Stop pestering the server; the booking still exists and My bookings
+        // will show the outcome whenever the customer next looks.
+        _poll?.cancel();
+        if (mounted) setState(() => _gaveUp = true);
+        return;
+      }
+      _polls++;
+
+      try {
+        final result =
+            await widget.api.paymentStatus(widget.reservation.reference);
+        if (!mounted) return;
+        setState(() {
+          _reservation = result.reservation;
+          _payment = result.payment;
+        });
+        if (!_needsPolling) _poll?.cancel();
+      } on ApiException {
+        // Transient; the next tick tries again.
+      } on ApiUnreachableException {
+        // Same.
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final payment = _payment;
+    final failed = payment?.status == PaymentStatus.failed;
+    final settling = _needsPolling && !_gaveUp;
+
+    final (icon, colour, headline, blurb) = switch (payment?.status) {
+      null => (
+          Icons.check_circle,
+          theme.colorScheme.primary,
+          'Request sent',
+          '${widget.establishment.name} will confirm shortly. '
+              'They may call ${_reservation.customerPhone}.',
+        ),
+      PaymentStatus.completed => (
+          Icons.check_circle,
+          theme.colorScheme.primary,
+          'Table confirmed',
+          'Paid and confirmed at ${widget.establishment.name}. '
+              'Show this reference when you arrive.',
+        ),
+      PaymentStatus.failed => (
+          Icons.error_outline,
+          theme.colorScheme.error,
+          'Payment did not go through',
+          'Your table is still held as a request. '
+              '${widget.establishment.name} will confirm it, or you can pay '
+              'on arrival.',
+        ),
+      _ => (
+          Icons.hourglass_top,
+          theme.colorScheme.tertiary,
+          _gaveUp ? 'Still waiting on payment' : 'Waiting for payment',
+          _gaveUp
+              ? 'It has not come through yet. Check My bookings in a moment — '
+                  'the table is held either way.'
+              : 'Approve the payment on your phone. This updates by itself.',
+        ),
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -26,21 +133,25 @@ class BookingConfirmedScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 16),
-          Icon(
-            Icons.check_circle,
-            size: 72,
-            color: theme.colorScheme.primary,
-          ),
+          if (settling)
+            const Center(
+              child: SizedBox(
+                height: 72,
+                width: 72,
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else
+            Icon(icon, size: 72, color: colour),
           const SizedBox(height: 16),
           Text(
-            'Request sent',
+            headline,
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            '${establishment.name} will confirm shortly. '
-            'They may call ${reservation.customerPhone}.',
+            blurb,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -58,7 +169,7 @@ class BookingConfirmedScreen extends StatelessWidget {
                     children: [
                       Text('Booking', style: theme.textTheme.labelLarge),
                       Text(
-                        '#${reservation.id}',
+                        '#${_reservation.id}',
                         style: theme.textTheme.labelLarge,
                       ),
                     ],
@@ -66,20 +177,26 @@ class BookingConfirmedScreen extends StatelessWidget {
                   const Divider(height: 24),
                   _Row(
                     'When',
-                    '${DateFormat.yMMMEd().format(reservation.dateTime)} · '
-                        '${DateFormat.Hm().format(reservation.dateTime)}',
+                    '${DateFormat.yMMMEd().format(_reservation.dateTime)} · '
+                        '${DateFormat.Hm().format(_reservation.dateTime)}',
                   ),
-                  _Row('Party', '${reservation.partySize}'),
-                  _Row('Space', reservation.spaceName),
-                  _Row('Name', reservation.customerName),
-                  _Row('Status', reservation.statusDisplay),
-                  if (reservation.reference.isNotEmpty)
+                  _Row('Party', '${_reservation.partySize}'),
+                  _Row('Space', _reservation.spaceName),
+                  _Row('Name', _reservation.customerName),
+                  _Row('Status', _reservation.statusDisplay),
+                  if (_reservation.reference.isNotEmpty)
                     _Row(
                       'Reference',
                       // Short enough to read down the phone, and the venue can
                       // find the booking from it in the admin.
-                      reservation.reference.split('-').first.toUpperCase(),
+                      _reservation.reference.split('-').first.toUpperCase(),
                     ),
+                  if (payment != null) ...[
+                    const Divider(height: 24),
+                    _Row('Paid with', payment.providerDisplay),
+                    _Row('Amount', '${payment.amount} GNF'),
+                    _Row('Payment', payment.statusDisplay),
+                  ],
                 ],
               ),
             ),
@@ -88,14 +205,27 @@ class BookingConfirmedScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
+              color: failed
+                  ? theme.colorScheme.errorContainer
+                  : theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.payments_outlined, size: 20),
-                SizedBox(width: 8),
-                Expanded(child: Text('Pay on arrival.')),
+                const Icon(Icons.payments_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    switch (payment?.status) {
+                      null => 'Pay on arrival.',
+                      PaymentStatus.completed =>
+                        'Deposit paid. Settle the rest at the venue.',
+                      PaymentStatus.failed =>
+                        'Nothing was charged. Pay on arrival instead.',
+                      _ => 'Waiting for the payment to clear.',
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -129,7 +259,7 @@ class _Row extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 72,
+            width: 84,
             child: Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(

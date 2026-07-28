@@ -270,12 +270,19 @@ class SylibookingApi {
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Book a slot.
+  ///
+  /// [paymentProvider] defaults to cash on arrival, which leaves the booking
+  /// pending for the merchant to confirm. A mobile money provider opens a
+  /// payment; the booking confirms only once that payment completes. The
+  /// amount is decided by the server — it is deliberately not a parameter.
   Future<Reservation> createReservation({
     required int spaceId,
     required String customerName,
     required String customerPhone,
     required DateTime when,
     required int partySize,
+    PaymentProvider paymentProvider = PaymentProvider.cashOnArrival,
   }) async {
     final json = await _post('/reservations/', {
       'space': spaceId,
@@ -283,8 +290,18 @@ class SylibookingApi {
       'customer_phone': customerPhone,
       'datetime': when.toUtc().toIso8601String(),
       'party_size': partySize,
+      'payment_provider': paymentProvider.wireValue,
     });
     return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Ask where a booking's payment stands.
+  ///
+  /// The server polls the provider and applies the result, so a payment that
+  /// settled since the last call confirms the booking here.
+  Future<PaymentStatusResult> paymentStatus(String reference) async {
+    final json = await _get('/reservations/ref/$reference/payment/');
+    return PaymentStatusResult.fromJson(json as Map<String, dynamic>);
   }
 
   Future<Reservation> confirmReservation(int id) async {

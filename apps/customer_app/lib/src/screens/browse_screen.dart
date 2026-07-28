@@ -132,28 +132,33 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   ),
                 ),
               ),
+              // Scrolls rather than centring: three chips do not fit across a
+              // 360dp phone, which is most of the market here.
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (final entry in [
-                      (null, 'All'),
-                      (EstablishmentType.lounge, 'Lounges'),
-                      (EstablishmentType.restaurant, 'Restaurants'),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: FilterChip(
-                          label: Text(entry.$2),
-                          selected: _typeFilter == entry.$1,
-                          onSelected: (_) {
-                            setState(() => _typeFilter = entry.$1);
-                            _load();
-                          },
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: [
+                      for (final entry in [
+                        (null, 'All'),
+                        (EstablishmentType.lounge, 'Lounges'),
+                        (EstablishmentType.restaurant, 'Restaurants'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: FilterChip(
+                            label: Text(entry.$2),
+                            selected: _typeFilter == entry.$1,
+                            onSelected: (_) {
+                              setState(() => _typeFilter = entry.$1);
+                              _load();
+                            },
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

@@ -33,6 +33,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
   bool _submitting = false;
   String? _error;
+  PaymentProvider _paymentProvider = PaymentProvider.cashOnArrival;
 
   @override
   void initState() {
@@ -71,6 +72,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
         customerPhone: _phone.text.trim(),
         when: widget.option.start,
         partySize: widget.partySize,
+        paymentProvider: _paymentProvider,
       );
 
       await widget.store.remember(reservation.reference);
@@ -80,6 +82,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => BookingConfirmedScreen(
+            api: widget.api,
             reservation: reservation,
             establishment: widget.establishment,
           ),
@@ -211,22 +214,62 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
+            const SizedBox(height: 24),
+            Text('How would you like to pay?',
+                style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            RadioGroup<PaymentProvider>(
+              groupValue: _paymentProvider,
+              onChanged: (value) {
+                // RadioGroup requires a handler, so ignore taps mid-submit
+                // rather than passing null.
+                if (_submitting) return;
+                setState(
+                  () =>
+                      _paymentProvider = value ?? PaymentProvider.cashOnArrival,
+                );
+              },
+              child: Column(
                 children: [
-                  const Icon(Icons.payments_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Pay on arrival. Nothing is charged now.',
+                  for (final choice in const [
+                    (
+                      PaymentProvider.cashOnArrival,
+                      'Pay on arrival',
+                      'Nothing is charged now. The venue confirms your table.',
+                      Icons.storefront,
                     ),
-                  ),
+                    (
+                      PaymentProvider.orangeMoney,
+                      'Orange Money',
+                      'Pay a deposit now — your table is confirmed straight '
+                          'away.',
+                      Icons.account_balance_wallet_outlined,
+                    ),
+                    (
+                      PaymentProvider.mtnMoney,
+                      'MTN Mobile Money',
+                      'Pay a deposit now — your table is confirmed straight '
+                          'away.',
+                      Icons.account_balance_wallet_outlined,
+                    ),
+                  ])
+                    RadioListTile<PaymentProvider>(
+                      value: choice.$1,
+                      title: Row(
+                        children: [
+                          Icon(choice.$4, size: 18),
+                          const SizedBox(width: 8),
+                          // Expanded so "MTN Mobile Money" still fits beside
+                          // the radio on a 360dp screen.
+                          Expanded(child: Text(choice.$2)),
+                        ],
+                      ),
+                      subtitle: Text(
+                        choice.$3,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                 ],
               ),
             ),
@@ -242,7 +285,11 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Reserve'),
+                  : Text(
+                      _paymentProvider.isMobileMoney
+                          ? 'Pay and reserve'
+                          : 'Reserve',
+                    ),
             ),
           ],
         ),

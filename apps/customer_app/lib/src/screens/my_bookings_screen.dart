@@ -232,6 +232,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                             '${reservation.partySize == 1 ? "guest" : "guests"}',
                             style: theme.textTheme.bodySmall,
                           ),
+                          if (reservation.payment case final payment?)
+                            Text(
+                              switch (payment.status) {
+                                PaymentStatus.completed =>
+                                  '${payment.providerDisplay} · '
+                                      '${payment.amount} GNF paid',
+                                PaymentStatus.failed =>
+                                  '${payment.providerDisplay} · payment failed',
+                                _ => '${payment.providerDisplay} · '
+                                    'payment pending',
+                              },
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: payment.status == PaymentStatus.failed
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                         ],
                       ),
                     ),

@@ -3,8 +3,34 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from establishments.models import Establishment, Space
+from payments.models import Payment
 from reservations.availability import is_space_available
 from reservations.models import Reservation
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Read-only view of a payment. Nothing here is client-settable."""
+
+    provider_display = serializers.CharField(
+        source='get_provider_display', read_only=True
+    )
+    status_display = serializers.CharField(
+        source='get_status_display', read_only=True
+    )
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id',
+            'provider',
+            'provider_display',
+            'amount',
+            'status',
+            'status_display',
+            'provider_reference',
+            'created_at',
+        ]
+        read_only_fields = fields
 
 
 class SpaceSerializer(serializers.ModelSerializer):
@@ -85,6 +111,26 @@ class ReservationSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     can_cancel = serializers.SerializerMethodField()
 
+    # How the customer intends to pay. Write-only: the resulting Payment is
+    # reported back through `payment`, not by echoing the request.
+    payment_provider = serializers.ChoiceField(
+        choices=Payment.Provider.choices,
+        write_only=True,
+        required=False,
+        default=Payment.Provider.CASH_ON_ARRIVAL,
+        help_text=(
+            'cash_on_arrival (the default) books exactly as before. A mobile '
+            'money provider opens a payment, and the booking is confirmed only '
+            'once that payment completes.'
+        ),
+    )
+    payment = serializers.SerializerMethodField()
+
+    def get_payment(self, reservation):
+        """The most recent payment, or null for cash on arrival."""
+        payment = reservation.payments.order_by('-created_at').first()
+        return None if payment is None else PaymentSerializer(payment).data
+
     def get_can_cancel(self, reservation):
         """Whether the customer may still cancel this themselves.
 
@@ -112,6 +158,8 @@ class ReservationSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
             'can_cancel',
+            'payment_provider',
+            'payment',
             'created_at',
         ]
         read_only_fields = ['status', 'reference', 'created_at']

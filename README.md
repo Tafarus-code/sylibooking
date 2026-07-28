@@ -99,6 +99,7 @@ the merchant-only endpoints at `/api-auth/login/` or `/admin/`.
 | `GET` | `/api/establishments/{id}/availability/` | public | Slot grid; params: `date` (required), `party_size` |
 | `POST` | `/api/reservations/` | public | Book a slot — always created `pending` |
 | `GET` | `/api/reservations/ref/{reference}/` | reference | The customer's own booking |
+| `GET` | `/api/reservations/ref/{reference}/payment/` | reference | Poll the provider; confirms the booking when paid |
 | `POST` | `/api/reservations/ref/{reference}/cancel/` | reference | Customer cancels, freeing the slot |
 | `GET` | `/api/reservations/{id}/` | merchant | Scoped to the caller's venues |
 | `GET` | `/api/reservations/` | merchant | Filters: `establishment`, `status`, `date`, `date_from`, `date_to` |
@@ -189,6 +190,40 @@ A brand new user sees an empty list until assigned:
 2. In `/admin/` → Establishments → pick one → add the user under **Staff**
 
 Superusers see every establishment's bookings.
+
+## Payments
+
+`POST /api/reservations/` takes an optional `payment_provider`:
+
+| Value | What happens |
+| --- | --- |
+| `cash_on_arrival` (default) | Exactly as before — no Payment row, booking stays `pending` for the merchant to confirm by hand |
+| `orange_money` / `mtn_money` | A Payment is opened and the provider called; the booking becomes `confirmed` **only** once that payment completes |
+
+Nothing talks to a real provider yet. Every provider resolves to
+`MockPaymentProvider`, which always succeeds immediately:
+
+```python
+PAYMENT_PROVIDERS = {
+    'orange_money': 'payments.providers.MockPaymentProvider',
+    'mtn_money': 'payments.providers.MockPaymentProvider',
+}
+```
+
+Real Orange Money / MTN adapters implement the same two-method
+`PaymentProvider` interface — `initiate_payment` and `check_status` — so
+switching one on is a change to that setting, not to the reservation flow.
+
+The amount is `RESERVATION_DEPOSIT_AMOUNT` (default 50 000 GNF, overridable via
+`.env`). It is read server-side: a client sending `amount` in the request body
+is ignored, since nothing may choose what it owes. One global figure for now —
+per-establishment pricing belongs on `Establishment` later.
+
+A payment that fails, or a provider that cannot be reached, leaves the booking
+`pending` rather than losing it. `GET .../payment/` polls the provider and
+applies the result, which is how the app learns a payment settled after the
+customer approved it on their handset. A completed payment never reinstates a
+booking that was cancelled in the meantime.
 
 ## Tests and linting
 

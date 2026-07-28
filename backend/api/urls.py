@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .auth import LoginView, LogoutView, MeView
 from .customer_views import (
     CancelReservationByReferenceView,
+    PaymentStatusView,
     ReservationByReferenceView,
 )
 from .views import EstablishmentViewSet, ReservationViewSet
@@ -27,6 +28,11 @@ urlpatterns = [
         'reservations/ref/<uuid:reference>/cancel/',
         CancelReservationByReferenceView.as_view(),
         name='reservation-cancel-by-reference',
+    ),
+    path(
+        'reservations/ref/<uuid:reference>/payment/',
+        PaymentStatusView.as_view(),
+        name='reservation-payment-status',
     ),
     path('', include(router.urls)),
 ]

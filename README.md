@@ -152,6 +152,11 @@ Reservations are *not* reachable by their sequential id without merchant
 credentials. They were once, which meant counting `1, 2, 3…` returned other
 people's names and phone numbers.
 
+At the booking step the customer picks pay-on-arrival (the default) or a mobile
+money provider. Paying confirms the table immediately; the confirmation screen
+polls until the payment settles and says plainly when nothing was charged. See
+[Payments](#payments) for what the server does with that choice.
+
 Customers can cancel a booking that has not started yet; the slot goes straight
 back on sale. Once it has started — or the visit is marked completed — the
 server refuses and the app says to call the venue instead, rather than letting

@@ -116,6 +116,7 @@ Map<String, dynamic> reservationJson({
   String status = 'pending',
   String customer = 'Mariama Diallo',
   bool canCancel = true,
+  Map<String, dynamic>? payment,
 }) {
   final now = DateTime.now();
   return {
@@ -133,13 +134,39 @@ Map<String, dynamic> reservationJson({
     'status': status,
     'status_display': status[0].toUpperCase() + status.substring(1),
     'can_cancel': canCancel,
+    'payment': payment,
   };
 }
 
-({Widget app, FakeBackend backend, InMemoryBookingStore store}) buildApp({
+Map<String, dynamic> paymentJson({
+  String provider = 'orange_money',
+  String status = 'completed',
+  String amount = '50000.00',
+}) =>
+    {
+      'id': 1,
+      'provider': provider,
+      'provider_display':
+          provider == 'orange_money' ? 'Orange Money' : 'MTN Mobile Money',
+      'amount': amount,
+      'status': status,
+      'status_display': status[0].toUpperCase() + status.substring(1),
+      'provider_reference': 'MOCK-ABC123',
+      'created_at': '2026-08-01T18:00:00Z',
+    };
+
+({Widget app, FakeBackend backend, InMemoryBookingStore store}) buildApp(
+  WidgetTester tester, {
   List<String>? bookingReferences,
   ({String name, String phone})? customer,
 }) {
+  // The default 800x600 test surface is shorter than any phone, which pushes
+  // the bottom of the booking form out of the tree entirely. Use a realistic
+  // 360x900 instead so what a customer can reach, the tests can reach.
+  tester.view.physicalSize = const Size(1080, 2700);
+  tester.view.devicePixelRatio = 3.0;
+  addTearDown(tester.view.reset);
+
   final backend = FakeBackend();
   final store = InMemoryBookingStore(
     references: bookingReferences,
@@ -161,7 +188,7 @@ Map<String, dynamic> reservationJson({
 void main() {
   group('browse', () {
     testWidgets('lists establishments', (tester) async {
-      final (:app, :backend, :store) = buildApp();
+      final (:app, :backend, :store) = buildApp(tester);
       backend.on('GET', '/api/establishments/', {
         'count': 2,
         'next': null,
@@ -185,7 +212,7 @@ void main() {
     });
 
     testWidgets('shows an empty state when nothing matches', (tester) async {
-      final (:app, :backend, :store) = buildApp();
+      final (:app, :backend, :store) = buildApp(tester);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -199,7 +226,7 @@ void main() {
     });
 
     testWidgets('filtering by type queries the API', (tester) async {
-      final (:app, :backend, :store) = buildApp();
+      final (:app, :backend, :store) = buildApp(tester);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -216,7 +243,7 @@ void main() {
     });
 
     testWidgets('an unreachable API offers a retry', (tester) async {
-      final (:app, :backend, :store) = buildApp();
+      final (:app, :backend, :store) = buildApp(tester);
       // No route registered -> 404 from the fake.
 
       await tester.pumpWidget(app);
@@ -232,7 +259,7 @@ void main() {
       WidgetTester tester, {
       Map<String, dynamic>? availability,
     }) async {
-      final (:app, :backend, :store) = buildApp();
+      final (:app, :backend, :store) = buildApp(tester);
       backend.on('GET', '/api/establishments/', {
         'count': 1,
         'next': null,
@@ -292,7 +319,7 @@ void main() {
       WidgetTester tester, {
       ({String name, String phone})? customer,
     }) async {
-      final (:app, :backend, :store) = buildApp(customer: customer);
+      final (:app, :backend, :store) = buildApp(tester, customer: customer);
       backend.on('GET', '/api/establishments/', {
         'count': 1,
         'next': null,
@@ -320,10 +347,9 @@ void main() {
       expect(find.text('Confirm booking'), findsOneWidget);
       expect(find.text('Table 4 (Table)'), findsOneWidget);
       expect(find.text('2 guests'), findsOneWidget);
-      expect(
-        find.text('Pay on arrival. Nothing is charged now.'),
-        findsOneWidget,
-      );
+      // Payment choice replaced the old fixed "pay on arrival" banner.
+      expect(find.text('How would you like to pay?'), findsOneWidget);
+      expect(find.text('Pay on arrival'), findsOneWidget);
     });
 
     testWidgets('name and phone are required', (tester) async {
@@ -434,8 +460,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('already booked'), findsOneWidget);
-      // Still on the form, so the customer can pick again.
-      expect(find.text('Reserve'), findsOneWidget);
+      // Still on the form, so the customer can pick again. Assert on the app
+      // bar rather than the button, which the error message can push off-screen.
+      expect(find.text('Confirm booking'), findsOneWidget);
       expect(await store.bookingReferences(), isEmpty);
     });
 
@@ -455,9 +482,223 @@ void main() {
     });
   });
 
+  group('paying for a booking', () {
+    Future<({FakeBackend backend, InMemoryBookingStore store})> reachForm(
+      WidgetTester tester,
+    ) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('19:00'));
+      await tester.pumpAndSettle();
+      return (backend: backend, store: store);
+    }
+
+    Future<void> fillIn(WidgetTester tester) async {
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'Mariama Diallo',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        '+224 620 00 00 00',
+      );
+    }
+
+    testWidgets('offers cash and both mobile money providers', (tester) async {
+      await reachForm(tester);
+
+      expect(find.text('Pay on arrival'), findsOneWidget);
+      expect(find.text('Orange Money'), findsOneWidget);
+      expect(find.text('MTN Mobile Money'), findsOneWidget);
+    });
+
+    testWidgets('cash on arrival is the default', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on('POST', '/api/reservations/', reservationJson());
+
+      await fillIn(tester);
+      await tester.tap(find.text('Reserve'));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(backend.lastRequest.body) as Map<String, dynamic>;
+      expect(body['payment_provider'], 'cash_on_arrival');
+    });
+
+    testWidgets('choosing mobile money changes the button', (tester) async {
+      await reachForm(tester);
+      expect(find.text('Reserve'), findsOneWidget);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pay and reserve'), findsOneWidget);
+    });
+
+    testWidgets('the chosen provider is sent', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        reservationJson(status: 'confirmed', payment: paymentJson()),
+      );
+
+      await tester.tap(find.text('MTN Mobile Money'));
+      await tester.pumpAndSettle();
+      await fillIn(tester);
+      await tester.tap(find.text('Pay and reserve'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests
+          .firstWhere((r) => r.url.path == '/api/reservations/');
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body['payment_provider'], 'mtn_money');
+    });
+
+    testWidgets('the client never sends an amount', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        reservationJson(status: 'confirmed', payment: paymentJson()),
+      );
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await fillIn(tester);
+      await tester.tap(find.text('Pay and reserve'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests
+          .firstWhere((r) => r.url.path == '/api/reservations/');
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body.containsKey('amount'), isFalse);
+    });
+
+    testWidgets('a paid booking says the table is confirmed', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        reservationJson(status: 'confirmed', payment: paymentJson()),
+      );
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await fillIn(tester);
+      await tester.tap(find.text('Pay and reserve'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Table confirmed'), findsOneWidget);
+      expect(find.text('Orange Money'), findsOneWidget);
+      expect(find.text('50000.00 GNF'), findsOneWidget);
+    });
+
+    testWidgets('a cash booking still reads as a request', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on('POST', '/api/reservations/', reservationJson());
+
+      await fillIn(tester);
+      await tester.tap(find.text('Reserve'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Request sent'), findsOneWidget);
+      expect(find.text('Pay on arrival.'), findsOneWidget);
+    });
+
+    testWidgets('a failed payment says nothing was charged', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        reservationJson(payment: paymentJson(status: 'failed')),
+      );
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await fillIn(tester);
+      await tester.tap(find.text('Pay and reserve'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Payment did not go through'), findsOneWidget);
+      expect(
+        find.text('Nothing was charged. Pay on arrival instead.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('an unsettled payment shows as waiting', (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        reservationJson(payment: paymentJson(status: 'pending')),
+      );
+      // The provider still has not settled it, so polling changes nothing.
+      backend.on('GET', '/api/reservations/ref/$testReference/payment/', {
+        'reservation': reservationJson(payment: paymentJson(status: 'pending')),
+        'payment': paymentJson(status: 'pending'),
+      });
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await fillIn(tester);
+      await tester.tap(find.text('Pay and reserve'));
+
+      // Bounded pumps rather than pumpAndSettle: the waiting screen shows a
+      // spinner, which never settles.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Waiting for payment'), findsOneWidget);
+    });
+
+    testWidgets('polling confirms a payment that settles afterwards',
+        (tester) async {
+      final (:backend, :store) = await reachForm(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        reservationJson(payment: paymentJson(status: 'pending')),
+      );
+      // By the time the app polls, the customer has approved it.
+      backend.on('GET', '/api/reservations/ref/$testReference/payment/', {
+        'reservation':
+            reservationJson(status: 'confirmed', payment: paymentJson()),
+        'payment': paymentJson(),
+      });
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await fillIn(tester);
+      await tester.tap(find.text('Pay and reserve'));
+
+      // pumpAndSettle runs the clock forward past the poll interval, so the
+      // spinner is replaced once the payment reports completed.
+      await tester.pumpAndSettle();
+
+      expect(find.text('Table confirmed'), findsOneWidget);
+      expect(find.text('Waiting for payment'), findsNothing);
+    });
+  });
+
   group('my bookings', () {
     testWidgets('is empty for a new device', (tester) async {
-      final (:app, :backend, :store) = buildApp();
+      final (:app, :backend, :store) = buildApp(tester);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -475,7 +716,7 @@ void main() {
     testWidgets('re-reads stored bookings so the status is live',
         (tester) async {
       final (:app, :backend, :store) =
-          buildApp(bookingReferences: [testReference]);
+          buildApp(tester, bookingReferences: [testReference]);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -498,7 +739,7 @@ void main() {
 
     testWidgets('looks bookings up by reference, never by id', (tester) async {
       final (:app, :backend, :store) =
-          buildApp(bookingReferences: [testReference]);
+          buildApp(tester, bookingReferences: [testReference]);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -524,7 +765,7 @@ void main() {
         (tester) async {
       const missing = '99999999-8888-7777-6666-555555555555';
       final (:app, :backend, :store) =
-          buildApp(bookingReferences: [testReference, missing]);
+          buildApp(tester, bookingReferences: [testReference, missing]);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -553,7 +794,7 @@ void main() {
       Map<String, dynamic>? reservation,
     }) async {
       final (:app, :backend, :store) =
-          buildApp(bookingReferences: [testReference]);
+          buildApp(tester, bookingReferences: [testReference]);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,

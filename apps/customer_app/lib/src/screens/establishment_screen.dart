@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../widgets/hours_section.dart';
+import '../widgets/menu_section.dart';
 import 'booking_form_screen.dart';
 
 /// Pick a day, a party size, and a time.
@@ -124,31 +126,24 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  HoursSection(establishment: establishment),
                   if (establishment.openingHours.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.schedule,
-                          size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            establishment.openingHours,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      establishment.openingHours,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
+            if (establishment.hasMenu) ...[
+              const Divider(height: 32),
+              MenuSection(menu: establishment.menu),
+            ],
             const Divider(height: 32),
             _SectionLabel('Party size'),
             _PartySizePicker(

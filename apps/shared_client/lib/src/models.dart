@@ -83,6 +83,97 @@ class Space {
       );
 }
 
+/// One weekday's opening hours.
+class OpeningHours {
+  const OpeningHours({
+    required this.dayOfWeek,
+    required this.dayDisplay,
+    required this.isClosed,
+    this.opens,
+    this.closes,
+    this.runsPastMidnight = false,
+  });
+
+  /// 0 is Monday, matching `DateTime.weekday - 1`.
+  final int dayOfWeek;
+  final String dayDisplay;
+  final bool isClosed;
+
+  /// `HH:MM` as sent by the API; null when closed.
+  final String? opens;
+  final String? closes;
+
+  /// True when this interval runs into the following day, e.g. 18:00-02:00.
+  final bool runsPastMidnight;
+
+  /// "18:00 – 02:00", or "Closed".
+  String get range {
+    if (isClosed || opens == null || closes == null) return 'Closed';
+    return '${_hhmm(opens!)} – ${_hhmm(closes!)}';
+  }
+
+  factory OpeningHours.fromJson(Map<String, dynamic> json) => OpeningHours(
+        dayOfWeek: json['day_of_week'] as int? ?? 0,
+        dayDisplay: json['day_display'] as String? ?? '',
+        isClosed: json['is_closed'] as bool? ?? true,
+        opens: json['opens'] as String?,
+        closes: json['closes'] as String?,
+        runsPastMidnight: json['runs_past_midnight'] as bool? ?? false,
+      );
+}
+
+/// Django sends times as `HH:MM:SS`; nobody wants to read the seconds.
+String _hhmm(String value) =>
+    value.length >= 5 ? value.substring(0, 5) : value;
+
+class MenuItem {
+  const MenuItem({
+    required this.id,
+    required this.name,
+    required this.price,
+    this.description = '',
+  });
+
+  final int id;
+  final String name;
+  final String description;
+
+  /// Guinean francs.
+  final String price;
+
+  factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        price: '${json['price'] ?? ''}',
+      );
+}
+
+/// A menu category with its available items.
+///
+/// The API omits categories that have nothing available, so a group here
+/// always has at least one item — the app never has to guard against an empty
+/// section.
+class MenuCategory {
+  const MenuCategory({
+    required this.category,
+    required this.categoryDisplay,
+    required this.items,
+  });
+
+  final String category;
+  final String categoryDisplay;
+  final List<MenuItem> items;
+
+  factory MenuCategory.fromJson(Map<String, dynamic> json) => MenuCategory(
+        category: json['category'] as String? ?? '',
+        categoryDisplay: json['category_display'] as String? ?? '',
+        items: (json['items'] as List<dynamic>? ?? [])
+            .map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 class Establishment {
   const Establishment({
     required this.id,
@@ -94,6 +185,11 @@ class Establishment {
     this.openingHours = '',
     this.spaceCount,
     this.spaces = const [],
+    this.isOpenNow = false,
+    this.closesAt,
+    this.today,
+    this.hours = const [],
+    this.menu = const [],
   });
 
   final int id;
@@ -110,6 +206,38 @@ class Establishment {
   /// Present on the detail endpoint only.
   final List<Space> spaces;
 
+  /// Computed server-side, so both apps agree and the overnight arithmetic
+  /// lives in one place. Present on list and detail.
+  final bool isOpenNow;
+
+  /// When the interval in progress ends, e.g. `02:00:00`. Null when closed.
+  final String? closesAt;
+
+  /// The current day's hours. Null when the merchant never set that day.
+  final OpeningHours? today;
+
+  /// All seven days, detail only. Empty when the API did not send them.
+  final List<OpeningHours> hours;
+
+  /// Available items by category, detail only. Categories with nothing
+  /// available are already omitted by the API.
+  final List<MenuCategory> menu;
+
+  bool get hasMenu => menu.isNotEmpty;
+  bool get hasHours => hours.isNotEmpty;
+
+  /// "Open until 02:00", "Closed today", or "Hours not listed".
+  String get openSummary {
+    if (isOpenNow) {
+      final until = closesAt == null ? null : _hhmm(closesAt!);
+      return until == null ? 'Open now' : 'Open until $until';
+    }
+    if (today == null) return 'Hours not listed';
+    if (today!.isClosed) return 'Closed today';
+    final opensAt = today!.opens;
+    return opensAt == null ? 'Closed now' : 'Closed · opens ${_hhmm(opensAt)}';
+  }
+
   factory Establishment.fromJson(Map<String, dynamic> json) => Establishment(
         id: json['id'] as int,
         name: json['name'] as String? ?? '',
@@ -121,6 +249,17 @@ class Establishment {
         spaceCount: json['space_count'] as int?,
         spaces: (json['spaces'] as List<dynamic>? ?? [])
             .map((e) => Space.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        isOpenNow: json['is_open_now'] as bool? ?? false,
+        closesAt: json['closes_at'] as String?,
+        today: json['today'] == null
+            ? null
+            : OpeningHours.fromJson(json['today'] as Map<String, dynamic>),
+        hours: (json['hours'] as List<dynamic>? ?? [])
+            .map((e) => OpeningHours.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        menu: (json['menu'] as List<dynamic>? ?? [])
+            .map((e) => MenuCategory.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }

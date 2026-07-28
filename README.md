@@ -116,6 +116,38 @@ curl -X POST http://127.0.0.1:8000/api/reservations/ \
        "datetime": "2026-08-01T19:00:00Z", "party_size": 2}'
 ```
 
+### Opening hours and menu
+
+`OpeningHours` holds one row per weekday per establishment. **A closing time
+earlier than the opening time means the venue runs past midnight** — 18:00 to
+02:00 is the ordinary case for a lounge in Conakry, not an edge case. That
+interval belongs to the day it *starts* on, so Monday 18:00–02:00 covers Tuesday
+01:00, and answering "is it open at 1am?" has to consult *yesterday's* row.
+
+That arithmetic lives in `establishments/hours.py` and is computed server-side,
+so both apps agree and it exists once rather than once per client. The API sends
+`is_open_now` and `closes_at` on both the list and detail endpoints, plus
+`today` and all seven days on detail.
+
+Three rules worth knowing:
+
+- **A day with no row is closed**, and an establishment with no hours at all
+  reports `today: null` — the apps show "Hours not listed" rather than guessing
+  "Closed". Silence is not the same as shut.
+- **`today` is only ever the current day.** Never a fallback to a neighbouring
+  day or a default, which would tell a customer a shut venue is open.
+- **`week_schedule` always returns seven rows**, filling unset days with a
+  closed placeholder, so a venue that listed five days still renders a full week.
+
+`MenuItem` carries a category (`food`, `drink`, `chicha_flavor`), a price in GNF
+and `is_available`. The detail endpoint groups available items by category and
+**omits any category with nothing available** — otherwise the app renders a
+heading with nothing under it. An establishment with no menu returns `[]` and the
+app shows no menu section at all, which is the common case for pilot merchants.
+
+`Establishment.opening_hours` survives as a free-text note shown beneath the
+structured hours. Nothing computes from it.
+
 ### How availability works
 
 `Reservation` stores only a start time, so every booking is treated as running

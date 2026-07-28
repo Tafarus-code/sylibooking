@@ -2,7 +2,13 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
-from establishments.models import Establishment, Space
+from establishments.hours import (
+    closing_time_at,
+    is_open_at,
+    todays_hours,
+    week_schedule,
+)
+from establishments.models import Establishment, MenuItem, OpeningHours, Space
 from payments.models import Payment
 from reservations.availability import is_space_available
 from reservations.models import Reservation
@@ -33,6 +39,40 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class OpeningHoursSerializer(serializers.ModelSerializer):
+    day_display = serializers.CharField(
+        source='get_day_of_week_display', read_only=True
+    )
+    runs_past_midnight = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = OpeningHours
+        fields = [
+            'day_of_week',
+            'day_display',
+            'is_closed',
+            'opens',
+            'closes',
+            'runs_past_midnight',
+        ]
+        read_only_fields = fields
+
+
+class MenuItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenuItem
+        fields = ['id', 'name', 'description', 'price']
+        read_only_fields = fields
+
+
+class MenuCategorySerializer(serializers.Serializer):
+    """One category with its items. Empty categories are never emitted."""
+
+    category = serializers.CharField(read_only=True)
+    category_display = serializers.CharField(read_only=True)
+    items = MenuItemSerializer(many=True, read_only=True)
+
+
 class SpaceSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
 
@@ -47,6 +87,11 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
     space_count = serializers.IntegerField(read_only=True)
 
+    # Computed here rather than in the app: the overnight arithmetic should
+    # exist once, and both apps should agree on the answer.
+    is_open_now = serializers.SerializerMethodField()
+    closes_at = serializers.SerializerMethodField()
+
     class Meta:
         model = Establishment
         fields = [
@@ -59,12 +104,26 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
             'latitude',
             'longitude',
             'space_count',
+            'is_open_now',
+            'closes_at',
         ]
+
+    def get_is_open_now(self, establishment):
+        return is_open_at(establishment)
+
+    def get_closes_at(self, establishment):
+        return closing_time_at(establishment)
 
 
 class EstablishmentDetailSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
     spaces = SpaceSerializer(many=True, read_only=True)
+
+    is_open_now = serializers.SerializerMethodField()
+    closes_at = serializers.SerializerMethodField()
+    today = serializers.SerializerMethodField()
+    hours = serializers.SerializerMethodField()
+    menu = serializers.SerializerMethodField()
 
     class Meta:
         model = Establishment
@@ -77,10 +136,59 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'address',
             'latitude',
             'longitude',
+            'is_open_now',
+            'closes_at',
+            'today',
+            'hours',
+            'menu',
             'opening_hours',
             'spaces',
             'created_at',
         ]
+
+    def get_is_open_now(self, establishment):
+        return is_open_at(establishment)
+
+    def get_closes_at(self, establishment):
+        """When the interval in progress ends, or null when closed."""
+        return closing_time_at(establishment)
+
+    def get_today(self, establishment):
+        """The current day's hours, or null if the merchant never set them.
+
+        Only ever the current day — falling back to another day would tell a
+        customer a shut venue is open.
+        """
+        row = todays_hours(establishment)
+        return None if row is None else OpeningHoursSerializer(row).data
+
+    def get_hours(self, establishment):
+        """All seven days, so the app can render a full week."""
+        return OpeningHoursSerializer(week_schedule(establishment), many=True).data
+
+    def get_menu(self, establishment):
+        """Available items grouped by category.
+
+        Unavailable items are excluded, and a category with nothing left in it
+        is dropped entirely rather than sent as an empty group — otherwise the
+        app renders a heading with nothing under it.
+        """
+        available = [
+            item for item in establishment.menu_items.all() if item.is_available
+        ]
+        groups = []
+        for value, label in MenuItem.Category.choices:
+            items = [item for item in available if item.category == value]
+            if not items:
+                continue
+            groups.append(
+                {
+                    'category': value,
+                    'category_display': label,
+                    'items': MenuItemSerializer(items, many=True).data,
+                }
+            )
+        return groups
 
 
 class SlotSerializer(serializers.Serializer):

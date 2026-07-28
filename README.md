@@ -148,6 +148,45 @@ app shows no menu section at all, which is the common case for pilot merchants.
 `Establishment.opening_hours` survives as a free-text note shown beneath the
 structured hours. Nothing computes from it.
 
+### Reviews and photos
+
+A `Review` hangs off a **reservation**, not off a customer — one review per
+booking. Since customers have no accounts, the **reservation reference is the
+credential**: posting a review means sending the reference issued at booking.
+The rules the server enforces:
+
+- The booking must be **`completed`**. Confirmed is not the same as been there.
+- The booking must belong to **this** establishment.
+- One review per booking, so a regular reviews each visit separately.
+
+A wrong-venue reference and a made-up one return the *same* message, so the
+error cannot be used to probe for valid references. Reviews publish the
+customer's **first name only** — the booking holds a full name and a phone
+number, and a public review needs neither.
+
+Photos accept either credential: a customer sends a reservation reference (any
+status — someone turned away still has something to show), a merchant sends
+their token and must staff the establishment. Uploads are size- and
+extension-checked, and the original filename is discarded, since it can carry a
+customer's name and two people's `IMG_0001.jpg` must not collide.
+
+`is_hidden` on both models is moderation-only and **never appears in any
+customer-facing response**. Hidden reviews are excluded from the list *and* from
+`average_rating`, which is computed on read rather than stored — a stored
+average would drift the moment something was hidden.
+
+| Endpoint | Auth |
+| --- | --- |
+| `GET /api/establishments/{id}/reviews/` | public, paginated, newest first |
+| `POST /api/establishments/{id}/reviews/` | reservation reference |
+| `GET /api/establishments/{id}/photos/` | public, paginated |
+| `POST /api/establishments/{id}/photos/` | reservation reference, or merchant token |
+
+Uploads land in `MEDIA_ROOT` (`backend/media/`, gitignored) and Django serves
+them **only when `DEBUG` is on**. In production a web server or object store
+must serve `MEDIA_URL`; `MAX_PHOTO_UPLOAD_BYTES` (5 MB) and
+`ALLOWED_PHOTO_EXTENSIONS` are settings.
+
 ### How availability works
 
 `Reservation` stores only a start time, so every booking is treated as running

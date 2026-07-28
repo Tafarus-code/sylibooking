@@ -125,6 +125,11 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
     hours = serializers.SerializerMethodField()
     menu = serializers.SerializerMethodField()
 
+    # Computed, never stored: a denormalised average drifts the moment a
+    # review is hidden, and hiding is the point of moderation.
+    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    review_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Establishment
         fields = [
@@ -141,6 +146,8 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'today',
             'hours',
             'menu',
+            'average_rating',
+            'review_count',
             'opening_hours',
             'spaces',
             'created_at',

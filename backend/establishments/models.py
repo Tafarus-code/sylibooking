@@ -1,4 +1,11 @@
+import uuid
+
 from django.conf import settings
+from django.core.validators import (
+    FileExtensionValidator,
+    MaxValueValidator,
+    MinValueValidator,
+)
 from django.db import models
 
 
@@ -67,6 +74,26 @@ class Establishment(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.city})'
+
+    def visible_reviews(self):
+        """Reviews a customer may see. Hidden ones count for nothing."""
+        return [review for review in self.reviews.all() if not review.is_hidden]
+
+    @property
+    def review_count(self):
+        return len(self.visible_reviews())
+
+    @property
+    def average_rating(self):
+        """Mean of visible ratings, to one decimal, or None with no reviews.
+
+        Computed rather than stored: a denormalised average drifts the moment
+        a review is hidden, and hiding is the whole point of moderation.
+        """
+        ratings = [review.rating for review in self.visible_reviews()]
+        if not ratings:
+            return None
+        return round(sum(ratings) / len(ratings), 1)
 
 
 class OpeningHours(models.Model):
@@ -199,6 +226,132 @@ class MenuItem(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.get_category_display()}) — {self.price}'
+
+
+def photo_upload_path(instance, filename):
+    """Scatter uploads per establishment, with an unguessable filename.
+
+    The original filename is discarded: it can carry a customer's name or a
+    path from their phone, and two people uploading IMG_0001.jpg must not
+    collide.
+    """
+    extension = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
+    return f'establishments/{instance.establishment_id}/{uuid.uuid4().hex}.{extension}'
+
+
+class Review(models.Model):
+    """One customer's verdict on one visit.
+
+    Tied to a reservation rather than floating free, so a review can only come
+    from someone who actually booked — and the OneToOne means one review per
+    visit, not per customer, so a regular can review each time they come.
+    """
+
+    establishment = models.ForeignKey(
+        Establishment,
+        on_delete=models.CASCADE,
+        related_name='reviews',
+    )
+    reservation = models.OneToOneField(
+        'reservations.Reservation',
+        on_delete=models.CASCADE,
+        related_name='review',
+        help_text='The visit being reviewed. One review per booking.',
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text='1 to 5.',
+    )
+    comment = models.TextField(
+        blank=True,
+        help_text='Optional — a rating on its own is a valid review.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text=(
+            'Hidden reviews are excluded from every customer-facing response '
+            'and from the average rating. Moderation only; never exposed.'
+        ),
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=1) & models.Q(rating__lte=5),
+                name='review_rating_between_1_and_5',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.rating}/5 for {self.establishment.name}'
+
+    @property
+    def author_display_name(self):
+        """First name only.
+
+        The booking carries a full name and a phone number; a public review
+        needs neither. This is the least that still reads as a person.
+        """
+        full = (self.reservation.customer_name or '').strip()
+        return full.split()[0] if full else 'Guest'
+
+
+class Photo(models.Model):
+    """A picture of an establishment, from the venue or from a customer."""
+
+    class UploaderRole(models.TextChoices):
+        CUSTOMER = 'customer', 'Customer'
+        MERCHANT = 'merchant', 'Merchant'
+
+    establishment = models.ForeignKey(
+        Establishment,
+        on_delete=models.CASCADE,
+        related_name='photos',
+    )
+    uploaded_by_role = models.CharField(
+        max_length=20,
+        choices=UploaderRole.choices,
+        help_text='Merchant photos are the venue\'s own; customer photos are not.',
+    )
+    reservation = models.ForeignKey(
+        'reservations.Reservation',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='photos',
+        help_text=(
+            'The booking a customer uploaded this from. Null for the venue\'s '
+            'own photos.'
+        ),
+    )
+    image = models.ImageField(
+        upload_to=photo_upload_path,
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=settings.ALLOWED_PHOTO_EXTENSIONS
+            )
+        ],
+    )
+    caption = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text=(
+            'Hidden photos are excluded from every customer-facing response. '
+            'Moderation only.'
+        ),
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return (
+            f'{self.get_uploaded_by_role_display()} photo of '
+            f'{self.establishment.name}'
+        )
 
 
 class Space(models.Model):

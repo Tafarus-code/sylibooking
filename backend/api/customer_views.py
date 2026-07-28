@@ -25,7 +25,9 @@ class ReservationByReferenceView(APIView):
 
     def get_object(self, reference):
         return get_object_or_404(
-            Reservation.objects.select_related('space', 'space__establishment'),
+            Reservation.objects.select_related(
+                'space', 'space__establishment'
+            ).prefetch_related('payments'),
             reference=reference,
         )
 
@@ -47,7 +49,9 @@ class PaymentStatusView(APIView):
 
     def get(self, request, reference):
         reservation = get_object_or_404(
-            Reservation.objects.select_related('space', 'space__establishment'),
+            Reservation.objects.select_related(
+                'space', 'space__establishment'
+            ).prefetch_related('payments'),
             reference=reference,
         )
 

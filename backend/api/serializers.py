@@ -111,11 +111,11 @@ class ReservationSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     can_cancel = serializers.SerializerMethodField()
 
-    # How the customer intends to pay. Write-only: the resulting Payment is
-    # reported back through `payment`, not by echoing the request.
+    # Written on create to choose how to pay; read back as how the booking is
+    # actually being paid, cash included. The Reservation property behind it
+    # reports cash_on_arrival when no Payment row exists.
     payment_provider = serializers.ChoiceField(
         choices=Payment.Provider.choices,
-        write_only=True,
         required=False,
         default=Payment.Provider.CASH_ON_ARRIVAL,
         help_text=(
@@ -124,11 +124,33 @@ class ReservationSerializer(serializers.ModelSerializer):
             'once that payment completes.'
         ),
     )
+    payment_provider_display = serializers.SerializerMethodField()
+
+    # Flat fields so a merchant list can render a badge per row without
+    # digging into the nested payment object.
+    payment_status = serializers.CharField(read_only=True, allow_null=True)
+    is_paid = serializers.BooleanField(read_only=True)
+    can_confirm = serializers.SerializerMethodField()
+
     payment = serializers.SerializerMethodField()
+
+    def get_payment_provider_display(self, reservation):
+        return Payment.Provider(reservation.payment_provider).label
+
+    def get_can_confirm(self, reservation):
+        """Whether the merchant may confirm this booking right now.
+
+        Sent so the app can disable the button, but the server enforces it
+        regardless — see ReservationViewSet.confirm.
+        """
+        return (
+            reservation.status == Reservation.Status.PENDING
+            and not reservation.needs_payment_before_confirming
+        )
 
     def get_payment(self, reservation):
         """The most recent payment, or null for cash on arrival."""
-        payment = reservation.payments.order_by('-created_at').first()
+        payment = reservation.latest_payment
         return None if payment is None else PaymentSerializer(payment).data
 
     def get_can_cancel(self, reservation):
@@ -158,7 +180,11 @@ class ReservationSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
             'can_cancel',
+            'can_confirm',
             'payment_provider',
+            'payment_provider_display',
+            'payment_status',
+            'is_paid',
             'payment',
             'created_at',
         ]

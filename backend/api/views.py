@@ -128,9 +128,13 @@ class ReservationViewSet(
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Reservation.objects.select_related(
-            'space', 'space__establishment'
-        ).all()
+        queryset = (
+            Reservation.objects.select_related('space', 'space__establishment')
+            # The list renders a payment badge per row; without this that is a
+            # query per booking across a whole day's bookings.
+            .prefetch_related('payments')
+            .all()
+        )
 
         # Scope to the caller's own venues. Without this, any logged-in user
         # would see every establishment's customer names and phone numbers.
@@ -196,11 +200,33 @@ class ReservationViewSet(
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def confirm(self, request, pk=None):
-        """Merchant accepts a pending booking."""
+        """Merchant accepts a pending booking.
+
+        Cash on arrival may be confirmed before any money changes hands — that
+        is what cash on arrival means. A mobile money booking may not: holding
+        a table against a payment that is still pending, or has failed, is
+        exactly the no-show the deposit exists to prevent. Enforced here rather
+        than by hiding the button, since the API is reachable directly.
+        """
         reservation = self.get_object()
         if reservation.status == Reservation.Status.CANCELLED:
             return Response(
                 {'detail': 'A cancelled reservation cannot be confirmed.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if reservation.needs_payment_before_confirming:
+            payment = reservation.latest_payment
+            return Response(
+                {
+                    'detail': (
+                        f'{payment.get_provider_display()} payment is '
+                        f'{payment.get_status_display().lower()}. Confirm this '
+                        f'booking once the payment completes, or cancel it.'
+                    ),
+                    'payment_status': payment.status,
+                    'payment_provider': payment.provider,
+                },
                 status=status.HTTP_409_CONFLICT,
             )
 

@@ -4,6 +4,7 @@ import 'package:shared_client/shared_client.dart';
 
 import '../auth_controller.dart';
 import '../widgets/reservation_card.dart';
+import 'reservation_detail_screen.dart';
 
 enum DateRange {
   today('Today'),
@@ -275,6 +276,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
               ReservationCard(
                 reservation: reservation,
                 busy: _pendingActions.contains(reservation.id),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ReservationDetailScreen(reservation: reservation),
+                  ),
+                ),
                 onConfirm: () => _act(
                   reservation,
                   _api.confirmReservation,

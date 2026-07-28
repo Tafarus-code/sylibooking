@@ -224,6 +224,26 @@ The amount is `RESERVATION_DEPOSIT_AMOUNT` (default 50 000 GNF, overridable via
 is ignored, since nothing may choose what it owes. One global figure for now —
 per-establishment pricing belongs on `Establishment` later.
 
+### Confirming, and who may confirm what
+
+One rule, enforced server-side rather than by hiding a button:
+
+- **Cash on arrival can be confirmed before any money changes hands.** That is
+  what cash on arrival means — the merchant is holding a table on trust.
+- **A mobile money booking cannot be confirmed while its payment is pending or
+  failed.** Holding a table against money that never arrived is the no-show the
+  deposit exists to prevent. `POST .../confirm/` returns `409` with the provider
+  and payment status; the merchant can still cancel it.
+
+The reservation payload carries `can_confirm` so the app can disable the button,
+but the check runs in the view regardless — the API is reachable directly.
+
+Merchant-facing reservation payloads also carry `payment_provider`,
+`payment_provider_display`, `payment_status` and `is_paid` as flat fields, so a
+day's list can render a badge per row without unpacking the nested payment.
+`payment_status` is null when there is nothing to settle, which is how "cash on
+arrival" is told apart from "mobile money, unpaid".
+
 A payment that fails, or a provider that cannot be reached, leaves the booking
 `pending` rather than losing it. `GET .../payment/` polls the provider and
 applies the result, which is how the app learns a payment settled after the

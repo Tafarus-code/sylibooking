@@ -34,12 +34,81 @@ class FakeBackend {
   http.Request get lastRequest => requests.last;
 }
 
+/// One weekday's hours as the API sends them.
+Map<String, dynamic> hoursJson(
+  int day,
+  String dayName, {
+  String? opens,
+  String? closes,
+  bool isClosed = false,
+}) =>
+    {
+      'day_of_week': day,
+      'day_display': dayName,
+      'is_closed': isClosed,
+      'opens': opens,
+      'closes': closes,
+      'runs_past_midnight':
+          opens != null && closes != null && closes.compareTo(opens) <= 0,
+    };
+
+const _dayNames = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+/// A full week open 18:00-02:00, i.e. past midnight every night.
+List<Map<String, dynamic>> lateWeek() => [
+      for (var day = 0; day < 7; day++)
+        hoursJson(day, _dayNames[day], opens: '18:00:00', closes: '02:00:00'),
+    ];
+
+/// A week where one day is shut.
+List<Map<String, dynamic>> weekClosedOn(int closedDay) => [
+      for (var day = 0; day < 7; day++)
+        if (day == closedDay)
+          hoursJson(day, _dayNames[day], isClosed: true)
+        else
+          hoursJson(day, _dayNames[day],
+              opens: '12:00:00', closes: '23:00:00'),
+    ];
+
+Map<String, dynamic> menuGroup(
+  String category,
+  String display,
+  List<(String, String)> items,
+) =>
+    {
+      'category': category,
+      'category_display': display,
+      'items': [
+        for (final (index, item) in items.indexed)
+          {
+            'id': index + 1,
+            'name': item.$1,
+            'description': '',
+            'price': item.$2,
+          },
+      ],
+    };
+
 Map<String, dynamic> establishmentJson({
   int id = 7,
   String name = 'Le Petit Baobab',
   String type = 'lounge',
   String city = 'Conakry',
   int spaceCount = 2,
+  bool isOpenNow = true,
+  String? closesAt = '02:00:00',
+  Map<String, dynamic>? today,
+  // Distinguishes "no hours recorded" from "today not overridden" — passing
+  // today: null alone would just fall through to the default below.
+  bool hoursUnknown = false,
 }) =>
     {
       'id': id,
@@ -49,11 +118,32 @@ Map<String, dynamic> establishmentJson({
       'city': city,
       'address': 'Kaloum, $city',
       'space_count': spaceCount,
+      'is_open_now': isOpenNow,
+      'closes_at': closesAt,
+      'today': hoursUnknown
+          ? null
+          : (today ??
+              hoursJson(0, 'Monday', opens: '18:00:00', closes: '02:00:00')),
     };
 
-Map<String, dynamic> establishmentDetailJson() => {
-      ...establishmentJson(),
-      'opening_hours': 'Mon-Sun 12:00-02:00',
+Map<String, dynamic> establishmentDetailJson({
+  bool isOpenNow = true,
+  String? closesAt = '02:00:00',
+  Map<String, dynamic>? today,
+  bool hoursUnknown = false,
+  List<Map<String, dynamic>>? hours,
+  List<Map<String, dynamic>>? menu,
+}) =>
+    {
+      ...establishmentJson(
+        isOpenNow: isOpenNow,
+        closesAt: closesAt,
+        today: today,
+        hoursUnknown: hoursUnknown,
+      ),
+      'opening_hours': '',
+      'hours': hours ?? lateWeek(),
+      'menu': menu ?? [],
       'spaces': [
         {
           'id': 3,
@@ -254,6 +344,273 @@ void main() {
     });
   });
 
+  group('open now indicator', () {
+    Future<void> browseWith(
+      WidgetTester tester,
+      List<Map<String, dynamic>> results,
+    ) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': results.length,
+        'next': null,
+        'results': results,
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('an open venue shows until when', (tester) async {
+      // The 1am case: a lounge open until 02:00 is still open.
+      await browseWith(tester, [
+        establishmentJson(isOpenNow: true, closesAt: '02:00:00'),
+      ]);
+
+      expect(find.text('Open until 02:00'), findsOneWidget);
+    });
+
+    testWidgets('a closed venue says closed', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(
+          isOpenNow: false,
+          closesAt: null,
+          today: hoursJson(0, 'Monday',
+              opens: '18:00:00', closes: '02:00:00'),
+        ),
+      ]);
+
+      expect(find.text('Closed'), findsOneWidget);
+      expect(find.textContaining('Open until'), findsNothing);
+    });
+
+    testWidgets('a venue closed today is not shown as open', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(
+          isOpenNow: false,
+          closesAt: null,
+          today: hoursJson(0, 'Monday', isClosed: true),
+        ),
+      ]);
+
+      expect(find.text('Closed'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no hours says so rather than guessing closed',
+        (tester) async {
+      await browseWith(tester, [
+        {
+          'id': 7,
+          'name': 'Le Petit Baobab',
+          'type': 'lounge',
+          'type_display': 'Lounge',
+          'city': 'Conakry',
+          'address': 'Kaloum',
+          'space_count': 2,
+          'is_open_now': false,
+          'closes_at': null,
+          'today': null,
+        },
+      ]);
+
+      expect(find.text('Hours not listed'), findsOneWidget);
+      expect(find.text('Closed'), findsNothing);
+      // Nothing recorded must not be reported as shut.
+    });
+
+    testWidgets('a mixed list marks each venue for itself', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(id: 7, name: 'Open Venue', isOpenNow: true),
+        establishmentJson(
+          id: 8,
+          name: 'Shut Venue',
+          isOpenNow: false,
+          closesAt: null,
+        ),
+      ]);
+
+      expect(find.text('Open until 02:00'), findsOneWidget);
+      expect(find.text('Closed'), findsOneWidget);
+    });
+  });
+
+  group('hours on the detail screen', () {
+    Future<void> openVenue(
+      WidgetTester tester, {
+      required Map<String, dynamic> detail,
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', detail);
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('today is shown prominently', (tester) async {
+      await openVenue(tester, detail: establishmentDetailJson());
+
+      expect(find.text('Open until 02:00'), findsOneWidget);
+    });
+
+    testWidgets('the full week is collapsed by default', (tester) async {
+      await openVenue(tester, detail: establishmentDetailJson());
+
+      expect(find.text('All week'), findsOneWidget);
+      expect(find.text('Wednesday'), findsNothing);
+    });
+
+    testWidgets('the full week expands on tap', (tester) async {
+      await openVenue(tester, detail: establishmentDetailJson());
+
+      await tester.tap(find.text('All week'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Monday'), findsOneWidget);
+      expect(find.text('Sunday'), findsOneWidget);
+      expect(find.text('18:00 – 02:00'), findsNWidgets(7));
+      expect(find.text('Hide week'), findsOneWidget);
+    });
+
+    testWidgets('a closed day reads as Closed in the week', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(hours: weekClosedOn(2)),
+      );
+
+      await tester.tap(find.text('All week'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Closed'), findsOneWidget);
+      expect(find.text('12:00 – 23:00'), findsNWidgets(6));
+    });
+
+    testWidgets('closed today says so instead of borrowing another day',
+        (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(
+          isOpenNow: false,
+          closesAt: null,
+          today: hoursJson(2, 'Wednesday', isClosed: true),
+          hours: weekClosedOn(2),
+        ),
+      );
+
+      expect(find.text('Closed today'), findsOneWidget);
+      expect(find.textContaining('Open until'), findsNothing);
+    });
+
+    testWidgets('a venue with no hours says they are not listed',
+        (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(
+          isOpenNow: false,
+          closesAt: null,
+          hoursUnknown: true,
+          hours: const [],
+        ),
+      );
+
+      expect(find.text('Hours not listed'), findsOneWidget);
+      expect(find.text('All week'), findsNothing);
+    });
+  });
+
+  group('menu on the detail screen', () {
+    Future<void> openVenue(
+      WidgetTester tester, {
+      required Map<String, dynamic> detail,
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', detail);
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('items are grouped under their category', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+          menuGroup('chicha_flavor', 'Chicha flavour', [
+            ('Menthe', '50000.00'),
+            ('Pomme', '50000.00'),
+          ]),
+        ]),
+      );
+
+      expect(find.text('Menu'), findsOneWidget);
+      expect(find.text('Food'), findsOneWidget);
+      expect(find.text('Chicha flavour'), findsOneWidget);
+      expect(find.text('Poulet braisé'), findsOneWidget);
+      expect(find.text('Menthe'), findsOneWidget);
+    });
+
+    testWidgets('prices are shown', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+        ]),
+      );
+
+      expect(find.text('75000.00 GNF'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no menu renders no Menu section at all',
+        (tester) async {
+      // Many pilot merchants will not have filled one in; an empty heading
+      // reads as a broken screen.
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: const []),
+      );
+
+      expect(find.text('Menu'), findsNothing);
+      expect(find.text('Food'), findsNothing);
+      // The rest of the screen is unaffected.
+      expect(find.text('Available times'), findsOneWidget);
+    });
+
+    testWidgets('only the categories the API sent are rendered',
+        (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('drink', 'Drink', [('Jus de gingembre', '20000.00')]),
+        ]),
+      );
+
+      expect(find.text('Drink'), findsOneWidget);
+      expect(find.text('Food'), findsNothing);
+      expect(find.text('Chicha flavour'), findsNothing);
+    });
+  });
+
   group('availability', () {
     Future<FakeBackend> openVenue(
       WidgetTester tester, {
@@ -290,7 +647,8 @@ void main() {
     testWidgets('shows the venue details', (tester) async {
       await openVenue(tester);
 
-      expect(find.text('Mon-Sun 12:00-02:00'), findsOneWidget);
+      // Structured hours replaced the old free-text line.
+      expect(find.text('Open until 02:00'), findsOneWidget);
       expect(find.text('Kaloum, Conakry'), findsOneWidget);
     });
 

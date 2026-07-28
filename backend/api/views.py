@@ -50,10 +50,14 @@ class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == 'list':
             # annotate() adds a GROUP BY, which makes Django treat the queryset
             # as unordered and pagination inconsistent, so re-state Meta.ordering.
-            return queryset.annotate(space_count=Count('spaces')).order_by(
-                'city', 'name'
+            # Hours are prefetched because every card shows an open/closed
+            # indicator computed from them.
+            return (
+                queryset.annotate(space_count=Count('spaces'))
+                .prefetch_related('hours')
+                .order_by('city', 'name')
             )
-        return queryset.prefetch_related('spaces')
+        return queryset.prefetch_related('spaces', 'hours', 'menu_items')
 
     def get_serializer_class(self):
         if self.action == 'list':

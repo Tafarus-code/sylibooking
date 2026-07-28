@@ -46,8 +46,9 @@ class Establishment(models.Model):
     opening_hours = models.TextField(
         blank=True,
         help_text=(
-            'Free text for now, e.g. "Mon-Thu 18:00-02:00, Fri-Sun 16:00-04:00". '
-            'Becomes structured data once availability logic needs to parse it.'
+            'Free-text note shown under the structured hours, e.g. "Kitchen '
+            'closes at 23:00". Superseded by the OpeningHours rows for '
+            'anything the apps compute from.'
         ),
     )
     staff = models.ManyToManyField(
@@ -66,6 +67,138 @@ class Establishment(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.city})'
+
+
+class OpeningHours(models.Model):
+    """When an establishment is open on one weekday.
+
+    A closing time earlier than the opening time means the venue runs past
+    midnight — 18:00 to 02:00 is the ordinary case for a lounge here, not an
+    edge case. That interval belongs to the day it *starts* on, so Monday
+    18:00-02:00 covers Tuesday morning.
+    """
+
+    class Day(models.IntegerChoices):
+        # Matches datetime.weekday(), so no arithmetic is needed to line them up.
+        MONDAY = 0, 'Monday'
+        TUESDAY = 1, 'Tuesday'
+        WEDNESDAY = 2, 'Wednesday'
+        THURSDAY = 3, 'Thursday'
+        FRIDAY = 4, 'Friday'
+        SATURDAY = 5, 'Saturday'
+        SUNDAY = 6, 'Sunday'
+
+    establishment = models.ForeignKey(
+        Establishment,
+        on_delete=models.CASCADE,
+        related_name='hours',
+    )
+    day_of_week = models.IntegerField(
+        choices=Day.choices,
+        help_text='0 is Monday, matching Python\'s datetime.weekday().',
+    )
+    is_closed = models.BooleanField(
+        default=False,
+        help_text='Closed all day. Opens/closes are ignored when set.',
+    )
+    opens = models.TimeField(
+        null=True,
+        blank=True,
+        help_text='Ignored when closed all day.',
+    )
+    closes = models.TimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            'Earlier than opens means the venue runs past midnight, e.g. '
+            '18:00 to 02:00.'
+        ),
+    )
+
+    class Meta:
+        ordering = ['establishment', 'day_of_week']
+        verbose_name_plural = 'opening hours'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['establishment', 'day_of_week'],
+                name='unique_hours_per_day_per_establishment',
+            ),
+        ]
+
+    def __str__(self):
+        if self.is_closed or self.opens is None or self.closes is None:
+            return f'{self.get_day_of_week_display()}: closed'
+        return (
+            f'{self.get_day_of_week_display()}: '
+            f'{self.opens:%H:%M}-{self.closes:%H:%M}'
+        )
+
+    @property
+    def runs_past_midnight(self):
+        """True when this interval spills into the following day."""
+        if self.is_closed or self.opens is None or self.closes is None:
+            return False
+        return self.closes <= self.opens
+
+    def covers(self, moment, from_previous_day=False):
+        """Whether this interval is open at ``moment`` (a time).
+
+        ``from_previous_day`` asks about the tail of an overnight interval:
+        Monday 18:00-02:00 covers Tuesday 01:00, and it is Monday's row that
+        has to answer for it.
+        """
+        if self.is_closed or self.opens is None or self.closes is None:
+            return False
+
+        if from_previous_day:
+            return self.runs_past_midnight and moment < self.closes
+
+        if self.runs_past_midnight:
+            # Open from `opens` until midnight; the rest is tomorrow's problem.
+            return moment >= self.opens
+        return self.opens <= moment < self.closes
+
+
+class MenuItem(models.Model):
+    """Something an establishment sells, shown on its detail screen.
+
+    Browsing only — there is no ordering flow, so this carries no stock or
+    preparation state. Unavailable items stay on the record rather than being
+    deleted, so a seasonal item can come back without being retyped.
+    """
+
+    class Category(models.TextChoices):
+        FOOD = 'food', 'Food'
+        DRINK = 'drink', 'Drink'
+        CHICHA_FLAVOR = 'chicha_flavor', 'Chicha flavour'
+
+    establishment = models.ForeignKey(
+        Establishment,
+        on_delete=models.CASCADE,
+        related_name='menu_items',
+    )
+    name = models.CharField(max_length=200)
+    description = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text='One line at most; this is a browsing screen.',
+    )
+    category = models.CharField(max_length=20, choices=Category.choices)
+    price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text='In Guinean francs.',
+    )
+    is_available = models.BooleanField(
+        default=True,
+        help_text='Unavailable items are hidden from customers, not deleted.',
+    )
+
+    class Meta:
+        ordering = ['category', 'name']
+
+    def __str__(self):
+        return f'{self.name} ({self.get_category_display()}) — {self.price}'
 
 
 class Space(models.Model):

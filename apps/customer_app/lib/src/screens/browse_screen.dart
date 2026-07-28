@@ -249,11 +249,61 @@ class _EstablishmentTile extends StatelessWidget {
                 '${establishment.spaceCount == 1 ? "space" : "spaces"}',
                 style: theme.textTheme.bodySmall,
               ),
+            const SizedBox(height: 4),
+            _OpenIndicator(establishment: establishment),
           ],
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
+    );
+  }
+}
+
+/// Open or shut, at a glance, on every card.
+///
+/// A dot plus a word rather than colour alone — these are scanned down a list,
+/// and colour on its own excludes anyone with a colour vision deficiency.
+class _OpenIndicator extends StatelessWidget {
+  const _OpenIndicator({required this.establishment});
+
+  final Establishment establishment;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Nothing recorded is not the same as shut; saying "Closed" would be a
+    // guess, and pilot merchants will not all have filled their hours in.
+    final unknown = establishment.today == null && !establishment.hasHours;
+    if (unknown) {
+      return Text(
+        'Hours not listed',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      );
+    }
+
+    final open = establishment.isOpenNow;
+    final colour = open ? theme.colorScheme.primary : theme.colorScheme.error;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(open ? Icons.circle : Icons.circle_outlined, size: 10, color: colour),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            open ? establishment.openSummary : 'Closed',
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colour,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

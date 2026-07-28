@@ -158,6 +158,21 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Uploaded files (establishment photos)
+#
+# Served by Django only when DEBUG is on — see config/urls.py. In production a
+# web server or object store serves MEDIA_URL; Django must not.
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Largest photo a customer or merchant may upload. Phones here produce large
+# files on poor connections, so the limit is enforced rather than hoped for.
+MAX_PHOTO_UPLOAD_BYTES = config(
+    'MAX_PHOTO_UPLOAD_BYTES', default=5 * 1024 * 1024, cast=int
+)
+ALLOWED_PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

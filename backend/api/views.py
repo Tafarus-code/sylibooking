@@ -57,7 +57,10 @@ class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
                 .prefetch_related('hours')
                 .order_by('city', 'name')
             )
-        return queryset.prefetch_related('spaces', 'hours', 'menu_items')
+        # Reviews are prefetched because the detail response averages them.
+        return queryset.prefetch_related(
+            'spaces', 'hours', 'menu_items', 'reviews'
+        )
 
     def get_serializer_class(self):
         if self.action == 'list':

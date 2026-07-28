@@ -14,6 +14,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
@@ -23,3 +25,8 @@ urlpatterns = [
     # Log in/out of the browsable API — handy while there is no merchant app.
     path('api-auth/', include('rest_framework.urls')),
 ]
+
+if settings.DEBUG:
+    # Development only. In production a web server or object store serves
+    # these; Django serving user uploads is both slow and a security risk.
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

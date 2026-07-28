@@ -7,6 +7,7 @@ from .customer_views import (
     PaymentStatusView,
     ReservationByReferenceView,
 )
+from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
 
 router = DefaultRouter()
@@ -33,6 +34,17 @@ urlpatterns = [
         'reservations/ref/<uuid:reference>/payment/',
         PaymentStatusView.as_view(),
         name='reservation-payment-status',
+    ),
+    # Before the router, so these are not taken for viewset detail routes.
+    path(
+        'establishments/<int:pk>/reviews/',
+        EstablishmentReviewsView.as_view(),
+        name='establishment-reviews',
+    ),
+    path(
+        'establishments/<int:pk>/photos/',
+        EstablishmentPhotosView.as_view(),
+        name='establishment-photos',
     ),
     path('', include(router.urls)),
 ]

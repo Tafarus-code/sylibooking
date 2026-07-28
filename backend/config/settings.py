@@ -50,6 +50,8 @@ INSTALLED_APPS = [
 
     # Third party
     'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
 
     # Local
     'establishments',
@@ -60,6 +62,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Must sit above CommonMiddleware so preflight OPTIONS requests get their
+    # headers even when another middleware would short-circuit the response.
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -156,3 +161,60 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Django REST Framework
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Token first: it is what the Flutter merchant app uses. Session auth
+        # stays for the browsable API and /admin/.
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    # Per-view permissions decide what is public; see api/views.py. There is no
+    # customer/merchant user model yet, so "authenticated" currently means an
+    # admin logged in through /admin/ or the browsable API.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+}
+
+
+# CORS
+#
+# Only the Flutter *web* build needs this; Android and iOS are not subject to
+# the browser's same-origin policy. `flutter run -d chrome` serves the app from
+# a fresh random localhost port every run, so pinning an allowlist locally
+# would mean editing this file constantly — hence allow-all in development
+# only. Production reads an explicit list and fails closed if it is unset.
+
+if DJANGO_ENV == 'production':
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
+else:
+    CORS_ALLOW_ALL_ORIGINS = True
+
+# Token auth travels in the Authorization header, not a cookie, so the browser
+# never needs to send credentials cross-origin.
+CORS_ALLOW_CREDENTIALS = False
+
+
+# Booking rules
+#
+# Reservation has no duration field: every booking is assumed to run for
+# RESERVATION_DURATION_MINUTES, which is what makes two bookings on one space
+# "overlap". Availability is offered on a fixed grid inside a fixed daily
+# window because Establishment.opening_hours is still free text and cannot be
+# parsed — once it becomes structured, these three become per-establishment.
+
+RESERVATION_DURATION_MINUTES = 120
+AVAILABILITY_SLOT_MINUTES = 30
+AVAILABILITY_WINDOW_START = '12:00'
+AVAILABILITY_WINDOW_END = '23:00'

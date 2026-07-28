@@ -41,6 +41,26 @@ python -c "from django.core.management.utils import get_random_secret_key as k; 
 | `SECRET_KEY` | — | Required in both environments |
 | `DEBUG` | `False` | Set `True` locally |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated |
+| `CORS_ALLOWED_ORIGINS` | empty | Production only, comma-separated. See below |
+
+### CORS (browser builds only)
+
+Running either app in Chrome makes every API call cross-origin, and the browser
+blocks it unless Django says otherwise:
+
+```
+Access to fetch at 'http://127.0.0.1:8000/api/auth/login/' from origin
+'http://localhost:58966' has been blocked by CORS policy
+```
+
+Locally this is handled for you — `DJANGO_ENV=local` allows any origin, because
+`flutter run -d chrome` serves from a new random port on every run. Android and
+iOS are not affected at all.
+
+In production the allowlist is explicit and fails closed: set
+`CORS_ALLOWED_ORIGINS=https://app.sylibooking.com` (comma-separated for several).
+Leaving it unset means no browser origin is permitted, which is the right
+default for an API serving only mobile builds.
 
 ## Switching to PostgreSQL
 
@@ -64,6 +84,112 @@ DB_PORT=5432          # optional, defaults to 5432
 `python backend/manage.py migrate` again against it. The same migrations apply
 to both backends; nothing in the models is SQLite-specific.
 
+## API
+
+Browsable at http://127.0.0.1:8000/api/ once the server is running. Log in for
+the merchant-only endpoints at `/api-auth/login/` or `/admin/`.
+
+| Method | Endpoint | Auth | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/login/` | public | Username + password → token |
+| `POST` | `/api/auth/logout/` | merchant | Invalidate the caller's token |
+| `GET` | `/api/auth/me/` | merchant | Who am I, and which venues do I staff |
+| `GET` | `/api/establishments/` | public | Browse; filters: `city`, `type`, `search` |
+| `GET` | `/api/establishments/{id}/` | public | Detail with its spaces |
+| `GET` | `/api/establishments/{id}/availability/` | public | Slot grid; params: `date` (required), `party_size` |
+| `POST` | `/api/reservations/` | public | Book a slot — always created `pending` |
+| `GET` | `/api/reservations/ref/{reference}/` | reference | The customer's own booking |
+| `POST` | `/api/reservations/ref/{reference}/cancel/` | reference | Customer cancels, freeing the slot |
+| `GET` | `/api/reservations/{id}/` | merchant | Scoped to the caller's venues |
+| `GET` | `/api/reservations/` | merchant | Filters: `establishment`, `status`, `date`, `date_from`, `date_to` |
+| `POST` | `/api/reservations/{id}/confirm/` | merchant | Accept a booking |
+| `POST` | `/api/reservations/{id}/cancel/` | merchant | Turn it down, freeing the slot |
+
+Booking a slot:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/reservations/ \
+  -H 'Content-Type: application/json' \
+  -d '{"space": 1, "customer_name": "Mariama Diallo",
+       "customer_phone": "+224 620 00 00 00",
+       "datetime": "2026-08-01T19:00:00Z", "party_size": 2}'
+```
+
+### How availability works
+
+`Reservation` stores only a start time, so every booking is treated as running
+for `RESERVATION_DURATION_MINUTES` (default 120). Two bookings on one space
+clash when those windows overlap, which is what blocks double-booking. Slots are
+offered on an `AVAILABILITY_SLOT_MINUTES` grid (default 30) between
+`AVAILABILITY_WINDOW_START` and `AVAILABILITY_WINDOW_END` — all in
+`config/settings.py`.
+
+Those three are global because `Establishment.opening_hours` is still free text
+and cannot be parsed. They become per-establishment once it is structured.
+
+A cancelled reservation frees its slot; pending, confirmed and completed all
+hold it.
+
+## Customer app (Flutter)
+
+`apps/customer_app` — browse lounges and restaurants, pick a day, party size and
+time, and reserve. Pay-on-arrival only; nothing is charged.
+
+```bash
+cd backend && python manage.py runserver
+cd apps/customer_app && flutter run
+```
+
+There are no customer accounts: a booking is a name and a phone number. Every
+reservation gets a **reference** (a UUID) at creation, and holding it is what
+proves the booking is yours — it is how **My bookings** reads the live status
+and how a customer cancels. The app stores references on the device; clearing
+app data loses that list, but the booking still stands at the venue, and staff
+can find it by reference in `/admin/`.
+
+Reservations are *not* reachable by their sequential id without merchant
+credentials. They were once, which meant counting `1, 2, 3…` returned other
+people's names and phone numbers.
+
+Customers can cancel a booking that has not started yet; the slot goes straight
+back on sale. Once it has started — or the visit is marked completed — the
+server refuses and the app says to call the venue instead, rather than letting
+someone rewrite what happened. Cancelling twice is a no-op, not an error, since
+a customer on a flaky connection will tap twice.
+
+Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
+collapses the per-space availability grid into the times that are free, choosing
+the smallest space that seats the party so a couple does not take the VIP room.
+
+## Merchant app (Flutter)
+
+`apps/merchant_app` — sign in, see today's or the next seven days' bookings,
+confirm or cancel. `apps/shared_client` holds the API models and HTTP client
+that both apps will share.
+
+```bash
+cd backend && python manage.py runserver     # the app needs the API running
+cd apps/merchant_app && flutter run
+```
+
+The app defaults to `http://10.0.2.2:8000/api` on Android (the emulator's route
+to the host) and `http://127.0.0.1:8000/api` elsewhere. Point it somewhere else
+at build time:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.20:8000/api
+```
+
+### Giving an account access to a venue
+
+The app shows only the reservations of establishments the signed-in user staffs.
+A brand new user sees an empty list until assigned:
+
+1. `python backend/manage.py createsuperuser` (or add a normal user in `/admin/`)
+2. In `/admin/` → Establishments → pick one → add the user under **Staff**
+
+Superusers see every establishment's bookings.
+
 ## Tests and linting
 
 ```bash
@@ -85,6 +211,7 @@ nothing if you run it from the repo root — `cd backend` first.
 | `lint` | `ruff check` — style, unused imports, import order, Django-specific rules |
 | `test-sqlite` | Django checks, missing-migration detection, full test suite on SQLite |
 | `test-postgres` | Same suite against PostgreSQL 16 with `DJANGO_ENV=production` |
+| `flutter` | `flutter analyze --fatal-infos` and `flutter test` for each Dart package |
 
 Running the suite on both backends means the environment split in `settings.py`
 is exercised, not just assumed, and `makemigrations --check --dry-run` fails the
@@ -110,14 +237,23 @@ requests targeting `main` or `dev` — so a branch is green before it merges.
 backend/
   config/           Django settings, urls, wsgi/asgi
   establishments/   Establishment + Space models
-  reservations/     Reservation model
+  reservations/     Reservation model + availability logic
   payments/         empty for now — Payment model comes later
-  api/              empty for now — DRF serializers/viewsets come next
+  api/              DRF serializers, viewsets, token auth
+apps/
+  shared_client/    Dart API client + models, shared by both apps
+  merchant_app/     Flutter — sign in, see bookings, confirm/cancel
+  customer_app/     Flutter — browse, pick a slot, reserve
 ```
 
 ## Current state
 
 - Models + admin for Establishment, Space, Reservation
-- No API endpoints yet (`api/` and `payments/` are registered but empty)
-- Payment/deposit fields deliberately left off Reservation until the payments
-  round
+- Read API for establishments, availability for a date, and reservation
+  create/confirm/cancel
+- **No real auth yet.** "Merchant" endpoints require any authenticated Django
+  user, which today means a superuser. There is no customer/merchant user model
+  and no per-establishment scoping, so any logged-in user can see and act on
+  every establishment's reservations. That lands with the merchant app.
+- `payments/` is still an empty app; payment/deposit fields are deliberately off
+  Reservation until then

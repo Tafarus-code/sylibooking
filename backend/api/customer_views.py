@@ -12,9 +12,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from payments.services import latest_payment_for, refresh_payment
 from reservations.models import Reservation
 
-from .serializers import ReservationSerializer
+from .serializers import PaymentSerializer, ReservationSerializer
 
 
 class ReservationByReferenceView(APIView):
@@ -31,6 +32,45 @@ class ReservationByReferenceView(APIView):
     def get(self, request, reference):
         reservation = self.get_object(reference)
         return Response(ReservationSerializer(reservation).data)
+
+
+class PaymentStatusView(APIView):
+    """GET /api/reservations/ref/{reference}/payment/ — where the money is.
+
+    Polls the provider rather than reporting a cached value, and applies the
+    result: a payment that has completed since the last check confirms the
+    booking here. This is what the customer app polls after starting a mobile
+    money payment.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, reference):
+        reservation = get_object_or_404(
+            Reservation.objects.select_related('space', 'space__establishment'),
+            reference=reference,
+        )
+
+        payment = latest_payment_for(reservation)
+        if payment is None:
+            # Cash on arrival books without a payment, which is not an error.
+            return Response(
+                {
+                    'reservation': ReservationSerializer(reservation).data,
+                    'payment': None,
+                    'detail': 'This booking is paid on arrival.',
+                }
+            )
+
+        payment = refresh_payment(payment)
+        reservation.refresh_from_db()
+
+        return Response(
+            {
+                'reservation': ReservationSerializer(reservation).data,
+                'payment': PaymentSerializer(payment).data,
+            }
+        )
 
 
 class CancelReservationByReferenceView(APIView):

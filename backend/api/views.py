@@ -10,6 +10,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from establishments.models import Establishment, Space
+from payments.models import Payment
+from payments.services import start_payment
 from reservations.availability import availability_for_establishment, is_space_available
 from reservations.models import Reservation
 
@@ -162,14 +164,17 @@ class ReservationViewSet(
         return queryset
 
     def perform_create(self, serializer):
-        """Re-check availability under a row lock.
+        """Re-check availability under a row lock, then open any payment.
 
-        The serializer already checked, but two requests can pass that check
-        concurrently and both write. Locking the space row serialises them so
-        the second one loses cleanly.
+        The serializer already checked availability, but two requests can pass
+        that check concurrently and both write. Locking the space row
+        serialises them so the second one loses cleanly.
         """
         space = serializer.validated_data['space']
         start = serializer.validated_data['datetime']
+        provider = serializer.validated_data.pop(
+            'payment_provider', Payment.Provider.CASH_ON_ARRIVAL
+        )
 
         with transaction.atomic():
             locked_space = get_object_or_404(
@@ -179,7 +184,15 @@ class ReservationViewSet(
                 raise ValidationError(
                     {'datetime': f'{locked_space.name} was just booked for that time.'}
                 )
-            serializer.save(status=Reservation.Status.PENDING)
+            reservation = serializer.save(status=Reservation.Status.PENDING)
+
+            # Cash on arrival returns None and changes nothing. Mobile money
+            # opens a payment and, if it completes, confirms the booking.
+            start_payment(reservation, provider)
+
+        # start_payment may have moved the reservation to confirmed; without
+        # this the response would still claim it is pending.
+        reservation.refresh_from_db()
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def confirm(self, request, pk=None):

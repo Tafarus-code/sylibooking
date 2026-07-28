@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from decimal import Decimal
 from pathlib import Path
 
 from decouple import AutoConfig, Csv
@@ -215,6 +216,23 @@ CORS_ALLOW_CREDENTIALS = False
 # parsed — once it becomes structured, these three become per-establishment.
 
 RESERVATION_DURATION_MINUTES = 120
+
+# Payments
+#
+# Every provider currently resolves to the mock, which always succeeds. Real
+# Orange Money / MTN adapters land behind the same interface, so switching one
+# on is a change here rather than in the reservation flow.
+
+PAYMENT_PROVIDERS = {
+    'orange_money': 'payments.providers.MockPaymentProvider',
+    'mtn_money': 'payments.providers.MockPaymentProvider',
+}
+
+# What a mobile money booking pays up front, in Guinean francs. Global for now;
+# per-establishment pricing is a product decision, not a client-supplied value.
+RESERVATION_DEPOSIT_AMOUNT = Decimal(
+    config('RESERVATION_DEPOSIT_AMOUNT', default='50000')
+)
 AVAILABILITY_SLOT_MINUTES = 30
 AVAILABILITY_WINDOW_START = '12:00'
 AVAILABILITY_WINDOW_END = '23:00'

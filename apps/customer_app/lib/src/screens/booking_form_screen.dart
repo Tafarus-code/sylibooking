@@ -73,7 +73,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
         partySize: widget.partySize,
       );
 
-      await widget.store.remember(reservation.id);
+      await widget.store.remember(reservation.reference);
       await widget.store.rememberCustomer(_name.text.trim(), _phone.text.trim());
 
       if (!mounted) return;

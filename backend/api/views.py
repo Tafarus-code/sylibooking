@@ -118,7 +118,10 @@ class ReservationViewSet(
     serializer_class = ReservationSerializer
 
     def get_permissions(self):
-        if self.action in ('create', 'retrieve'):
+        # Creating is public; everything keyed by sequential id is not.
+        # Customers reach their own booking through ReservationByReferenceView,
+        # which needs the unguessable reference.
+        if self.action == 'create':
             return [AllowAny()]
         return [IsAuthenticated()]
 
@@ -129,9 +132,8 @@ class ReservationViewSet(
 
         # Scope to the caller's own venues. Without this, any logged-in user
         # would see every establishment's customer names and phone numbers.
-        # retrieve stays unscoped: a customer looks up their own booking by id.
         user = self.request.user
-        if self.action != 'retrieve' and not user.is_superuser:
+        if not user.is_superuser:
             queryset = queryset.filter(space__establishment__staff=user)
 
         establishment = self.request.query_params.get('establishment')

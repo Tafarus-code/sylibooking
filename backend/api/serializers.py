@@ -83,11 +83,24 @@ class ReservationSerializer(serializers.ModelSerializer):
         source='space.establishment.name', read_only=True
     )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    can_cancel = serializers.SerializerMethodField()
+
+    def get_can_cancel(self, reservation):
+        """Whether the customer may still cancel this themselves.
+
+        Sent so the app can hide the button rather than offer an action the
+        server will refuse.
+        """
+        return (
+            reservation.status.lower() != Reservation.Status.CANCELLED
+            and reservation.customer_cancellable_reason() is None
+        )
 
     class Meta:
         model = Reservation
         fields = [
             'id',
+            'reference',
             'space',
             'space_name',
             'establishment',
@@ -98,9 +111,10 @@ class ReservationSerializer(serializers.ModelSerializer):
             'party_size',
             'status',
             'status_display',
+            'can_cancel',
             'created_at',
         ]
-        read_only_fields = ['status', 'created_at']
+        read_only_fields = ['status', 'reference', 'created_at']
 
     def validate_party_size(self, value):
         if value < 1:

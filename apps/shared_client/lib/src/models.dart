@@ -128,6 +128,7 @@ class Establishment {
 class Reservation {
   const Reservation({
     required this.id,
+    required this.reference,
     required this.spaceId,
     required this.spaceName,
     required this.establishmentId,
@@ -138,9 +139,15 @@ class Reservation {
     required this.partySize,
     required this.status,
     required this.statusDisplay,
+    this.canCancel = false,
   });
 
   final int id;
+
+  /// Unguessable handle proving this booking is the caller's. Customers have
+  /// no accounts, so this is how they read or cancel it later.
+  final String reference;
+
   final int spaceId;
   final String spaceName;
   final int? establishmentId;
@@ -154,8 +161,13 @@ class Reservation {
   final ReservationStatus status;
   final String statusDisplay;
 
+  /// Whether the customer may still cancel this themselves. The server decides
+  /// — a booking that has started or already happened is the venue's to undo.
+  final bool canCancel;
+
   factory Reservation.fromJson(Map<String, dynamic> json) => Reservation(
         id: json['id'] as int,
+        reference: json['reference'] as String? ?? '',
         spaceId: json['space'] as int,
         spaceName: json['space_name'] as String? ?? '',
         establishmentId: json['establishment'] as int?,
@@ -166,6 +178,7 @@ class Reservation {
         partySize: json['party_size'] as int? ?? 0,
         status: ReservationStatus.parse(json['status'] as String?),
         statusDisplay: json['status_display'] as String? ?? '',
+        canCancel: json['can_cancel'] as bool? ?? false,
       );
 }
 

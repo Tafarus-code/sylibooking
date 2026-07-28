@@ -73,6 +73,13 @@ class BookingConfirmedScreen extends StatelessWidget {
                   _Row('Space', reservation.spaceName),
                   _Row('Name', reservation.customerName),
                   _Row('Status', reservation.statusDisplay),
+                  if (reservation.reference.isNotEmpty)
+                    _Row(
+                      'Reference',
+                      // Short enough to read down the phone, and the venue can
+                      // find the booking from it in the admin.
+                      reservation.reference.split('-').first.toUpperCase(),
+                    ),
                 ],
               ),
             ),

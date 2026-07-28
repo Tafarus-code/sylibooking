@@ -108,14 +108,19 @@ Map<String, dynamic> availabilityJson({
   };
 }
 
+const testReference = '11111111-2222-3333-4444-555555555555';
+
 Map<String, dynamic> reservationJson({
   int id = 42,
+  String reference = testReference,
   String status = 'pending',
   String customer = 'Mariama Diallo',
+  bool canCancel = true,
 }) {
   final now = DateTime.now();
   return {
     'id': id,
+    'reference': reference,
     'space': 3,
     'space_name': 'Table 4',
     'establishment': 7,
@@ -127,15 +132,19 @@ Map<String, dynamic> reservationJson({
     'party_size': 2,
     'status': status,
     'status_display': status[0].toUpperCase() + status.substring(1),
+    'can_cancel': canCancel,
   };
 }
 
 ({Widget app, FakeBackend backend, InMemoryBookingStore store}) buildApp({
-  List<int>? bookingIds,
+  List<String>? bookingReferences,
   ({String name, String phone})? customer,
 }) {
   final backend = FakeBackend();
-  final store = InMemoryBookingStore(ids: bookingIds, customer: customer);
+  final store = InMemoryBookingStore(
+    references: bookingReferences,
+    customer: customer,
+  );
   return (
     app: CustomerApp(
       api: SylibookingApi(
@@ -382,7 +391,8 @@ void main() {
       await tester.tap(find.text('Reserve'));
       await tester.pumpAndSettle();
 
-      expect(await store.bookingIds(), [42]);
+      // The reference, not the sequential id — the id is no longer usable.
+      expect(await store.bookingReferences(), [testReference]);
       expect((await store.lastCustomer())?.name, 'Mariama Diallo');
     });
 
@@ -426,7 +436,7 @@ void main() {
       expect(find.textContaining('already booked'), findsOneWidget);
       // Still on the form, so the customer can pick again.
       expect(find.text('Reserve'), findsOneWidget);
-      expect(await store.bookingIds(), isEmpty);
+      expect(await store.bookingReferences(), isEmpty);
     });
 
     testWidgets('the booking time is sent as UTC', (tester) async {
@@ -464,7 +474,8 @@ void main() {
 
     testWidgets('re-reads stored bookings so the status is live',
         (tester) async {
-      final (:app, :backend, :store) = buildApp(bookingIds: [42]);
+      final (:app, :backend, :store) =
+          buildApp(bookingReferences: [testReference]);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
@@ -472,7 +483,7 @@ void main() {
       });
       backend.on(
         'GET',
-        '/api/reservations/42/',
+        '/api/reservations/ref/$testReference/',
         reservationJson(status: 'confirmed'),
       );
 
@@ -485,16 +496,46 @@ void main() {
       expect(find.text('Confirmed'), findsOneWidget);
     });
 
-    testWidgets('a booking deleted server-side is skipped, not fatal',
-        (tester) async {
-      final (:app, :backend, :store) = buildApp(bookingIds: [42, 43]);
+    testWidgets('looks bookings up by reference, never by id', (tester) async {
+      final (:app, :backend, :store) =
+          buildApp(bookingReferences: [testReference]);
       backend.on('GET', '/api/establishments/', {
         'count': 0,
         'next': null,
         'results': [],
       });
-      backend.on('GET', '/api/reservations/42/', reservationJson());
-      // 43 has no route -> 404.
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.pumpAndSettle();
+
+      final paths = backend.requests.map((r) => r.url.path).toList();
+      expect(paths, contains('/api/reservations/ref/$testReference/'));
+      expect(paths, isNot(contains('/api/reservations/42/')));
+    });
+
+    testWidgets('a booking deleted server-side is skipped, not fatal',
+        (tester) async {
+      const missing = '99999999-8888-7777-6666-555555555555';
+      final (:app, :backend, :store) =
+          buildApp(bookingReferences: [testReference, missing]);
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(),
+      );
+      // The other reference has no route -> 404.
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
@@ -503,6 +544,100 @@ void main() {
 
       expect(find.text('Le Petit Baobab'), findsOneWidget);
       expect(find.text('No bookings yet'), findsNothing);
+    });
+  });
+
+  group('cancelling a booking', () {
+    Future<FakeBackend> openMyBookings(
+      WidgetTester tester, {
+      Map<String, dynamic>? reservation,
+    }) async {
+      final (:app, :backend, :store) =
+          buildApp(bookingReferences: [testReference]);
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservation ?? reservationJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a cancellable booking offers the button', (tester) async {
+      await openMyBookings(tester);
+      expect(find.text('Cancel booking'), findsOneWidget);
+    });
+
+    testWidgets('a booking the server will not let go hides the button',
+        (tester) async {
+      await openMyBookings(
+        tester,
+        reservation: reservationJson(canCancel: false),
+      );
+
+      expect(find.text('Cancel booking'), findsNothing);
+      expect(find.text('To change this booking, call the venue.'),
+          findsOneWidget);
+    });
+
+    testWidgets('cancelling asks first and can be backed out of',
+        (tester) async {
+      await openMyBookings(tester);
+
+      await tester.tap(find.text('Cancel booking'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cancel this booking?'), findsOneWidget);
+
+      await tester.tap(find.text('Keep it'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pending'), findsOneWidget);
+    });
+
+    testWidgets('confirming cancels and updates the card', (tester) async {
+      final backend = await openMyBookings(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/ref/$testReference/cancel/',
+        reservationJson(status: 'cancelled', canCancel: false),
+      );
+
+      await tester.tap(find.text('Cancel booking'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Cancel booking'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancelled'), findsOneWidget);
+      expect(find.text('Booking cancelled.'), findsOneWidget);
+    });
+
+    testWidgets('a booking that already started is refused with a reason',
+        (tester) async {
+      final backend = await openMyBookings(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/ref/$testReference/cancel/',
+        {
+          'detail': 'This booking has already started. Please call the venue '
+              'directly.',
+        },
+        status: 409,
+      );
+
+      await tester.tap(find.text('Cancel booking'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Cancel booking'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('already started'), findsOneWidget);
     });
   });
 }

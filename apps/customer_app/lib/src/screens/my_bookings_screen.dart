@@ -23,6 +23,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   bool _loading = true;
   String? _error;
 
+  /// References currently being cancelled, so their buttons disable.
+  final Set<String> _cancelling = {};
+
   @override
   void initState() {
     super.initState();
@@ -36,11 +39,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     });
 
     try {
-      final ids = await widget.store.bookingIds();
+      final references = await widget.store.bookingReferences();
       final found = <Reservation>[];
-      for (final id in ids) {
+      for (final reference in references) {
         try {
-          found.add(await widget.api.reservation(id));
+          found.add(await widget.api.reservationByReference(reference));
         } on ApiException catch (e) {
           // A booking deleted server-side should not break the whole list.
           if (!e.isNotFound) rethrow;
@@ -65,6 +68,73 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _cancel(Reservation reservation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel this booking?'),
+        content: Text(
+          '${reservation.establishmentName} on '
+          '${DateFormat.MMMEd().format(reservation.dateTime)} at '
+          '${DateFormat.Hm().format(reservation.dateTime)}.\n\n'
+          'The table goes back to other customers, so you may not get it '
+          'again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Cancel booking'),
+          ),
+        ],
+      ),
+    );
+
+    if (!(confirmed ?? false)) return;
+
+    setState(() => _cancelling.add(reservation.reference));
+    try {
+      final updated =
+          await widget.api.cancelReservationByReference(reservation.reference);
+      if (!mounted) return;
+      setState(() {
+        _reservations = [
+          for (final r in _reservations)
+            r.reference == updated.reference ? updated : r,
+        ];
+      });
+      _notify('Booking cancelled.');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _notify(e.message, isError: true);
+      // The server refused because its view differs from ours — reload.
+      if (e.isConflict || e.isNotFound) await _load();
+    } on ApiUnreachableException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _cancelling.remove(reservation.reference));
+    }
+  }
+
+  void _notify(String message, {bool isError = false}) {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? theme.colorScheme.error : null,
+        ),
+      );
   }
 
   @override
@@ -131,28 +201,67 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       itemCount: _reservations.length,
       itemBuilder: (context, index) {
         final reservation = _reservations[index];
+        final busy = _cancelling.contains(reservation.reference);
+
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            title: Text(reservation.establishmentName),
-            subtitle: Column(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
-                Text(
-                  '${DateFormat.yMMMEd().format(reservation.dateTime)} · '
-                  '${DateFormat.Hm().format(reservation.dateTime)}',
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reservation.establishmentName,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${DateFormat.yMMMEd().format(reservation.dateTime)}'
+                            ' · ${DateFormat.Hm().format(reservation.dateTime)}',
+                          ),
+                          Text(
+                            '${reservation.spaceName} · '
+                            '${reservation.partySize} '
+                            '${reservation.partySize == 1 ? "guest" : "guests"}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    _StatusChip(status: reservation.status),
+                  ],
                 ),
-                Text(
-                  '${reservation.spaceName} · ${reservation.partySize} '
-                  '${reservation.partySize == 1 ? "guest" : "guests"}',
-                  style: theme.textTheme.bodySmall,
-                ),
+                if (reservation.canCancel) ...[
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: busy ? null : () => _cancel(reservation),
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Cancel booking'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ] else if (reservation.status.isOpen) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'To change this booking, call the venue.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
             ),
-            trailing: _StatusChip(status: reservation.status),
           ),
         );
       },

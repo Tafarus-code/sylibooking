@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import 'write_review_screen.dart';
 
 /// Bookings made on this device, re-read from the server so the status is live.
 ///
@@ -121,6 +122,21 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       if (mounted) _notify(e.message, isError: true);
     } finally {
       if (mounted) setState(() => _cancelling.remove(reservation.reference));
+    }
+  }
+
+  Future<void> _review(Reservation reservation) async {
+    final posted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => WriteReviewScreen(
+          api: widget.api,
+          reservation: reservation,
+        ),
+      ),
+    );
+
+    if ((posted ?? false) && mounted) {
+      _notify('Thanks — your review is live.');
     }
   }
 
@@ -255,7 +271,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     _StatusChip(status: reservation.status),
                   ],
                 ),
-                if (reservation.canCancel) ...[
+                if (reservation.status == ReservationStatus.completed) ...[
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => _review(reservation),
+                      icon: const Icon(Icons.rate_review_outlined, size: 18),
+                      label: const Text('Write a review'),
+                    ),
+                  ),
+                ] else if (reservation.canCancel) ...[
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,

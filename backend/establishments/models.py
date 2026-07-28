@@ -276,7 +276,9 @@ class Review(models.Model):
     )
 
     class Meta:
-        ordering = ['-created_at']
+        # -id breaks ties: two reviews written in the same millisecond would
+        # otherwise come back in an arbitrary order, which paginates badly.
+        ordering = ['-created_at', '-id']
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(rating__gte=1) & models.Q(rating__lte=5),
@@ -345,7 +347,7 @@ class Photo(models.Model):
     )
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-created_at', '-id']
 
     def __str__(self):
         return (

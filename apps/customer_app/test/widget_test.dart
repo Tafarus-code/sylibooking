@@ -611,6 +611,253 @@ void main() {
     });
   });
 
+  group('reviews and photos on the detail screen', () {
+    Map<String, dynamic> reviewJson({
+      int id = 1,
+      int rating = 5,
+      String comment = 'Excellent night.',
+      String author = 'Mariama',
+    }) =>
+        {
+          'id': id,
+          'rating': rating,
+          'comment': comment,
+          'author': author,
+          'created_at': '2026-07-20T20:00:00Z',
+        };
+
+    Map<String, dynamic> photoJson({
+      int id = 1,
+      String caption = 'Terrace',
+      String role = 'merchant',
+    }) =>
+        {
+          'id': id,
+          'image': 'http://localhost:8000/media/establishments/7/a.jpg',
+          'caption': caption,
+          'uploaded_by_role': role,
+          'uploaded_by_role_display':
+              role == 'merchant' ? 'Merchant' : 'Customer',
+          'created_at': '2026-07-20T20:00:00Z',
+        };
+
+    Future<FakeBackend> openVenue(
+      WidgetTester tester, {
+      double? averageRating,
+      int reviewCount = 0,
+      List<Map<String, dynamic>> reviews = const [],
+      List<Map<String, dynamic>> photos = const [],
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'average_rating': averageRating,
+        'review_count': reviewCount,
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': reviews.length,
+        'next': null,
+        'results': reviews,
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': photos.length,
+        'next': null,
+        'results': photos,
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a venue with no reviews invites the first one',
+        (tester) async {
+      await openVenue(tester);
+
+      expect(
+        find.text('No reviews yet — be the first after your visit.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the average rating is shown when there are reviews',
+        (tester) async {
+      await openVenue(
+        tester,
+        averageRating: 4.5,
+        reviewCount: 2,
+        reviews: [reviewJson(), reviewJson(id: 2, rating: 4)],
+      );
+
+      expect(find.text('4.5'), findsWidgets);
+      expect(find.text('2 reviews'), findsOneWidget);
+    });
+
+    testWidgets('individual reviews are listed', (tester) async {
+      await openVenue(
+        tester,
+        averageRating: 5.0,
+        reviewCount: 1,
+        reviews: [reviewJson(comment: 'Best chicha in Conakry.')],
+      );
+
+      expect(find.text('Best chicha in Conakry.'), findsOneWidget);
+      expect(find.text('Mariama'), findsOneWidget);
+    });
+
+    testWidgets('a review with no comment still renders', (tester) async {
+      await openVenue(
+        tester,
+        averageRating: 3.0,
+        reviewCount: 1,
+        reviews: [reviewJson(comment: '', rating: 3)],
+      );
+
+      expect(find.text('Mariama'), findsOneWidget);
+    });
+
+    testWidgets('photos render when the venue has them', (tester) async {
+      await openVenue(tester, photos: [photoJson(caption: 'Our terrace')]);
+
+      expect(find.text('Our terrace'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no photos shows no photo strip', (tester) async {
+      await openVenue(tester);
+
+      expect(find.byType(Image), findsNothing);
+    });
+  });
+
+  group('writing a review', () {
+    Future<({FakeBackend backend, InMemoryBookingStore store})> openMyBookings(
+      WidgetTester tester, {
+      required String reservationStatus,
+    }) async {
+      final (:app, :backend, :store) =
+          buildApp(tester, bookingReferences: [testReference]);
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(status: reservationStatus, canCancel: false),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.pumpAndSettle();
+      return (backend: backend, store: store);
+    }
+
+    testWidgets('a completed visit offers to be reviewed', (tester) async {
+      await openMyBookings(tester, reservationStatus: 'completed');
+
+      expect(find.text('Write a review'), findsOneWidget);
+    });
+
+    testWidgets('a pending booking does not offer a review', (tester) async {
+      await openMyBookings(tester, reservationStatus: 'pending');
+
+      expect(find.text('Write a review'), findsNothing);
+    });
+
+    testWidgets('the review form opens with the venue named', (tester) async {
+      await openMyBookings(tester, reservationStatus: 'completed');
+
+      await tester.tap(find.text('Write a review'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('How was it?'), findsOneWidget);
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+      expect(find.text('Only your first name is shown.'), findsOneWidget);
+    });
+
+    testWidgets('posting without a rating is refused locally', (tester) async {
+      final (:backend, :store) =
+          await openMyBookings(tester, reservationStatus: 'completed');
+
+      await tester.tap(find.text('Write a review'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Post review'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose a rating from 1 to 5.'), findsOneWidget);
+      expect(
+        backend.requests.where((r) => r.method == 'POST'),
+        isEmpty,
+      );
+    });
+
+    testWidgets('a rating and comment are posted', (tester) async {
+      final (:backend, :store) =
+          await openMyBookings(tester, reservationStatus: 'completed');
+      backend.on('POST', '/api/establishments/7/reviews/', {
+        'id': 1,
+        'rating': 5,
+        'comment': 'Lovely',
+        'author': 'Mariama',
+        'created_at': '2026-07-28T20:00:00Z',
+      });
+
+      await tester.tap(find.text('Write a review'));
+      await tester.pumpAndSettle();
+      // Fifth star.
+      await tester.tap(find.byIcon(Icons.star_border).last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'Lovely');
+      await tester.tap(find.text('Post review'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests
+          .firstWhere((r) => r.url.path == '/api/establishments/7/reviews/');
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body['rating'], 5);
+      expect(body['comment'], 'Lovely');
+      expect(body['reservation_reference'], testReference);
+    });
+
+    testWidgets('the server refusing is shown to the customer', (tester) async {
+      final (:backend, :store) =
+          await openMyBookings(tester, reservationStatus: 'completed');
+      backend.on(
+        'POST',
+        '/api/establishments/7/reviews/',
+        {
+          'reservation_reference': ['This visit has already been reviewed.'],
+        },
+        status: 400,
+      );
+
+      await tester.tap(find.text('Write a review'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.star_border).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Post review'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('already been reviewed'), findsOneWidget);
+      // Still on the form rather than pretending it worked.
+      expect(find.text('Post review'), findsOneWidget);
+    });
+  });
+
   group('availability', () {
     Future<FakeBackend> openVenue(
       WidgetTester tester, {

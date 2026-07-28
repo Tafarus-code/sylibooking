@@ -174,6 +174,183 @@ class MenuCategory {
       );
 }
 
+class Review {
+  const Review({
+    required this.id,
+    required this.rating,
+    required this.author,
+    required this.createdAt,
+    this.comment = '',
+  });
+
+  final int id;
+  final int rating;
+  final String comment;
+
+  /// First name only — the API deliberately publishes no more than that.
+  final String author;
+  final DateTime createdAt;
+
+  factory Review.fromJson(Map<String, dynamic> json) => Review(
+        id: json['id'] as int,
+        rating: json['rating'] as int? ?? 0,
+        comment: json['comment'] as String? ?? '',
+        author: json['author'] as String? ?? 'Guest',
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      );
+}
+
+class Photo {
+  const Photo({
+    required this.id,
+    required this.imageUrl,
+    required this.uploadedByRole,
+    required this.uploadedByRoleDisplay,
+    this.caption = '',
+  });
+
+  final int id;
+  final String imageUrl;
+
+  /// `customer` or `merchant` — a venue's own photo is not a guest snapshot.
+  final String uploadedByRole;
+  final String uploadedByRoleDisplay;
+  final String caption;
+
+  bool get isFromMerchant => uploadedByRole == 'merchant';
+
+  factory Photo.fromJson(Map<String, dynamic> json) => Photo(
+        id: json['id'] as int,
+        imageUrl: json['image'] as String? ?? '',
+        uploadedByRole: json['uploaded_by_role'] as String? ?? '',
+        uploadedByRoleDisplay:
+            json['uploaded_by_role_display'] as String? ?? '',
+        caption: json['caption'] as String? ?? '',
+      );
+}
+
+/// One provider's line on the merchant dashboard.
+class ProviderTotals {
+  const ProviderTotals({
+    required this.provider,
+    required this.providerDisplay,
+    required this.bookings,
+    required this.collected,
+    required this.awaiting,
+  });
+
+  final String provider;
+  final String providerDisplay;
+  final int bookings;
+  final String collected;
+  final String awaiting;
+
+  factory ProviderTotals.fromJson(Map<String, dynamic> json) => ProviderTotals(
+        provider: json['provider'] as String? ?? '',
+        providerDisplay: json['provider_display'] as String? ?? '',
+        bookings: json['bookings'] as int? ?? 0,
+        collected: '${json['collected'] ?? '0.00'}',
+        awaiting: '${json['awaiting'] ?? '0.00'}',
+      );
+}
+
+/// A booking whose money has not arrived and whose date has not passed.
+class AttentionItem {
+  const AttentionItem({
+    required this.reservationId,
+    required this.customerName,
+    required this.dateTime,
+    required this.spaceName,
+    required this.establishmentName,
+    required this.paymentProviderDisplay,
+    this.paymentStatus,
+  });
+
+  final int reservationId;
+  final String customerName;
+  final DateTime dateTime;
+  final String spaceName;
+  final String establishmentName;
+  final String paymentProviderDisplay;
+  final PaymentStatus? paymentStatus;
+
+  factory AttentionItem.fromJson(Map<String, dynamic> json) => AttentionItem(
+        reservationId: json['id'] as int,
+        customerName: json['customer_name'] as String? ?? '',
+        dateTime: DateTime.parse(json['datetime'] as String).toLocal(),
+        spaceName: json['space_name'] as String? ?? '',
+        establishmentName: json['establishment_name'] as String? ?? '',
+        paymentProviderDisplay:
+            json['payment_provider_display'] as String? ?? '',
+        paymentStatus: json['payment_status'] == null
+            ? null
+            : PaymentStatus.parse(json['payment_status'] as String?),
+      );
+}
+
+/// What the merchant took, what is still owed, and what to chase.
+class PaymentDashboard {
+  const PaymentDashboard({
+    required this.from,
+    required this.to,
+    required this.collected,
+    required this.awaiting,
+    required this.failed,
+    required this.completedCount,
+    required this.pendingCount,
+    required this.failedCount,
+    required this.reservationCounts,
+    required this.byProvider,
+    required this.needsAttention,
+  });
+
+  final DateTime from;
+  final DateTime to;
+
+  /// Amounts as strings: nothing on the client rounds money.
+  final String collected;
+  final String awaiting;
+  final String failed;
+
+  final int completedCount;
+  final int pendingCount;
+  final int failedCount;
+
+  /// Keyed by reservation status, plus `total`.
+  final Map<String, int> reservationCounts;
+  final List<ProviderTotals> byProvider;
+  final List<AttentionItem> needsAttention;
+
+  int get totalReservations => reservationCounts['total'] ?? 0;
+
+  factory PaymentDashboard.fromJson(Map<String, dynamic> json) {
+    final period = json['period'] as Map<String, dynamic>? ?? {};
+    final payments = json['payments'] as Map<String, dynamic>? ?? {};
+    final reservations = json['reservations'] as Map<String, dynamic>? ?? {};
+
+    return PaymentDashboard(
+      from: DateTime.parse(period['from'] as String),
+      to: DateTime.parse(period['to'] as String),
+      collected: '${payments['collected'] ?? '0.00'}',
+      awaiting: '${payments['awaiting'] ?? '0.00'}',
+      failed: '${payments['failed'] ?? '0.00'}',
+      completedCount: payments['completed_count'] as int? ?? 0,
+      pendingCount: payments['pending_count'] as int? ?? 0,
+      failedCount: payments['failed_count'] as int? ?? 0,
+      reservationCounts: {
+        for (final entry in reservations.entries)
+          if (entry.value is int) entry.key: entry.value as int,
+      },
+      byProvider: (json['by_provider'] as List<dynamic>? ?? [])
+          .map((e) => ProviderTotals.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      needsAttention: (json['needs_attention'] as List<dynamic>? ?? [])
+          .map((e) => AttentionItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 class Establishment {
   const Establishment({
     required this.id,
@@ -190,6 +367,8 @@ class Establishment {
     this.today,
     this.hours = const [],
     this.menu = const [],
+    this.averageRating,
+    this.reviewCount = 0,
   });
 
   final int id;
@@ -222,6 +401,13 @@ class Establishment {
   /// Available items by category, detail only. Categories with nothing
   /// available are already omitted by the API.
   final List<MenuCategory> menu;
+
+  /// Mean of visible ratings, or null when nobody has reviewed yet. Computed
+  /// server-side so hidden reviews never count.
+  final double? averageRating;
+  final int reviewCount;
+
+  bool get hasReviews => reviewCount > 0;
 
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
@@ -261,6 +447,8 @@ class Establishment {
         menu: (json['menu'] as List<dynamic>? ?? [])
             .map((e) => MenuCategory.fromJson(e as Map<String, dynamic>))
             .toList(),
+        averageRating: (json['average_rating'] as num?)?.toDouble(),
+        reviewCount: json['review_count'] as int? ?? 0,
       );
 }
 

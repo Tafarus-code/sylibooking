@@ -97,7 +97,10 @@ _BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme) {
   return (
     label: 'Cash on arrival',
     shortLabel: 'Cash',
-    icon: Icons.payments_outlined,
+    // local_atm rather than payments_outlined: the latter now marks the
+    // Payments tab, and the same glyph meaning two things in one screen is
+    // exactly what a scannable badge must not do.
+    icon: Icons.local_atm,
     background: Colors.transparent,
     foreground: scheme.onSurfaceVariant,
     border: scheme.outlineVariant,

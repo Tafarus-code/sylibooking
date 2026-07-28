@@ -241,7 +241,8 @@ void main() {
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Reservations'), findsOneWidget);
+      // Twice now: the app bar title and the navigation destination.
+      expect(find.text('Reservations'), findsWidgets);
       expect(find.text('Le Petit Baobab'), findsOneWidget);
       expect(find.text('Mariama Diallo'), findsOneWidget);
     });
@@ -254,7 +255,7 @@ void main() {
       await tester.pumpWidget(MerchantApp(auth: auth));
       await tester.pumpAndSettle();
 
-      expect(find.text('Reservations'), findsOneWidget);
+      expect(find.text('Reservations'), findsWidgets);
       expect(find.text('Sign in'), findsNothing);
     });
 
@@ -526,7 +527,7 @@ void main() {
         ],
       });
 
-      expect(find.byIcon(Icons.payments_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.local_atm), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
       expect(find.byIcon(Icons.hourglass_top), findsOneWidget);
     });
@@ -698,6 +699,232 @@ void main() {
       await openDetail(tester, paidBooking());
 
       expect(find.byTooltip('Copy Provider reference'), findsOneWidget);
+    });
+  });
+
+  group('payments dashboard', () {
+    Map<String, dynamic> dashboardJson({
+      String collected = '150000.00',
+      String awaiting = '0.00',
+      String failed = '0.00',
+      int completedCount = 3,
+      int pendingCount = 0,
+      int failedCount = 0,
+      List<Map<String, dynamic>>? needsAttention,
+    }) =>
+        {
+          'period': {'from': '2026-07-01', 'to': '2026-07-30'},
+          'establishments': [
+            {'id': 7, 'name': 'Le Petit Baobab'},
+          ],
+          'reservations': {
+            'total': 10,
+            'pending': 2,
+            'confirmed': 6,
+            'cancelled': 1,
+            'completed': 1,
+          },
+          'payments': {
+            'collected': collected,
+            'awaiting': awaiting,
+            'failed': failed,
+            'completed_count': completedCount,
+            'pending_count': pendingCount,
+            'failed_count': failedCount,
+          },
+          'by_provider': [
+            {
+              'provider': 'cash_on_arrival',
+              'provider_display': 'Cash on arrival',
+              'bookings': 6,
+              'collected': '0.00',
+              'awaiting': '0.00',
+            },
+            {
+              'provider': 'orange_money',
+              'provider_display': 'Orange Money',
+              'bookings': 3,
+              'collected': '150000.00',
+              'awaiting': '0.00',
+            },
+            {
+              'provider': 'mtn_money',
+              'provider_display': 'MTN Mobile Money',
+              'bookings': 0,
+              'collected': '0.00',
+              'awaiting': '0.00',
+            },
+          ],
+          'needs_attention': needsAttention ?? [],
+        };
+
+    Future<FakeBackend> openDashboard(
+      WidgetTester tester, {
+      Map<String, dynamic>? dashboard,
+      bool failDashboard = false,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      if (!failDashboard) {
+        backend.on(
+          'GET',
+          '/api/dashboard/payments/',
+          dashboard ?? dashboardJson(),
+        );
+      }
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.payments_outlined));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    /// The "Needs chasing" section sits below the fold on a 360x900 phone, so
+    /// it is not built until scrolled to.
+    Future<void> scrollToBottom(WidgetTester tester) async {
+      // Drag the list itself: any content-based target scrolls out of reach
+      // after the first drag.
+      const list = Key('payments-dashboard-list');
+      for (var i = 0; i < 5; i++) {
+        await tester.drag(find.byKey(list), const Offset(0, -400));
+        await tester.pumpAndSettle();
+      }
+    }
+
+    testWidgets('is reachable from the reservations screen', (tester) async {
+      await openDashboard(tester);
+      expect(find.text('Collected'), findsOneWidget);
+    });
+
+    testWidgets('shows what was collected', (tester) async {
+      await openDashboard(tester);
+
+      expect(find.text('150000.00 GNF'), findsWidgets);
+      expect(find.text('3 payments'), findsOneWidget);
+    });
+
+    testWidgets('shows outstanding and failed money separately',
+        (tester) async {
+      await openDashboard(
+        tester,
+        dashboard: dashboardJson(
+          awaiting: '50000.00',
+          failed: '25000.00',
+          pendingCount: 1,
+          failedCount: 1,
+        ),
+      );
+
+      expect(find.text('Awaiting'), findsOneWidget);
+      expect(find.text('Failed'), findsOneWidget);
+      expect(find.text('1 pending'), findsOneWidget);
+      expect(find.text('1 failed'), findsOneWidget);
+    });
+
+    testWidgets('breaks takings down by payment method', (tester) async {
+      await openDashboard(tester);
+
+      expect(find.text('Cash on arrival'), findsOneWidget);
+      expect(find.text('Orange Money'), findsOneWidget);
+      expect(find.text('MTN Mobile Money'), findsOneWidget);
+      // Cash is settled at the till, so it shows no figure.
+      expect(find.text('at the till'), findsOneWidget);
+    });
+
+    testWidgets('counts bookings by status', (tester) async {
+      await openDashboard(tester);
+
+      expect(find.text('Total'), findsOneWidget);
+      expect(find.text('Cancelled'), findsOneWidget);
+    });
+
+    testWidgets('says so when nothing is outstanding', (tester) async {
+      await openDashboard(tester);
+
+      await scrollToBottom(tester);
+
+      expect(
+        find.text('Nothing outstanding. Every booking is settled.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('lists bookings that need chasing', (tester) async {
+      await openDashboard(
+        tester,
+        dashboard: dashboardJson(needsAttention: [
+          {
+            'id': 42,
+            'customer_name': 'Unpaid Guest',
+            'datetime': DateTime.now()
+                .add(const Duration(days: 2))
+                .toUtc()
+                .toIso8601String(),
+            'space_name': 'Table 4',
+            'establishment_name': 'Le Petit Baobab',
+            'payment_status': 'pending',
+            'payment_provider_display': 'Orange Money',
+          },
+        ]),
+      );
+
+      await scrollToBottom(tester);
+
+      expect(find.text('Unpaid Guest'), findsOneWidget);
+      expect(find.text('Orange Money not received'), findsOneWidget);
+      expect(
+        find.text('Nothing outstanding. Every booking is settled.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('a failed payment reads differently from an unpaid one',
+        (tester) async {
+      await openDashboard(
+        tester,
+        dashboard: dashboardJson(needsAttention: [
+          {
+            'id': 42,
+            'customer_name': 'Failed Guest',
+            'datetime': DateTime.now()
+                .add(const Duration(days: 2))
+                .toUtc()
+                .toIso8601String(),
+            'space_name': 'Table 4',
+            'establishment_name': 'Le Petit Baobab',
+            'payment_status': 'failed',
+            'payment_provider_display': 'MTN Mobile Money',
+          },
+        ]),
+      );
+
+      await scrollToBottom(tester);
+
+      expect(find.text('MTN Mobile Money payment failed'), findsOneWidget);
+    });
+
+    testWidgets('changing the window re-queries with new dates',
+        (tester) async {
+      final backend = await openDashboard(tester);
+
+      await tester.tap(find.text('7 days'));
+      await tester.pumpAndSettle();
+
+      final query = backend.requests.last.url.queryParameters;
+      expect(query['date_from'], isNotNull);
+      expect(query['date_to'], isNotNull);
+    });
+
+    testWidgets('a failure offers a retry', (tester) async {
+      await openDashboard(tester, failDashboard: true);
+
+      expect(find.text('Try again'), findsOneWidget);
     });
   });
 

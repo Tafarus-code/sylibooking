@@ -218,9 +218,25 @@ class ReservationScopingTests(MerchantAuthTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('date_from', response.data)
 
-    def test_customer_can_still_look_up_their_own_booking_by_id(self):
-        """retrieve stays unscoped so a customer can check their reservation."""
+    def test_lookup_by_id_is_closed_to_anonymous_callers(self):
+        """Retrieve by id used to be public so customers could check a booking.
+
+        Sequential ids made that a way to read anyone's name and phone number
+        by counting upwards, so customers now go through their reference
+        instead — see api/test_customer_cancel.py.
+        """
         response = self.client.get(
             reverse('reservation-detail', args=[self.baobab_booking.pk])
+        )
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        )
+
+    def test_the_reference_still_reaches_the_booking(self):
+        response = self.client.get(
+            reverse(
+                'reservation-by-reference', args=[self.baobab_booking.reference]
+            )
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)

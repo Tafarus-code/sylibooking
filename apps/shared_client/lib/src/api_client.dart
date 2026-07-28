@@ -247,10 +247,26 @@ class SylibookingApi {
     return all;
   }
 
-  /// One booking by id. Public, so a customer with no account can check the
-  /// status of something they booked.
+  /// One booking by id. Merchant-only — scoped to the caller's own venues.
+  /// Customers use [reservationByReference] instead.
   Future<Reservation> reservation(int id) async {
     final json = await _get('/reservations/$id/');
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// One booking by its reference. Needs no account: holding the reference is
+  /// what proves the booking is yours.
+  Future<Reservation> reservationByReference(String reference) async {
+    final json = await _get('/reservations/ref/$reference/');
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Customer cancels their own booking, freeing the slot.
+  ///
+  /// Cancelling twice succeeds rather than erroring. A booking that has
+  /// already started throws [ApiException] with `isConflict`.
+  Future<Reservation> cancelReservationByReference(String reference) async {
+    final json = await _post('/reservations/ref/$reference/cancel/');
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 

@@ -1,4 +1,7 @@
+import uuid
+
 from django.db import models
+from django.utils import timezone
 
 from establishments.models import Space
 
@@ -16,6 +19,17 @@ class Reservation(models.Model):
         CANCELLED = 'cancelled', 'Cancelled'
         COMPLETED = 'completed', 'Completed'
 
+    reference = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+        help_text=(
+            'Unguessable handle the customer uses to view or cancel their own '
+            'booking. Customers have no accounts, so this is what proves the '
+            'booking is theirs — the sequential id must not be used for that.'
+        ),
+    )
     space = models.ForeignKey(
         Space,
         on_delete=models.PROTECT,
@@ -52,3 +66,25 @@ class Reservation(models.Model):
             f'{self.customer_name} — {self.space.name} '
             f'@ {self.datetime:%Y-%m-%d %H:%M} ({self.get_status_display()})'
         )
+
+    @property
+    def has_started(self):
+        return self.datetime <= timezone.now()
+
+    def customer_cancellable_reason(self):
+        """Why the customer may not cancel this, or None if they may.
+
+        A merchant can cancel more freely — they are in the room and can see
+        what actually happened. A customer cancelling a visit that already
+        began would be rewriting history, so those get sent to the venue.
+        """
+        if self.status == self.Status.COMPLETED:
+            return 'This visit already happened.'
+        if self.status == self.Status.CANCELLED:
+            return None  # Already cancelled; cancelling again is a no-op.
+        if self.has_started:
+            return (
+                'This booking has already started. Please call the venue '
+                'directly.'
+            )
+        return None

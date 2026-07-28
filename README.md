@@ -98,7 +98,9 @@ the merchant-only endpoints at `/api-auth/login/` or `/admin/`.
 | `GET` | `/api/establishments/{id}/` | public | Detail with its spaces |
 | `GET` | `/api/establishments/{id}/availability/` | public | Slot grid; params: `date` (required), `party_size` |
 | `POST` | `/api/reservations/` | public | Book a slot — always created `pending` |
-| `GET` | `/api/reservations/{id}/` | public | Check one booking by id |
+| `GET` | `/api/reservations/ref/{reference}/` | reference | The customer's own booking |
+| `POST` | `/api/reservations/ref/{reference}/cancel/` | reference | Customer cancels, freeing the slot |
+| `GET` | `/api/reservations/{id}/` | merchant | Scoped to the caller's venues |
 | `GET` | `/api/reservations/` | merchant | Filters: `establishment`, `status`, `date`, `date_from`, `date_to` |
 | `POST` | `/api/reservations/{id}/confirm/` | merchant | Accept a booking |
 | `POST` | `/api/reservations/{id}/cancel/` | merchant | Turn it down, freeing the slot |
@@ -138,10 +140,22 @@ cd backend && python manage.py runserver
 cd apps/customer_app && flutter run
 ```
 
-There are no customer accounts: a booking is a name and a phone number. The app
-remembers the ids it created on the device and re-reads them from
-`/api/reservations/{id}/` for **My bookings**, so the status stays live. Clearing
-app data loses that list — the booking itself still stands at the venue.
+There are no customer accounts: a booking is a name and a phone number. Every
+reservation gets a **reference** (a UUID) at creation, and holding it is what
+proves the booking is yours — it is how **My bookings** reads the live status
+and how a customer cancels. The app stores references on the device; clearing
+app data loses that list, but the booking still stands at the venue, and staff
+can find it by reference in `/admin/`.
+
+Reservations are *not* reachable by their sequential id without merchant
+credentials. They were once, which meant counting `1, 2, 3…` returned other
+people's names and phone numbers.
+
+Customers can cancel a booking that has not started yet; the slot goes straight
+back on sale. Once it has started — or the visit is marked completed — the
+server refuses and the app says to call the venue instead, rather than letting
+someone rewrite what happened. Cancelling twice is a no-op, not an error, since
+a customer on a flaky connection will tap twice.
 
 Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
 collapses the per-space availability grid into the times that are free, choosing

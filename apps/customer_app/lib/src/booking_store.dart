@@ -7,8 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// from the public detail endpoint. Clearing app data loses the list; the
 /// booking itself still stands at the venue.
 abstract class BookingStore {
-  Future<List<int>> bookingIds();
-  Future<void> remember(int id);
+  Future<List<String>> bookingReferences();
+  Future<void> remember(String reference);
 
   /// Prefill for the next booking, so a returning customer types once.
   Future<({String name, String phone})?> lastCustomer();
@@ -16,25 +16,26 @@ abstract class BookingStore {
 }
 
 class SharedPreferencesBookingStore implements BookingStore {
-  static const _idsKey = 'sylibooking.customer.bookings';
+  // Deliberately a new key: the old one held sequential ids, which the API no
+  // longer accepts from customers. Anything stored under it is unusable, so it
+  // is left behind rather than migrated.
+  static const _referencesKey = 'sylibooking.customer.booking_refs';
   static const _nameKey = 'sylibooking.customer.name';
   static const _phoneKey = 'sylibooking.customer.phone';
 
   @override
-  Future<List<int>> bookingIds() async {
+  Future<List<String>> bookingReferences() async {
     final prefs = await SharedPreferences.getInstance();
-    return (prefs.getStringList(_idsKey) ?? [])
-        .map(int.tryParse)
-        .whereType<int>()
-        .toList();
+    return prefs.getStringList(_referencesKey) ?? [];
   }
 
   @override
-  Future<void> remember(int id) async {
+  Future<void> remember(String reference) async {
+    if (reference.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getStringList(_idsKey) ?? [];
-    if (existing.contains('$id')) return;
-    await prefs.setStringList(_idsKey, [...existing, '$id']);
+    final existing = prefs.getStringList(_referencesKey) ?? [];
+    if (existing.contains(reference)) return;
+    await prefs.setStringList(_referencesKey, [...existing, reference]);
   }
 
   @override
@@ -56,17 +57,20 @@ class SharedPreferencesBookingStore implements BookingStore {
 
 /// Used in widget tests, which have no platform channels.
 class InMemoryBookingStore implements BookingStore {
-  InMemoryBookingStore({List<int>? ids, this.customer}) : _ids = [...?ids];
+  InMemoryBookingStore({List<String>? references, this.customer})
+      : _references = [...?references];
 
-  final List<int> _ids;
+  final List<String> _references;
   ({String name, String phone})? customer;
 
   @override
-  Future<List<int>> bookingIds() async => List.unmodifiable(_ids);
+  Future<List<String>> bookingReferences() async =>
+      List.unmodifiable(_references);
 
   @override
-  Future<void> remember(int id) async {
-    if (!_ids.contains(id)) _ids.add(id);
+  Future<void> remember(String reference) async {
+    if (reference.isEmpty) return;
+    if (!_references.contains(reference)) _references.add(reference);
   }
 
   @override

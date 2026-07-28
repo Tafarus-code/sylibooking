@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import 'payment_badge.dart';
+
 /// One booking, with the actions the merchant can still take on it.
 class ReservationCard extends StatelessWidget {
   const ReservationCard({
@@ -9,24 +11,36 @@ class ReservationCard extends StatelessWidget {
     required this.reservation,
     required this.onConfirm,
     required this.onCancel,
+    this.onTap,
     this.busy = false,
   });
 
   final Reservation reservation;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
+
+  /// Opens the detail view, where the reference and amount live.
+  final VoidCallback? onTap;
   final bool busy;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final time = DateFormat.Hm().format(reservation.dateTime);
-    final canConfirm = reservation.status == ReservationStatus.pending;
+    final isPending = reservation.status == ReservationStatus.pending;
+    // The server refuses to confirm an unpaid mobile money booking, so offer
+    // the button greyed rather than absent — a missing button looks like a
+    // bug, a disabled one with a reason explains itself.
+    final canConfirm = isPending && reservation.canConfirm;
+    final blockedByPayment = isPending && !reservation.canConfirm;
     final canCancel = reservation.status.isOpen;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Padding(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,7 +90,21 @@ class ReservationCard extends StatelessWidget {
                 _StatusChip(status: reservation.status),
               ],
             ),
-            if (canConfirm || canCancel) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: PaymentBadge(reservation: reservation),
+            ),
+            if (blockedByPayment) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Cannot confirm until the payment clears.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+            if (isPending || canCancel) ...[
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -90,10 +118,10 @@ class ReservationCard extends StatelessWidget {
                         foregroundColor: theme.colorScheme.error,
                       ),
                     ),
-                  if (canConfirm) ...[
+                  if (isPending) ...[
                     const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: busy ? null : onConfirm,
+                      onPressed: (busy || !canConfirm) ? null : onConfirm,
                       icon: const Icon(Icons.check, size: 18),
                       label: const Text('Confirm'),
                     ),
@@ -102,6 +130,7 @@ class ReservationCard extends StatelessWidget {
               ),
             ],
           ],
+        ),
         ),
       ),
     );

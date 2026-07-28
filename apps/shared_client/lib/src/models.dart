@@ -140,6 +140,11 @@ class Reservation {
     required this.status,
     required this.statusDisplay,
     this.canCancel = false,
+    this.canConfirm = false,
+    this.paymentProvider = PaymentProvider.cashOnArrival,
+    this.paymentProviderDisplay = '',
+    this.paymentStatus,
+    this.isPaid = false,
     this.payment,
   });
 
@@ -166,8 +171,29 @@ class Reservation {
   /// — a booking that has started or already happened is the venue's to undo.
   final bool canCancel;
 
+  /// Whether the merchant may confirm this now. The server enforces the same
+  /// rule, so a client that ignores this gets a 409.
+  final bool canConfirm;
+
+  /// How the booking is being paid, cash included.
+  final PaymentProvider paymentProvider;
+  final String paymentProviderDisplay;
+
+  /// Null when there is nothing to settle — that is, cash on arrival.
+  final PaymentStatus? paymentStatus;
+
+  final bool isPaid;
+
   /// The most recent payment, or null for a cash-on-arrival booking.
   final Payment? payment;
+
+  /// True when money is owed through a provider and has not arrived.
+  ///
+  /// The distinction that matters on a merchant's screen: an unpaid mobile
+  /// money booking is not the same as a cash booking, even though neither has
+  /// been paid yet.
+  bool get isAwaitingPayment =>
+      paymentProvider.isMobileMoney && !isPaid;
 
   factory Reservation.fromJson(Map<String, dynamic> json) => Reservation(
         id: json['id'] as int,
@@ -183,6 +209,16 @@ class Reservation {
         status: ReservationStatus.parse(json['status'] as String?),
         statusDisplay: json['status_display'] as String? ?? '',
         canCancel: json['can_cancel'] as bool? ?? false,
+        canConfirm: json['can_confirm'] as bool? ?? false,
+        paymentProvider: PaymentProvider.parse(
+          json['payment_provider'] as String?,
+        ),
+        paymentProviderDisplay:
+            json['payment_provider_display'] as String? ?? '',
+        paymentStatus: json['payment_status'] == null
+            ? null
+            : PaymentStatus.parse(json['payment_status'] as String?),
+        isPaid: json['is_paid'] as bool? ?? false,
         payment: json['payment'] == null
             ? null
             : Payment.fromJson(json['payment'] as Map<String, dynamic>),

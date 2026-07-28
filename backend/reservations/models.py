@@ -71,6 +71,58 @@ class Reservation(models.Model):
     def has_started(self):
         return self.datetime <= timezone.now()
 
+    @property
+    def latest_payment(self):
+        """The payment this booking is settled by, if any.
+
+        Cash on arrival writes no Payment row, so this is None for those —
+        which is what tells the merchant list to show "Cash on arrival"
+        rather than "Unpaid".
+        """
+        # Uses the prefetched list when the caller prefetched, so a day's
+        # worth of bookings does not become a query per row.
+        payments = self.payments.all()
+        return max(payments, key=lambda p: p.created_at, default=None)
+
+    @property
+    def payment_provider(self):
+        """How this booking is being paid, cash included."""
+        payment = self.latest_payment
+        if payment is None:
+            # Imported here: payments depends on reservations, not the reverse.
+            from payments.models import Payment
+
+            return Payment.Provider.CASH_ON_ARRIVAL
+        return payment.provider
+
+    @property
+    def payment_status(self):
+        """Status of the payment, or None when there is nothing to settle."""
+        payment = self.latest_payment
+        return None if payment is None else payment.status
+
+    @property
+    def is_paid(self):
+        from payments.models import Payment
+
+        payment = self.latest_payment
+        return payment is not None and payment.status == Payment.Status.COMPLETED
+
+    @property
+    def needs_payment_before_confirming(self):
+        """True when money must arrive before the merchant may confirm.
+
+        Cash on arrival is confirmed on trust — that is the whole point of it.
+        A mobile money booking that has not been paid is a different thing:
+        confirming it would hold a table against money that never came.
+        """
+        from payments.models import Payment
+
+        payment = self.latest_payment
+        if payment is None:
+            return False
+        return payment.is_mobile_money and payment.status != Payment.Status.COMPLETED
+
     def customer_cancellable_reason(self):
         """Why the customer may not cancel this, or None if they may.
 

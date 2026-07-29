@@ -7,8 +7,9 @@ import '../booking_store.dart';
 import '../directions.dart';
 import '../image_source.dart';
 import '../location_source.dart';
+import '../widgets/browse_header.dart';
+import '../widgets/establishment_card.dart';
 import 'establishment_screen.dart';
-import 'my_bookings_screen.dart';
 
 /// Discovery: what is open near me, and what kind of place is it.
 class BrowseScreen extends StatefulWidget {
@@ -44,6 +45,20 @@ class _BrowseScreenState extends State<BrowseScreen> {
   LocationStatus _locationStatus = LocationStatus.unknown;
   bool _sortByDistance = false;
 
+  /// Filtered client-side: the API has no open-now filter, and adding one
+  /// would mean the server deciding "now" for a list the client caches.
+  bool _openOnly = false;
+
+  /// Sentinels so the chip row can carry filters of different kinds.
+  static const _openNowFilter = 'open-now';
+  static const _nearestFilter = 'nearest';
+
+  /// From the last booking on this device; there are no customer accounts.
+  String? _customerName;
+
+  /// Cover photo per venue, fetched lazily so the list is not blocked on it.
+  final Map<int, String?> _covers = {};
+
   /// Sorting by distance is only offered once there is a position to sort by.
   bool get _canSortByDistance => _here != null;
 
@@ -52,6 +67,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.initState();
     _load();
     _locateIfAlreadyAllowed();
+    _loadCustomerName();
+  }
+
+  Future<void> _loadCustomerName() async {
+    final last = await widget.store.lastCustomer();
+    if (last == null || !mounted) return;
+    setState(() => _customerName = last.name);
   }
 
   /// Only asks the system for a fix if permission is already granted.
@@ -118,6 +140,22 @@ class _BrowseScreenState extends State<BrowseScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Fetch a venue's first photo once, for the card's cover.
+  ///
+  /// Deliberately after the list is on screen: the names and times are what a
+  /// customer is scanning, and they should not wait on images.
+  void _ensureCover(Establishment establishment) {
+    if (_covers.containsKey(establishment.id)) return;
+    _covers[establishment.id] = null;
+
+    widget.api.photos(establishment.id).then((page) {
+      if (!mounted || page.results.isEmpty) return;
+      setState(() => _covers[establishment.id] = page.results.first.imageUrl);
+    }).catchError((Object _) {
+      // No cover is a normal state, not an error worth showing.
+    });
+  }
+
   /// Distance from here, or null when either end has no coordinates.
   double? _distanceTo(Establishment establishment) {
     final here = _here;
@@ -127,9 +165,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   List<Establishment> get _visible {
-    if (!_sortByDistance || _here == null) return _establishments;
+    var shown = _establishments;
+    if (_openOnly) {
+      shown = shown.where((e) => e.isOpenNow).toList();
+    }
+    if (!_sortByDistance || _here == null) return shown;
 
-    final sorted = [..._establishments];
+    final sorted = [...shown];
     sorted.sort((a, b) {
       final da = _distanceTo(a);
       final db = _distanceTo(b);
@@ -194,111 +236,59 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Chrome: this screen stays on the app theme no matter which venues, and
+    // therefore which presets, appear in the list below.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Find a table'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.receipt_long),
-            tooltip: 'My bookings',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MyBookingsScreen(
-                  api: widget.api,
-                  store: widget.store,
-                  imageSource: widget.imageSource,
-                ),
-              ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            BrowseHeader(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              customerName: _customerName,
+              onClear: () {
+                _searchController.clear();
+                _load();
+              },
             ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(112),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search by name',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    isDense: true,
-                    suffixIcon: _searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              _load();
-                            },
-                          ),
-                  ),
-                ),
-              ),
-              // Scrolls rather than centring: three chips do not fit across a
-              // 360dp phone, which is most of the market here.
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      for (final entry in [
-                        (null, 'All'),
-                        (EstablishmentType.lounge, 'Lounges'),
-                        (EstablishmentType.restaurant, 'Restaurants'),
-                      ])
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: FilterChip(
-                            label: Text(entry.$2),
-                            selected: _typeFilter == entry.$1,
-                            onSelected: (_) {
-                              setState(() => _typeFilter = entry.$1);
-                              _load();
-                            },
-                          ),
-                        ),
-                      // Sorting by distance appears only once there is a
-                      // position to sort by; otherwise this is the way in.
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: _canSortByDistance
-                            ? FilterChip(
-                                avatar: const Icon(Icons.near_me, size: 16),
-                                label: const Text('Nearest'),
-                                selected: _sortByDistance,
-                                onSelected: (selected) => setState(
-                                  () => _sortByDistance = selected,
-                                ),
-                              )
-                            : ActionChip(
-                                avatar: const Icon(
-                                  Icons.near_me_outlined,
-                                  size: 16,
-                                ),
-                                label: const Text('Show distances'),
-                                onPressed: _askForLocation,
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            BrowseFilters(
+              options: [
+                (null, 'All'),
+                (EstablishmentType.restaurant, 'Restaurants'),
+                (EstablishmentType.lounge, 'Lounges'),
+                (_openNowFilter, 'Open now'),
+                (_nearestFilter, _canSortByDistance ? 'Nearest' : 'Show distances'),
+              ],
+              isSelected: (value) => switch (value) {
+                _openNowFilter => _openOnly,
+                _nearestFilter => _sortByDistance,
+                final EstablishmentType? type => _typeFilter == type,
+                _ => false,
+              },
+              onSelected: (value) {
+                switch (value) {
+                  case _openNowFilter:
+                    setState(() => _openOnly = !_openOnly);
+                  case _nearestFilter:
+                    if (_canSortByDistance) {
+                      setState(() => _sortByDistance = !_sortByDistance);
+                    } else {
+                      _askForLocation();
+                    }
+                  case final EstablishmentType? type:
+                    setState(() => _typeFilter = type);
+                    _load();
+                }
+              },
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: RefreshIndicator(onRefresh: _load, child: _body()),
+            ),
+          ],
         ),
       ),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }
 
@@ -314,23 +304,30 @@ class _BrowseScreenState extends State<BrowseScreen> {
       );
     }
 
-    if (_establishments.isEmpty) {
-      return const _EmptyState(
+    final visible = _visible;
+
+    if (visible.isEmpty) {
+      // "Open now" filters client-side, so the list can empty out even when the
+      // fetch returned venues. Name that case rather than showing blank space.
+      return _EmptyState(
         icon: Icons.search_off,
         title: 'Nothing found',
-        detail: 'Try a different name, or clear the filters.',
+        detail: _openOnly && _establishments.isNotEmpty
+            ? 'Nothing is open right now. Turn off "Open now" to see places '
+                  'you can book for later.'
+            : 'Try a different name, or clear the filters.',
       );
     }
-
-    final visible = _visible;
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: visible.length,
       itemBuilder: (context, index) {
         final establishment = visible[index];
-        return _EstablishmentTile(
+        _ensureCover(establishment);
+        return EstablishmentCard(
           establishment: establishment,
+          coverUrl: _covers[establishment.id],
           distanceKm: _distanceTo(establishment),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -345,135 +342,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-class _EstablishmentTile extends StatelessWidget {
-  const _EstablishmentTile({
-    required this.establishment,
-    required this.onTap,
-    this.distanceKm,
-  });
-
-  final Establishment establishment;
-  final VoidCallback onTap;
-
-  /// Null when there is no fix, or the venue has no coordinates.
-  final double? distanceKm;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isLounge = establishment.type == EstablishmentType.lounge;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: isLounge
-              ? theme.colorScheme.tertiaryContainer
-              : theme.colorScheme.secondaryContainer,
-          child: Icon(
-            isLounge ? Icons.local_fire_department : Icons.restaurant,
-            color: isLounge
-                ? theme.colorScheme.onTertiaryContainer
-                : theme.colorScheme.onSecondaryContainer,
-          ),
-        ),
-        title: Text(establishment.name),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 2),
-            Text('${establishment.typeDisplay} · ${establishment.city}'),
-            if (establishment.spaceCount != null)
-              Text(
-                '${establishment.spaceCount} '
-                '${establishment.spaceCount == 1 ? "space" : "spaces"}',
-                style: theme.textTheme.bodySmall,
-              ),
-            const SizedBox(height: 4),
-            // Both halves flex: "Open until 02:00 · 253 km away" does not fit
-            // across a 360dp phone otherwise.
-            Row(
-              children: [
-                Flexible(
-                  child: _OpenIndicator(establishment: establishment),
-                ),
-                if (distanceKm case final km?) ...[
-                  Text(
-                    ' · ',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Flexible(
-                    child: Text(
-                      formatDistance(km),
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-/// Open or shut, at a glance, on every card.
-///
-/// A dot plus a word rather than colour alone — these are scanned down a list,
-/// and colour on its own excludes anyone with a colour vision deficiency.
-class _OpenIndicator extends StatelessWidget {
-  const _OpenIndicator({required this.establishment});
-
-  final Establishment establishment;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // Nothing recorded is not the same as shut; saying "Closed" would be a
-    // guess, and pilot merchants will not all have filled their hours in.
-    final unknown = establishment.today == null && !establishment.hasHours;
-    if (unknown) {
-      return Text(
-        'Hours not listed',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      );
-    }
-
-    final open = establishment.isOpenNow;
-    final colour = open ? theme.colorScheme.primary : theme.colorScheme.error;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(open ? Icons.circle : Icons.circle_outlined, size: 10, color: colour),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            open ? establishment.openSummary : 'Closed',
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colour,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

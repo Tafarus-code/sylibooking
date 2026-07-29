@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 import 'auth_controller.dart';
 import 'image_source.dart';
@@ -35,10 +36,9 @@ class _MerchantAppState extends State<MerchantApp> {
     return MaterialApp(
       title: 'Sylibooking Merchant',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00695C)),
-        useMaterial3: true,
-      ),
+      // Same house style as the customer app; the chrome should not look
+      // like two different products.
+      theme: sylibookingAppTheme(),
       home: ListenableBuilder(
         listenable: widget.auth,
         builder: (context, _) => switch (widget.auth.state) {

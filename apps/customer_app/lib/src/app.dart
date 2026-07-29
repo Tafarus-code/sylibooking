@@ -5,7 +5,7 @@ import 'booking_store.dart';
 import 'directions.dart';
 import 'image_source.dart';
 import 'location_source.dart';
-import 'screens/browse_screen.dart';
+import 'screens/customer_home_screen.dart';
 
 class CustomerApp extends StatelessWidget {
   const CustomerApp({
@@ -30,11 +30,10 @@ class CustomerApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sylibooking',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFB4551C)),
-        useMaterial3: true,
-      ),
-      home: BrowseScreen(
+      // The app's own look. Establishment branding is layered on top of this
+      // by EstablishmentThemeScope, and only on a venue's own screens.
+      theme: sylibookingAppTheme(),
+      home: CustomerHomeScreen(
         api: api,
         store: store,
         imageSource: imageSource ?? DeviceImageSource(),

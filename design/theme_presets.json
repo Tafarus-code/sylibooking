@@ -11,6 +11,29 @@
     "than merely asserted."
   ],
   "default": "ember",
+  "_base_comment": [
+    "The app's own look, before any establishment preset is layered on top.",
+    "Named after the Ember house style: deepwood (dark green), ivory (warm",
+    "off-white), ember (amber accent).",
+    "",
+    "DERIVED, NOT TRANSCRIBED: sylibooking-design.html was not in the",
+    "repository when this was written, so these values were chosen to match",
+    "the described direction. Correct them here and both apps follow."
+  ],
+  "base": {
+    "deepwood": "#12281F",
+    "deepwood_soft": "#1D3A2D",
+    "ivory": "#F7F3EC",
+    "ivory_dim": "#E8E0D3",
+    "ember": "#B4551C",
+    "ember_bright": "#D9722F",
+    "on_ember": "#FFFFFF",
+    "on_deepwood": "#F7F3EC",
+    "on_ivory": "#12281F",
+    "display_font": "Fraunces",
+    "body_font": "Manrope",
+    "mono_font": "IBM Plex Mono"
+  },
   "presets": [
     {
       "key": "ember",

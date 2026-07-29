@@ -93,6 +93,9 @@ class _PhotoThumb extends StatelessWidget {
                       horizontal: 8,
                       vertical: 4,
                     ),
+                    // Not themed on purpose: a caption sits on an arbitrary
+                    // photograph, where only a dark scrim with light text can
+                    // be relied on to stay readable.
                     color: Colors.black54,
                     child: Text(
                       photo.caption,

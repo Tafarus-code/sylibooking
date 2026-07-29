@@ -454,7 +454,7 @@ class _DayPicker extends StatelessWidget {
                       children: [
                         Text(
                           offset == 0 ? 'Today' : DateFormat.E().format(day),
-                          style: const TextStyle(fontSize: 11),
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                         Text(DateFormat.MMMd().format(day)),
                       ],

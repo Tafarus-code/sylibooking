@@ -251,6 +251,8 @@ class _PhotoTile extends StatelessWidget {
             right: 0,
             bottom: 0,
             child: Container(
+              // Not themed on purpose: this overlays an arbitrary photograph,
+              // where only a dark scrim with light text stays readable.
               color: Colors.black54,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Text(

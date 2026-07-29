@@ -5,6 +5,7 @@
 library;
 
 export 'src/api_client.dart';
+export 'src/app_theme.dart';
 export 'src/booking_options.dart';
 export 'src/establishment_theme.dart';
 export 'src/geo.dart';

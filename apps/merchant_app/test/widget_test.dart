@@ -203,6 +203,84 @@ Map<String, dynamic> venueJson({
     };
 
 void main() {
+  group('app baseline theme', () {
+    /// Signed in on the reservation list, with the theme in force there.
+    Future<ThemeData> signedInTheme(
+      WidgetTester tester, {
+      List<Map<String, dynamic>>? venues,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': venues ?? [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      return Theme.of(tester.element(find.text('Reservations').first));
+    }
+
+    testWidgets('the merchant app runs on the same Ember baseline',
+        (tester) async {
+      final theme = await signedInTheme(tester);
+
+      // Was a teal seed before: two apps in one product should not look like
+      // two products.
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
+      expect(theme.colorScheme.onSurface, SylibookingTokens.onIvory);
+    });
+
+    testWidgets('merchant type comes from the house faces', (tester) async {
+      final theme = await signedInTheme(tester);
+
+      expect(
+        theme.textTheme.bodyMedium?.fontFamily,
+        contains(SylibookingTokens.bodyFont),
+      );
+      expect(
+        theme.textTheme.titleLarge?.fontFamily,
+        contains(SylibookingTokens.displayFont),
+      );
+    });
+
+    testWidgets('the venue picker is app chrome, not venue branding',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [
+          {...venueJson(id: 7), 'theme_preset': 'bissap'},
+          {...venueJson(id: 8, name: 'Chez Fatou'), 'theme_preset': 'harmattan'},
+        ],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+
+      final scheme =
+          Theme.of(tester.element(find.text('Choose a venue'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
+    });
+
+    testWidgets('the login screen is themed before any venue is known',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester);
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+
+      final scheme =
+          Theme.of(tester.element(find.text('Sign in'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
+    });
+  });
+
   group('login screen', () {
     testWidgets('is shown when there is no stored token', (tester) async {
       final (:auth, :backend) = buildAuth(tester);

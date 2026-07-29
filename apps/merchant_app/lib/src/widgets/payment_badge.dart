@@ -21,7 +21,8 @@ class PaymentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final style = _styleFor(reservation, scheme);
 
     return Container(
@@ -42,9 +43,8 @@ class PaymentBadge extends StatelessWidget {
             child: Text(
               compact ? style.shortLabel : style.label,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: theme.textTheme.labelMedium?.copyWith(
                 color: style.foreground,
-                fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
             ),

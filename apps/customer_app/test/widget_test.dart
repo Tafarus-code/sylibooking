@@ -291,6 +291,310 @@ Map<String, dynamic> paymentJson({
 }
 
 void main() {
+  group('app baseline theme', () {
+    /// Browse with one venue, and the theme in force on that screen.
+    Future<ThemeData> browseTheme(
+      WidgetTester tester, {
+      String? preset,
+      ({String name, String phone})? customer,
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester, customer: customer);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'theme_preset': preset},
+        ],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return Theme.of(tester.element(find.text('Find a table')));
+    }
+
+    testWidgets('browse chrome is Ember, not a Material default',
+        (tester) async {
+      final theme = await browseTheme(tester);
+
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      expect(theme.colorScheme.onPrimary, SylibookingTokens.onEmber);
+      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
+      expect(theme.colorScheme.onSurface, SylibookingTokens.onIvory);
+    });
+
+    testWidgets('body copy is set in the house body face', (tester) async {
+      final theme = await browseTheme(tester);
+
+      // Loose contains: google_fonts appends a weight suffix to the family.
+      expect(
+        theme.textTheme.bodyMedium?.fontFamily,
+        contains(SylibookingTokens.bodyFont),
+      );
+    });
+
+    testWidgets('headings are set in the house display face', (tester) async {
+      final theme = await browseTheme(tester);
+
+      expect(
+        theme.textTheme.headlineSmall?.fontFamily,
+        contains(SylibookingTokens.displayFont),
+      );
+      expect(
+        theme.textTheme.titleLarge?.fontFamily,
+        contains(SylibookingTokens.displayFont),
+      );
+    });
+
+    testWidgets('a loud venue preset does not reach the browse chrome',
+        (tester) async {
+      final theme = await browseTheme(tester, preset: 'bissap');
+
+      // The same guarantee the branding tests make, asserted against the
+      // baseline itself rather than merely "not bissap".
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+    });
+
+    testWidgets('the greeting names a returning customer', (tester) async {
+      await browseTheme(
+        tester,
+        customer: (name: 'Fatou Diallo', phone: '+224620000000'),
+      );
+
+      // First name only: the greeting is a hello, not a record lookup.
+      expect(find.textContaining('Fatou'), findsOneWidget);
+      expect(find.textContaining('Diallo'), findsNothing);
+    });
+
+    testWidgets('a new device is greeted without a name', (tester) async {
+      await browseTheme(tester);
+
+      expect(find.text('Find a table'), findsOneWidget);
+      expect(find.textContaining(','), findsNothing);
+    });
+  });
+
+  group('bottom navigation', () {
+    Future<FakeBackend> openApp(WidgetTester tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('offers browse, bookings, favourites and profile',
+        (tester) async {
+      await openApp(tester);
+
+      expect(find.text('Browse'), findsOneWidget);
+      expect(find.text('Bookings'), findsOneWidget);
+      expect(find.text('Favourites'), findsOneWidget);
+      expect(find.text('Profile'), findsOneWidget);
+    });
+
+    testWidgets('browse is where the app opens', (tester) async {
+      await openApp(tester);
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+    });
+
+    testWidgets('the bar is themed by the app, not by a listed venue',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'theme_preset': 'indigo_soir'},
+        ],
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      final scheme = Theme.of(tester.element(find.text('Browse'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
+    });
+
+    testWidgets('favourites says it is not built rather than looking broken',
+        (tester) async {
+      await openApp(tester);
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Favourites is coming'), findsOneWidget);
+    });
+
+    testWidgets('profile explains why there is no account', (tester) async {
+      await openApp(tester);
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('reference'), findsOneWidget);
+    });
+
+    testWidgets('coming back to browse does not refetch the list',
+        (tester) async {
+      final backend = await openApp(tester);
+      final listCalls = backend.requests
+          .where((r) => r.url.path == '/api/establishments/')
+          .length;
+
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Browse'));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests
+            .where((r) => r.url.path == '/api/establishments/')
+            .length,
+        listCalls,
+      );
+    });
+  });
+
+  group('browse cards', () {
+    Future<FakeBackend> browseWith(
+      WidgetTester tester,
+      List<Map<String, dynamic>> results, {
+      LocationSource? locationSource,
+    }) async {
+      final (:app, :backend, :store) =
+          buildApp(tester, locationSource: locationSource);
+      backend.on('GET', '/api/establishments/', {
+        'count': results.length,
+        'next': null,
+        'results': results,
+      });
+      for (final result in results) {
+        backend.on('GET', '/api/establishments/${result['id']}/photos/', {
+          'count': 1,
+          'next': null,
+          'results': [
+            {
+              'id': 1,
+              'image_url': 'http://localhost:8000/media/venue.jpg',
+              'caption': '',
+              'uploaded_by_role': 'merchant',
+              'uploaded_by_role_display': 'The venue',
+              'created_at': '2026-08-01T18:00:00Z',
+            },
+          ],
+        });
+      }
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('every card carries a status badge', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(),
+        establishmentJson(
+          id: 8,
+          name: 'Chez Fatou',
+          type: 'restaurant',
+          isOpenNow: false,
+        ),
+      ]);
+
+      expect(find.text('Open until 02:00'), findsOneWidget);
+      expect(find.text('Closed'), findsOneWidget);
+    });
+
+    testWidgets('a cover photo is fetched per venue', (tester) async {
+      final backend = await browseWith(tester, [establishmentJson()]);
+
+      expect(
+        backend.requests.any(
+          (r) => r.url.path == '/api/establishments/7/photos/',
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('no photos leaves the card intact', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+    });
+
+    testWidgets('the filter row offers every filter at 360dp', (tester) async {
+      await browseWith(tester, [establishmentJson()]);
+
+      // All present in the tree, whether or not each is currently on screen.
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Restaurants'), findsOneWidget);
+      expect(find.text('Lounges'), findsOneWidget);
+      expect(find.text('Open now'), findsOneWidget);
+    });
+
+    testWidgets('open now hides a shut venue', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(),
+        establishmentJson(id: 8, name: 'Chez Fatou', isOpenNow: false),
+      ]);
+
+      // Five chips do not fit across 360dp, so this one has to be scrolled
+      // to — exactly as a customer would.
+      await tester.ensureVisible(find.text('Open now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open now'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      expect(find.text('Chez Fatou'), findsNothing);
+    });
+
+    testWidgets('open now filtering everything out explains itself',
+        (tester) async {
+      await browseWith(tester, [
+        establishmentJson(isOpenNow: false),
+      ]);
+
+      // Five chips do not fit across 360dp, so this one has to be scrolled
+      // to — exactly as a customer would.
+      await tester.ensureVisible(find.text('Open now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open now'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nothing is open right now'), findsOneWidget);
+    });
+
+    testWidgets('open now is a client-side filter, not a new query',
+        (tester) async {
+      final backend = await browseWith(tester, [establishmentJson()]);
+      final before = backend.requests.length;
+
+      // Five chips do not fit across 360dp, so this one has to be scrolled
+      // to — exactly as a customer would.
+      await tester.ensureVisible(find.text('Open now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open now'));
+      await tester.pumpAndSettle();
+
+      expect(backend.requests.length, before);
+    });
+  });
+
   group('browse', () {
     testWidgets('lists establishments', (tester) async {
       final (:app, :backend, :store) = buildApp(tester);
@@ -1212,7 +1516,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
       return (backend: backend, picker: picker);
     }
@@ -1302,7 +1606,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
       return (backend: backend, store: store);
     }
@@ -1853,7 +2157,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       expect(find.text('No bookings yet'), findsOneWidget);
@@ -1876,7 +2180,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       expect(find.text('Le Petit Baobab'), findsOneWidget);
@@ -1899,7 +2203,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       final paths = backend.requests.map((r) => r.url.path).toList();
@@ -1926,7 +2230,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       expect(find.text('Le Petit Baobab'), findsOneWidget);
@@ -1954,7 +2258,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
       return backend;
     }

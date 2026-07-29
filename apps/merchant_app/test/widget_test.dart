@@ -1098,6 +1098,171 @@ void main() {
     });
   });
 
+  group('manage tab and role gating', () {
+    Future<FakeBackend> openManage(
+      WidgetTester tester, {
+      String role = 'owner',
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('an owner sees every management entry', (tester) async {
+      await openManage(tester, role: 'owner');
+
+      expect(find.text('Menu'), findsOneWidget);
+      expect(find.text('Opening hours'), findsOneWidget);
+      expect(find.text('Venue details'), findsOneWidget);
+      expect(find.text('Who has access'), findsOneWidget);
+    });
+
+    testWidgets('a manager sees everything except access', (tester) async {
+      await openManage(tester, role: 'manager');
+
+      expect(find.text('Menu'), findsOneWidget);
+      expect(find.text('Opening hours'), findsOneWidget);
+      expect(find.text('Venue details'), findsOneWidget);
+      // Staff management is owner-only, so it is not offered at all.
+      expect(find.text('Who has access'), findsNothing);
+    });
+
+    testWidgets('staff see only the menu, and are told why', (tester) async {
+      await openManage(tester, role: 'staff');
+
+      expect(find.text('Menu'), findsOneWidget);
+      expect(find.text('Mark items sold out'), findsOneWidget);
+      expect(find.text('Opening hours'), findsNothing);
+      expect(find.text('Venue details'), findsNothing);
+      expect(find.text('Who has access'), findsNothing);
+      expect(
+        find.textContaining('managed by an owner or manager'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the venue and the role are named', (tester) async {
+      await openManage(tester, role: 'manager');
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      expect(find.textContaining('you are manager here'), findsOneWidget);
+    });
+  });
+
+  group('menu screen', () {
+    Future<FakeBackend> openMenu(
+      WidgetTester tester, {
+      String role = 'owner',
+      List<Map<String, dynamic>>? items,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/7/menu/', {
+        'results': items ??
+            [
+              {
+                'id': 1,
+                'name': 'Poulet braisé',
+                'description': '',
+                'category': 'food',
+                'price': '75000.00',
+                'is_available': true,
+              },
+            ],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('items are listed with their price', (tester) async {
+      await openMenu(tester);
+
+      expect(find.text('Poulet braisé'), findsOneWidget);
+      expect(find.text('75000.00 GNF'), findsOneWidget);
+    });
+
+    testWidgets('an owner can add and edit items', (tester) async {
+      await openMenu(tester, role: 'owner');
+
+      expect(find.text('Add item'), findsOneWidget);
+      expect(find.byType(PopupMenuButton<String>), findsOneWidget);
+    });
+
+    testWidgets('staff get the availability switch but no editing',
+        (tester) async {
+      await openMenu(tester, role: 'staff');
+
+      // The switch is the one menu change their role allows.
+      expect(find.byType(Switch), findsOneWidget);
+      expect(find.text('Add item'), findsNothing);
+      expect(find.byType(PopupMenuButton<String>), findsNothing);
+      expect(
+        find.textContaining('Adding and editing is done by a manager or owner'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('toggling availability calls the dedicated endpoint',
+        (tester) async {
+      final backend = await openMenu(tester, role: 'staff');
+      backend.on(
+        'PATCH',
+        '/api/merchant/establishments/7/menu/1/availability/',
+        {
+          'id': 1,
+          'name': 'Poulet braisé',
+          'description': '',
+          'category': 'food',
+          'price': '75000.00',
+          'is_available': false,
+        },
+      );
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      final patched = backend.requests.last;
+      expect(
+        patched.url.path,
+        '/api/merchant/establishments/7/menu/1/availability/',
+      );
+      expect(find.text('Sold out'), findsOneWidget);
+    });
+
+    testWidgets('an empty menu says so', (tester) async {
+      await openMenu(tester, items: const []);
+
+      expect(find.text('No menu yet'), findsOneWidget);
+    });
+  });
+
   group('signing out', () {
     Future<FakeBackend> signedIn(
       WidgetTester tester, {

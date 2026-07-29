@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../auth_controller.dart';
+import 'manage_screen.dart';
 import 'payments_dashboard_screen.dart';
 import 'reservations_screen.dart';
 
@@ -27,6 +28,7 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
         children: [
           ReservationsScreen(auth: widget.auth),
           PaymentsDashboardScreen(auth: widget.auth),
+          ManageScreen(auth: widget.auth),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -42,6 +44,11 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
             icon: Icon(Icons.payments_outlined),
             selectedIcon: Icon(Icons.payments),
             label: 'Payments',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.tune_outlined),
+            selectedIcon: Icon(Icons.tune),
+            label: 'Manage',
           ),
         ],
       ),

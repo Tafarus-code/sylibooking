@@ -293,6 +293,15 @@ Two details worth knowing:
 
 ## Merchant app (Flutter)
 
+Three tabs: **Reservations**, **Payments**, **Manage**. Manage is the way into
+the venue itself — menu, opening hours, venue details, and who has access.
+
+**Entries a role cannot use are absent, not disabled.** A manager sees no "Who
+has access"; staff see only the menu, with a line saying who to ask. The server
+refuses either way — the UI simply does not offer a button that would always
+fail. The menu is the deliberate exception: staff belong there, because marking
+a dish sold out is theirs to do.
+
 `apps/merchant_app` — sign in, see today's or the next seven days' bookings,
 confirm or cancel. `apps/shared_client` holds the API models and HTTP client
 that both apps will share.

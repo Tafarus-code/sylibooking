@@ -127,6 +127,18 @@ class SylibookingApi {
         ),
       );
 
+  Future<dynamic> _patch(String path, Map<String, dynamic> body) => _send(
+        () => _http.patch(_uri(path), headers: _headers, body: jsonEncode(body)),
+      );
+
+  /// Takes a list body: the hours endpoint replaces a whole week at once.
+  Future<dynamic> _put(String path, Object body) => _send(
+        () => _http.put(_uri(path), headers: _headers, body: jsonEncode(body)),
+      );
+
+  Future<dynamic> _delete(String path) =>
+      _send(() => _http.delete(_uri(path), headers: _headers));
+
   // --- Auth ---------------------------------------------------------------
 
   /// Exchange credentials for a token, which is then kept on this client.
@@ -393,6 +405,162 @@ class SylibookingApi {
     return results
         .map((e) => MerchantVenue.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Create a venue. The caller becomes its owner.
+  Future<Establishment> createEstablishment({
+    required String name,
+    required String type,
+    required String city,
+    required String address,
+    String tagline = '',
+    String description = '',
+  }) async {
+    final json = await _post('/merchant/establishments/', {
+      'name': name,
+      'type': type,
+      'city': city,
+      'address': address,
+      'tagline': tagline,
+      'description': description,
+    });
+    return Establishment.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// The venue's editable profile. Any member may read it.
+  Future<Establishment> merchantProfile(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/');
+    return Establishment.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Owner and manager only; the server returns 403 for staff.
+  Future<Establishment> updateProfile(
+    int establishmentId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/',
+      fields,
+    );
+    return Establishment.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant hours -----------------------------------------------------
+
+  Future<List<OpeningHours>> merchantHours(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/hours/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => OpeningHours.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Replace the whole week. A week is edited as a unit, so this is a PUT.
+  Future<List<OpeningHours>> replaceHours(
+    int establishmentId,
+    List<Map<String, dynamic>> week,
+  ) async {
+    final json = await _put(
+      '/merchant/establishments/$establishmentId/hours/',
+      week,
+    );
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => OpeningHours.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // --- Merchant menu ------------------------------------------------------
+
+  /// Every item including unavailable ones. Any member may read it.
+  Future<List<MerchantMenuItem>> merchantMenu(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/menu/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => MerchantMenuItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<MerchantMenuItem> createMenuItem(
+    int establishmentId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/menu/',
+      fields,
+    );
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<MerchantMenuItem> updateMenuItem(
+    int establishmentId,
+    int itemId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/menu/$itemId/',
+      fields,
+    );
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMenuItem(int establishmentId, int itemId) async {
+    await _delete('/merchant/establishments/$establishmentId/menu/$itemId/');
+  }
+
+  /// Mark an item sold out, or back on. Staff may do this; it is the one
+  /// menu change their role allows.
+  Future<MerchantMenuItem> setMenuItemAvailability(
+    int establishmentId,
+    int itemId,
+    bool isAvailable,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/menu/$itemId/availability/',
+      {'is_available': isAvailable},
+    );
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant staff -----------------------------------------------------
+
+  /// Owner only; the server returns 403 for manager and staff alike.
+  Future<List<Membership>> merchantStaff(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/staff/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => Membership.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Membership> addStaff(
+    int establishmentId, {
+    required String username,
+    required MerchantRole role,
+  }) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/staff/',
+      {'username': username, 'role': role.name.toLowerCase()},
+    );
+    return Membership.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Membership> changeStaffRole(
+    int establishmentId,
+    int membershipId,
+    MerchantRole role,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/staff/$membershipId/',
+      {'role': role.name.toLowerCase()},
+    );
+    return Membership.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<void> removeStaff(int establishmentId, int membershipId) async {
+    await _delete(
+      '/merchant/establishments/$establishmentId/staff/$membershipId/',
+    );
   }
 
   // --- Merchant dashboard -------------------------------------------------

@@ -233,6 +233,81 @@ class MerchantVenue {
       );
 }
 
+/// A menu item as the merchant sees it — unavailable ones included.
+class MerchantMenuItem {
+  const MerchantMenuItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.price,
+    required this.isAvailable,
+    this.description = '',
+  });
+
+  final int id;
+  final String name;
+  final String description;
+
+  /// `food`, `drink` or `chicha_flavor`.
+  final String category;
+  final String price;
+  final bool isAvailable;
+
+  String get categoryDisplay => switch (category) {
+        'food' => 'Food',
+        'drink' => 'Drink',
+        'chicha_flavor' => 'Chicha flavour',
+        _ => category,
+      };
+
+  MerchantMenuItem copyWith({bool? isAvailable}) => MerchantMenuItem(
+        id: id,
+        name: name,
+        description: description,
+        category: category,
+        price: price,
+        isAvailable: isAvailable ?? this.isAvailable,
+      );
+
+  factory MerchantMenuItem.fromJson(Map<String, dynamic> json) =>
+      MerchantMenuItem(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        price: '${json['price'] ?? ''}',
+        isAvailable: json['is_available'] as bool? ?? true,
+      );
+}
+
+/// Someone's membership of a venue, as shown on the staff screen.
+class Membership {
+  const Membership({
+    required this.id,
+    required this.userId,
+    required this.username,
+    required this.fullName,
+    required this.role,
+    required this.roleDisplay,
+  });
+
+  final int id;
+  final int userId;
+  final String username;
+  final String fullName;
+  final MerchantRole role;
+  final String roleDisplay;
+
+  factory Membership.fromJson(Map<String, dynamic> json) => Membership(
+        id: json['id'] as int,
+        userId: json['user'] as int? ?? 0,
+        username: json['username'] as String? ?? '',
+        fullName: json['full_name'] as String? ?? '',
+        role: MerchantRole.parse(json['role'] as String?),
+        roleDisplay: json['role_display'] as String? ?? '',
+      );
+}
+
 class Review {
   const Review({
     required this.id,
@@ -428,6 +503,8 @@ class Establishment {
     this.menu = const [],
     this.averageRating,
     this.reviewCount = 0,
+    this.tagline = '',
+    this.description = '',
   });
 
   final int id;
@@ -467,6 +544,10 @@ class Establishment {
   final int reviewCount;
 
   bool get hasReviews => reviewCount > 0;
+
+  /// One-line hook and a longer blurb, both merchant-editable.
+  final String tagline;
+  final String description;
 
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
@@ -508,6 +589,8 @@ class Establishment {
             .toList(),
         averageRating: (json['average_rating'] as num?)?.toDouble(),
         reviewCount: json['review_count'] as int? ?? 0,
+        tagline: json['tagline'] as String? ?? '',
+        description: json['description'] as String? ?? '',
       );
 }
 

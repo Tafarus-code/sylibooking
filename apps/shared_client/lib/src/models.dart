@@ -527,6 +527,7 @@ class Establishment {
     this.description = '',
     this.latitude,
     this.longitude,
+    this.themePreset = 'ember',
   });
 
   final int id;
@@ -575,6 +576,10 @@ class Establishment {
   /// them at first — nothing may assume a position exists.
   final double? latitude;
   final double? longitude;
+
+  /// Which curated branding preset this venue uses. Only the key travels;
+  /// the colours and fonts live in the shared design file.
+  final String themePreset;
 
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
@@ -631,6 +636,7 @@ class Establishment {
         // DRF serialises DecimalField as a string, so accept either.
         latitude: _toDouble(json['latitude']),
         longitude: _toDouble(json['longitude']),
+        themePreset: json['theme_preset'] as String? ?? 'ember',
       );
 }
 

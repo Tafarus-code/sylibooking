@@ -250,6 +250,28 @@ Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
 collapses the per-space availability grid into the times that are free, choosing
 the smallest space that seats the party so a couple does not take the VIP room.
 
+## Establishment branding
+
+Five curated presets — Ember (default), Palm Night, Harmattan, Bissap, Indigo
+Soir — each pairing a display font, a body font, an accent, and a text colour
+pre-verified against that accent for WCAG AA. **No colour picker and no font
+picker:** a merchant chooses a key, and `theme_preset` is the only thing stored.
+That is what lets every venue stay legible.
+
+`design/theme_presets.json` is the single source of truth. The backend reads it
+at import; `shared_client` mirrors it in Dart, and a test compares the two so
+they cannot drift. Contrast is **recomputed from the hex values** by tests on
+both sides, so "pre-verified" is checked rather than asserted.
+
+Theming is **scoped, never global**. `EstablishmentThemeScope` wraps only the
+customer's establishment detail screen and the merchant's branding preview.
+Bottom navigation, browse, settings and the venue switcher keep the app's own
+theme, so moving between venues never makes the app itself look like it changed.
+An unknown preset key falls back to the default rather than failing — a newer
+server may know presets an older build does not.
+
+Fonts come from `google_fonts` at runtime rather than being bundled per app.
+
 ## Distance and directions
 
 No map SDK. Distance is computed client-side with the haversine formula in

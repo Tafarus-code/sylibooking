@@ -8,6 +8,8 @@ from django.core.validators import (
 )
 from django.db import models
 
+from .theme_presets import DEFAULT_PRESET, PRESET_CHOICES
+
 
 def _scattered_upload_path(folder, establishment_id, filename):
     """A stable folder per venue, with an unguessable filename.
@@ -80,6 +82,16 @@ class Establishment(models.Model):
         max_length=200,
         blank=True,
         help_text='One line, e.g. "Rooftop chicha over Kaloum".',
+    )
+    theme_preset = models.CharField(
+        max_length=30,
+        choices=PRESET_CHOICES,
+        default=DEFAULT_PRESET,
+        help_text=(
+            'Which curated branding preset this venue uses. The key is the '
+            'only thing stored — colours and fonts live in the shared design '
+            'file, so a merchant cannot pick something unreadable.'
+        ),
     )
     staff = models.ManyToManyField(
         settings.AUTH_USER_MODEL,

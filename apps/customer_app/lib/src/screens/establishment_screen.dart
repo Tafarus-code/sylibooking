@@ -163,6 +163,21 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
   @override
   Widget build(BuildContext context) {
     final establishment = _detail ?? widget.establishment;
+
+    // The venue's branding is scoped to this screen alone. Browse, the
+    // bottom of the stack, and every other screen keep the app's own theme,
+    // so moving between venues never makes the app itself look different.
+    return EstablishmentThemeScope(
+      presetKey: establishment.themePreset,
+      // Builder so the subtree reads the scoped theme rather than the outer
+      // one this method was built with.
+      child: Builder(
+        builder: (context) => _scaffold(context, establishment),
+      ),
+    );
+  }
+
+  Widget _scaffold(BuildContext context, Establishment establishment) {
     final theme = Theme.of(context);
 
     return Scaffold(

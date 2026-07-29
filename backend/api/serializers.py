@@ -119,6 +119,7 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
             'space_count',
             'is_open_now',
             'closes_at',
+            'theme_preset',
         ]
 
     def get_is_open_now(self, establishment):
@@ -161,6 +162,7 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'menu',
             'average_rating',
             'review_count',
+            'theme_preset',
             'opening_hours',
             'spaces',
             'created_at',

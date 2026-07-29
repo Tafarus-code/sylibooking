@@ -676,6 +676,120 @@ void main() {
     });
   });
 
+  group('establishment branding', () {
+    Future<void> openVenue(WidgetTester tester, {String? preset}) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'theme_preset': preset},
+        ],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'theme_preset': preset,
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+    }
+
+    /// The theme actually in force inside the detail screen.
+    ColorScheme schemeInDetail(WidgetTester tester) {
+      final context = tester.element(find.text('Available times'));
+      return Theme.of(context).colorScheme;
+    }
+
+    // One test per preset, so each gets a fresh tester — sharing one leaves
+    // the previous screen in the tree and the assertion reads the old theme.
+    for (final preset in themePresets) {
+      testWidgets('the detail screen renders under ${preset.name}',
+          (tester) async {
+        await openVenue(tester, preset: preset.key);
+
+        // Intact under each one, not merely recoloured.
+        expect(find.text('Available times'), findsOneWidget);
+        expect(find.text('Kaloum, Conakry'), findsOneWidget);
+        expect(schemeInDetail(tester).primary, preset.accent);
+      });
+    }
+
+    testWidgets('a venue with no preset gets the default', (tester) async {
+      await openVenue(tester, preset: null);
+
+      expect(
+        schemeInDetail(tester).primary,
+        themePresetFor('ember').accent,
+      );
+    });
+
+    testWidgets('an unknown preset falls back rather than breaking',
+        (tester) async {
+      // A preset a newer server knows and this build does not.
+      await openVenue(tester, preset: 'neon_disco');
+
+      expect(find.text('Available times'), findsOneWidget);
+      expect(
+        schemeInDetail(tester).primary,
+        themePresetFor('ember').accent,
+      );
+    });
+
+    testWidgets('the browse screen keeps the app theme whatever the venue uses',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          // A loud preset that must not leak into the chrome.
+          {...establishmentJson(), 'theme_preset': 'bissap'},
+        ],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      final browseScheme =
+          Theme.of(tester.element(find.text('Find a table'))).colorScheme;
+      expect(
+        browseScheme.primary,
+        isNot(themePresetFor('bissap').accent),
+      );
+    });
+
+    testWidgets('leaving the detail screen restores the app theme',
+        (tester) async {
+      await openVenue(tester, preset: 'bissap');
+      final branded = schemeInDetail(tester).primary;
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      final browseScheme =
+          Theme.of(tester.element(find.text('Find a table'))).colorScheme;
+      expect(browseScheme.primary, isNot(branded));
+    });
+  });
+
   group('open now indicator', () {
     Future<void> browseWith(
       WidgetTester tester,

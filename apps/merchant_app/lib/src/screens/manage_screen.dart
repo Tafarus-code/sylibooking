@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth_controller.dart';
 import '../image_source.dart';
+import 'branding_screen.dart';
 import 'hours_screen.dart';
 import 'menu_screen.dart';
 import 'photos_screen.dart';
@@ -100,6 +101,12 @@ class ManageScreen extends StatelessWidget {
               title: 'Venue details',
               subtitle: 'Name, tagline, description, address',
               onTap: () => _open(context, ProfileScreen(auth: auth)),
+            ),
+            _Entry(
+              icon: Icons.palette_outlined,
+              title: 'Branding',
+              subtitle: 'How your venue looks to customers',
+              onTap: () => _open(context, BrandingScreen(auth: auth)),
             ),
           ],
 

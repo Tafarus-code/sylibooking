@@ -1426,6 +1426,172 @@ void main() {
     });
   });
 
+  group('branding screen', () {
+    Future<FakeBackend> openBranding(
+      WidgetTester tester, {
+      String role = 'owner',
+      String preset = 'ember',
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/7/', {
+        'id': 7,
+        'name': 'Le Petit Baobab',
+        'type': 'lounge',
+        'city': 'Conakry',
+        'address': 'Kaloum',
+        'tagline': '',
+        'description': '',
+        'opening_hours': '',
+        'theme_preset': preset,
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Branding'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    /// The preview and the save button sit below the fold on a 360x900
+    /// phone, so they are not built until scrolled to.
+    Future<void> scrollDown(WidgetTester tester) async {
+      for (var i = 0; i < 5; i++) {
+        await tester.drag(
+          find.byKey(const Key('branding-list')),
+          const Offset(0, -400),
+        );
+        await tester.pumpAndSettle();
+      }
+    }
+
+    testWidgets('all five presets are offered', (tester) async {
+      await openBranding(tester);
+
+      for (final preset in themePresets) {
+        expect(find.text(preset.name), findsOneWidget, reason: preset.key);
+      }
+    });
+
+    testWidgets('each swatch shows the venue name in its own style',
+        (tester) async {
+      await openBranding(tester);
+
+      // Each visible swatch renders the venue's own name on the accent.
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+    });
+
+    testWidgets('the saved preset starts selected', (tester) async {
+      await openBranding(tester, preset: 'bissap');
+      await scrollDown(tester);
+
+      // Selected swatch is the only one with a filled check.
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
+    });
+
+    testWidgets('choosing a preset previews it before saving', (tester) async {
+      final backend = await openBranding(tester, preset: 'ember');
+
+      await tester.tap(find.text('Bissap'));
+      await tester.pumpAndSettle();
+      await scrollDown(tester);
+
+      // Preview re-themed, and nothing sent yet.
+      final previewScheme =
+          Theme.of(tester.element(find.text('Open until 02:00'))).colorScheme;
+      expect(previewScheme.primary, themePresetFor('bissap').accent);
+      expect(backend.requests.where((r) => r.method == 'PATCH'), isEmpty);
+      expect(find.text('Save branding'), findsOneWidget);
+    });
+
+    testWidgets('saving sends only the preset key', (tester) async {
+      final backend = await openBranding(tester);
+      backend.on('PATCH', '/api/merchant/establishments/7/', {
+        'id': 7,
+        'name': 'Le Petit Baobab',
+        'type': 'lounge',
+        'city': 'Conakry',
+        'address': 'Kaloum',
+        'tagline': '',
+        'description': '',
+        'opening_hours': '',
+        'theme_preset': 'indigo_soir',
+      });
+
+      await tester.tap(find.text('Indigo Soir'));
+      await tester.pumpAndSettle();
+      await scrollDown(tester);
+      await tester.tap(find.text('Save branding'));
+      await tester.pumpAndSettle();
+
+      final patched = backend.requests.firstWhere((r) => r.method == 'PATCH');
+      final body = jsonDecode(patched.body) as Map<String, dynamic>;
+      expect(body, {'theme_preset': 'indigo_soir'});
+      // No colours or fonts travel — only the key.
+      expect(body.containsKey('accent'), isFalse);
+      expect(find.text('Branding saved.'), findsOneWidget);
+    });
+
+    testWidgets('a refusal from the server is surfaced', (tester) async {
+      final backend = await openBranding(tester);
+      backend.on(
+        'PATCH',
+        '/api/merchant/establishments/7/',
+        {'detail': 'Your role here is staff. Editing the venue profile is '
+            'not something you can do.'},
+        status: 403,
+      );
+
+      await tester.tap(find.text('Bissap'));
+      await tester.pumpAndSettle();
+      await scrollDown(tester);
+      await tester.tap(find.text('Save branding'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('not something you can do'), findsOneWidget);
+    });
+
+    testWidgets('staff are not offered branding at all', (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: 'staff')],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Branding'), findsNothing);
+    });
+
+    testWidgets('the app chrome keeps its own theme', (tester) async {
+      await openBranding(tester, preset: 'bissap');
+
+      // The screen around the preview is the app's, not the venue's.
+      final chrome =
+          Theme.of(tester.element(find.text('Branding').first)).colorScheme;
+      expect(chrome.primary, isNot(themePresetFor('bissap').accent));
+    });
+  });
+
   group('signing out', () {
     Future<FakeBackend> signedIn(
       WidgetTester tester, {

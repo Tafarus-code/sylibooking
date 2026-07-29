@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -26,6 +26,7 @@ from establishments.permissions import (
     require_profile_access,
     require_staff_management,
 )
+from establishments.theme_presets import DEFAULT_PRESET, PRESETS
 
 from .reviews import validate_photo_file  # noqa: E402  (after app imports)
 
@@ -90,6 +91,7 @@ class EstablishmentProfileSerializer(serializers.ModelSerializer):
             'tagline',
             'description',
             'opening_hours',
+            'theme_preset',
         ]
 
 
@@ -221,6 +223,20 @@ class MerchantEstablishmentsView(APIView):
             EstablishmentProfileSerializer(establishment).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class ThemePresetsView(APIView):
+    """GET /api/theme-presets/ — the curated set, for the branding screen.
+
+    Served rather than hard-coded in the app so a preset can be corrected
+    without shipping a new build, and so both apps and the backend agree on
+    one definition.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({'default': DEFAULT_PRESET, 'results': PRESETS})
 
 
 class MerchantEstablishmentProfileView(APIView):

@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "The single source of truth for establishment branding presets.",
+    "Read at import time by backend/establishments/theme_presets.py and",
+    "mirrored in apps/shared_client/lib/src/establishment_theme.dart, which a",
+    "test compares against this file so the two cannot drift.",
+    "",
+    "A fixed design set, not merchant data: merchants pick a key, never a",
+    "colour or a font. Every on_accent value is checked against its accent for",
+    "WCAG AA contrast by tests on both sides, so these are verified rather",
+    "than merely asserted."
+  ],
+  "default": "ember",
+  "_base_comment": [
+    "The app's own look, before any establishment preset is layered on top.",
+    "Named after the Ember house style: deepwood (dark green), ivory (warm",
+    "off-white), ember (amber accent).",
+    "",
+    "DERIVED, NOT TRANSCRIBED: sylibooking-design.html was not in the",
+    "repository when this was written, so these values were chosen to match",
+    "the described direction. Correct them here and both apps follow."
+  ],
+  "base": {
+    "deepwood": "#12281F",
+    "deepwood_soft": "#1D3A2D",
+    "ivory": "#F7F3EC",
+    "ivory_dim": "#E8E0D3",
+    "ember": "#B4551C",
+    "ember_bright": "#D9722F",
+    "on_ember": "#FFFFFF",
+    "on_deepwood": "#F7F3EC",
+    "on_ivory": "#12281F",
+    "display_font": "Fraunces",
+    "body_font": "Manrope",
+    "mono_font": "IBM Plex Mono"
+  },
+  "presets": [
+    {
+      "key": "ember",
+      "name": "Ember",
+      "description": "Warm amber on deep green. The house style.",
+      "display_font": "Fraunces",
+      "body_font": "Manrope",
+      "accent": "#B4551C",
+      "on_accent": "#FFFFFF"
+    },
+    {
+      "key": "palm_night",
+      "name": "Palm Night",
+      "description": "Deep forest green, quiet and after-dark.",
+      "display_font": "Playfair Display",
+      "body_font": "Inter",
+      "accent": "#0B4F3A",
+      "on_accent": "#FFFFFF"
+    },
+    {
+      "key": "harmattan",
+      "name": "Harmattan",
+      "description": "Dry-season ochre, dusty and bright.",
+      "display_font": "Space Grotesk",
+      "body_font": "IBM Plex Sans",
+      "accent": "#A16207",
+      "on_accent": "#FFFFFF"
+    },
+    {
+      "key": "bissap",
+      "name": "Bissap",
+      "description": "Hibiscus red, the colour of the drink.",
+      "display_font": "DM Serif Display",
+      "body_font": "Work Sans",
+      "accent": "#9D174D",
+      "on_accent": "#FFFFFF"
+    },
+    {
+      "key": "indigo_soir",
+      "name": "Indigo Soir",
+      "description": "Indigo dye, deep and late.",
+      "display_font": "Fraunces",
+      "body_font": "IBM Plex Sans",
+      "accent": "#3730A3",
+      "on_accent": "#FFFFFF"
+    }
+  ]
+}

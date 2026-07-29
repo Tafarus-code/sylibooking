@@ -17,6 +17,7 @@ from .merchant import (
     MerchantMenuView,
     MerchantStaffMemberView,
     MerchantStaffView,
+    ThemePresetsView,
 )
 from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
@@ -57,6 +58,11 @@ urlpatterns = [
         'merchant/establishments/',
         MerchantEstablishmentsView.as_view(),
         name='merchant-establishments',
+    ),
+    path(
+        'theme-presets/',
+        ThemePresetsView.as_view(),
+        name='theme-presets',
     ),
     path(
         'merchant/establishments/<int:pk>/',

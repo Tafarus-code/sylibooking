@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo of your venue to show customers.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of your venue to show customers.</string>
 </dict>
 </plist>

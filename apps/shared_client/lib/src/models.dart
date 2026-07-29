@@ -4,6 +4,8 @@
 /// back, they send plain maps, so there is no `toJson` to drift out of sync.
 library;
 
+import 'geo.dart';
+
 enum EstablishmentType {
   lounge,
   restaurant,
@@ -122,6 +124,13 @@ class OpeningHours {
       );
 }
 
+double? _toDouble(Object? value) => switch (value) {
+      null => null,
+      final num n => n.toDouble(),
+      final String s => double.tryParse(s),
+      _ => null,
+    };
+
 /// Django sends times as `HH:MM:SS`; nobody wants to read the seconds.
 String _hhmm(String value) =>
     value.length >= 5 ? value.substring(0, 5) : value;
@@ -132,6 +141,7 @@ class MenuItem {
     required this.name,
     required this.price,
     this.description = '',
+    this.imageUrl,
   });
 
   final int id;
@@ -141,11 +151,15 @@ class MenuItem {
   /// Guinean francs.
   final String price;
 
+  /// Null for most items; a picture is optional.
+  final String? imageUrl;
+
   factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
         id: json['id'] as int,
         name: json['name'] as String? ?? '',
         description: json['description'] as String? ?? '',
         price: '${json['price'] ?? ''}',
+        imageUrl: json['image'] as String?,
       );
 }
 
@@ -242,6 +256,7 @@ class MerchantMenuItem {
     required this.price,
     required this.isAvailable,
     this.description = '',
+    this.imageUrl,
   });
 
   final int id;
@@ -252,6 +267,9 @@ class MerchantMenuItem {
   final String category;
   final String price;
   final bool isAvailable;
+
+  /// Null for most items — a picture is optional.
+  final String? imageUrl;
 
   String get categoryDisplay => switch (category) {
         'food' => 'Food',
@@ -267,6 +285,7 @@ class MerchantMenuItem {
         category: category,
         price: price,
         isAvailable: isAvailable ?? this.isAvailable,
+        imageUrl: imageUrl,
       );
 
   factory MerchantMenuItem.fromJson(Map<String, dynamic> json) =>
@@ -277,6 +296,7 @@ class MerchantMenuItem {
         category: json['category'] as String? ?? '',
         price: '${json['price'] ?? ''}',
         isAvailable: json['is_available'] as bool? ?? true,
+        imageUrl: json['image_url'] as String?,
       );
 }
 
@@ -505,6 +525,9 @@ class Establishment {
     this.reviewCount = 0,
     this.tagline = '',
     this.description = '',
+    this.latitude,
+    this.longitude,
+    this.themePreset = 'ember',
   });
 
   final int id;
@@ -549,8 +572,27 @@ class Establishment {
   final String tagline;
   final String description;
 
+  /// Null for venues whose coordinates were never recorded, which is most of
+  /// them at first — nothing may assume a position exists.
+  final double? latitude;
+  final double? longitude;
+
+  /// Which curated branding preset this venue uses. Only the key travels;
+  /// the colours and fonts live in the shared design file.
+  final String themePreset;
+
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
+
+  /// Many venues have no coordinates recorded, so distance is never assumed.
+  LatLng? get position {
+    final lat = latitude;
+    final lon = longitude;
+    if (lat == null || lon == null) return null;
+    return LatLng(lat, lon);
+  }
+
+  bool get hasPosition => position != null;
 
   /// "Open until 02:00", "Closed today", or "Hours not listed".
   String get openSummary {
@@ -591,6 +633,10 @@ class Establishment {
         reviewCount: json['review_count'] as int? ?? 0,
         tagline: json['tagline'] as String? ?? '',
         description: json['description'] as String? ?? '',
+        // DRF serialises DecimalField as a string, so accept either.
+        latitude: _toDouble(json['latitude']),
+        longitude: _toDouble(json['longitude']),
+        themePreset: json['theme_preset'] as String? ?? 'ember',
       );
 }
 

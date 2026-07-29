@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
+import 'package:customer_app/src/directions.dart';
+import 'package:customer_app/src/image_source.dart';
+import 'package:customer_app/src/location_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -249,6 +252,9 @@ Map<String, dynamic> paymentJson({
   WidgetTester tester, {
   List<String>? bookingReferences,
   ({String name, String phone})? customer,
+  ImageSource? imageSource,
+  LocationSource? locationSource,
+  DirectionsLauncher? directionsLauncher,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -269,6 +275,15 @@ Map<String, dynamic> paymentJson({
         httpClient: backend.client,
       ),
       store: store,
+      imageSource: imageSource,
+      // Default: no location at all, which is the state most tests want and
+      // the one the app must never depend on.
+      locationSource: locationSource ??
+          FakeLocationSource(
+            granted: false,
+            status: LocationStatus.unknown,
+          ),
+      directionsLauncher: directionsLauncher ?? FakeDirectionsLauncher(),
     ),
     backend: backend,
     store: store,
@@ -276,6 +291,310 @@ Map<String, dynamic> paymentJson({
 }
 
 void main() {
+  group('app baseline theme', () {
+    /// Browse with one venue, and the theme in force on that screen.
+    Future<ThemeData> browseTheme(
+      WidgetTester tester, {
+      String? preset,
+      ({String name, String phone})? customer,
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester, customer: customer);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'theme_preset': preset},
+        ],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return Theme.of(tester.element(find.text('Find a table')));
+    }
+
+    testWidgets('browse chrome is Ember, not a Material default',
+        (tester) async {
+      final theme = await browseTheme(tester);
+
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      expect(theme.colorScheme.onPrimary, SylibookingTokens.onEmber);
+      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
+      expect(theme.colorScheme.onSurface, SylibookingTokens.onIvory);
+    });
+
+    testWidgets('body copy is set in the house body face', (tester) async {
+      final theme = await browseTheme(tester);
+
+      // Loose contains: google_fonts appends a weight suffix to the family.
+      expect(
+        theme.textTheme.bodyMedium?.fontFamily,
+        contains(SylibookingTokens.bodyFont),
+      );
+    });
+
+    testWidgets('headings are set in the house display face', (tester) async {
+      final theme = await browseTheme(tester);
+
+      expect(
+        theme.textTheme.headlineSmall?.fontFamily,
+        contains(SylibookingTokens.displayFont),
+      );
+      expect(
+        theme.textTheme.titleLarge?.fontFamily,
+        contains(SylibookingTokens.displayFont),
+      );
+    });
+
+    testWidgets('a loud venue preset does not reach the browse chrome',
+        (tester) async {
+      final theme = await browseTheme(tester, preset: 'bissap');
+
+      // The same guarantee the branding tests make, asserted against the
+      // baseline itself rather than merely "not bissap".
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+    });
+
+    testWidgets('the greeting names a returning customer', (tester) async {
+      await browseTheme(
+        tester,
+        customer: (name: 'Fatou Diallo', phone: '+224620000000'),
+      );
+
+      // First name only: the greeting is a hello, not a record lookup.
+      expect(find.textContaining('Fatou'), findsOneWidget);
+      expect(find.textContaining('Diallo'), findsNothing);
+    });
+
+    testWidgets('a new device is greeted without a name', (tester) async {
+      await browseTheme(tester);
+
+      expect(find.text('Find a table'), findsOneWidget);
+      expect(find.textContaining(','), findsNothing);
+    });
+  });
+
+  group('bottom navigation', () {
+    Future<FakeBackend> openApp(WidgetTester tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('offers browse, bookings, favourites and profile',
+        (tester) async {
+      await openApp(tester);
+
+      expect(find.text('Browse'), findsOneWidget);
+      expect(find.text('Bookings'), findsOneWidget);
+      expect(find.text('Favourites'), findsOneWidget);
+      expect(find.text('Profile'), findsOneWidget);
+    });
+
+    testWidgets('browse is where the app opens', (tester) async {
+      await openApp(tester);
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+    });
+
+    testWidgets('the bar is themed by the app, not by a listed venue',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'theme_preset': 'indigo_soir'},
+        ],
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      final scheme = Theme.of(tester.element(find.text('Browse'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
+    });
+
+    testWidgets('favourites says it is not built rather than looking broken',
+        (tester) async {
+      await openApp(tester);
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Favourites is coming'), findsOneWidget);
+    });
+
+    testWidgets('profile explains why there is no account', (tester) async {
+      await openApp(tester);
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('reference'), findsOneWidget);
+    });
+
+    testWidgets('coming back to browse does not refetch the list',
+        (tester) async {
+      final backend = await openApp(tester);
+      final listCalls = backend.requests
+          .where((r) => r.url.path == '/api/establishments/')
+          .length;
+
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Browse'));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests
+            .where((r) => r.url.path == '/api/establishments/')
+            .length,
+        listCalls,
+      );
+    });
+  });
+
+  group('browse cards', () {
+    Future<FakeBackend> browseWith(
+      WidgetTester tester,
+      List<Map<String, dynamic>> results, {
+      LocationSource? locationSource,
+    }) async {
+      final (:app, :backend, :store) =
+          buildApp(tester, locationSource: locationSource);
+      backend.on('GET', '/api/establishments/', {
+        'count': results.length,
+        'next': null,
+        'results': results,
+      });
+      for (final result in results) {
+        backend.on('GET', '/api/establishments/${result['id']}/photos/', {
+          'count': 1,
+          'next': null,
+          'results': [
+            {
+              'id': 1,
+              'image_url': 'http://localhost:8000/media/venue.jpg',
+              'caption': '',
+              'uploaded_by_role': 'merchant',
+              'uploaded_by_role_display': 'The venue',
+              'created_at': '2026-08-01T18:00:00Z',
+            },
+          ],
+        });
+      }
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('every card carries a status badge', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(),
+        establishmentJson(
+          id: 8,
+          name: 'Chez Fatou',
+          type: 'restaurant',
+          isOpenNow: false,
+        ),
+      ]);
+
+      expect(find.text('Open until 02:00'), findsOneWidget);
+      expect(find.text('Closed'), findsOneWidget);
+    });
+
+    testWidgets('a cover photo is fetched per venue', (tester) async {
+      final backend = await browseWith(tester, [establishmentJson()]);
+
+      expect(
+        backend.requests.any(
+          (r) => r.url.path == '/api/establishments/7/photos/',
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('no photos leaves the card intact', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+    });
+
+    testWidgets('the filter row offers every filter at 360dp', (tester) async {
+      await browseWith(tester, [establishmentJson()]);
+
+      // All present in the tree, whether or not each is currently on screen.
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Restaurants'), findsOneWidget);
+      expect(find.text('Lounges'), findsOneWidget);
+      expect(find.text('Open now'), findsOneWidget);
+    });
+
+    testWidgets('open now hides a shut venue', (tester) async {
+      await browseWith(tester, [
+        establishmentJson(),
+        establishmentJson(id: 8, name: 'Chez Fatou', isOpenNow: false),
+      ]);
+
+      // Five chips do not fit across 360dp, so this one has to be scrolled
+      // to — exactly as a customer would.
+      await tester.ensureVisible(find.text('Open now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open now'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      expect(find.text('Chez Fatou'), findsNothing);
+    });
+
+    testWidgets('open now filtering everything out explains itself',
+        (tester) async {
+      await browseWith(tester, [
+        establishmentJson(isOpenNow: false),
+      ]);
+
+      // Five chips do not fit across 360dp, so this one has to be scrolled
+      // to — exactly as a customer would.
+      await tester.ensureVisible(find.text('Open now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open now'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nothing is open right now'), findsOneWidget);
+    });
+
+    testWidgets('open now is a client-side filter, not a new query',
+        (tester) async {
+      final backend = await browseWith(tester, [establishmentJson()]);
+      final before = backend.requests.length;
+
+      // Five chips do not fit across 360dp, so this one has to be scrolled
+      // to — exactly as a customer would.
+      await tester.ensureVisible(find.text('Open now'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open now'));
+      await tester.pumpAndSettle();
+
+      expect(backend.requests.length, before);
+    });
+  });
+
   group('browse', () {
     testWidgets('lists establishments', (tester) async {
       final (:app, :backend, :store) = buildApp(tester);
@@ -341,6 +660,437 @@ void main() {
 
       expect(find.text('Could not load places'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+    });
+  });
+
+  group('distance and directions', () {
+    // Kaloum, Conakry — the customer's position in these tests.
+    const here = LatLng(9.509167, -13.712222);
+
+    Map<String, dynamic> venue({
+      int id = 7,
+      String name = 'Le Petit Baobab',
+      Object? lat = '9.513667',
+      Object? lon = '-13.712222',
+    }) =>
+        {
+          ...establishmentJson(id: id, name: name),
+          'latitude': lat,
+          'longitude': lon,
+        };
+
+    /// The filter chips scroll horizontally; at 360dp the later ones sit
+    /// off-screen, so bring one into view before tapping it.
+    Future<void> tapChip(WidgetTester tester, String label) async {
+      await tester.ensureVisible(find.text(label));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
+    Future<FakeBackend> browse(
+      WidgetTester tester, {
+      required List<Map<String, dynamic>> results,
+      LocationSource? locationSource,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        locationSource: locationSource,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': results.length,
+        'next': null,
+        'results': results,
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('no location means no distance and no sort option',
+        (tester) async {
+      await browse(tester, results: [venue()]);
+
+      expect(find.textContaining('away'), findsNothing);
+      expect(find.text('Nearest'), findsNothing);
+      // The way in is offered instead.
+      expect(find.text('Show distances'), findsOneWidget);
+    });
+
+    testWidgets('a denied permission leaves browsing intact', (tester) async {
+      await browse(
+        tester,
+        results: [venue(), venue(id: 8, name: 'Chez Fatou')],
+        locationSource: FakeLocationSource(
+          granted: false,
+          status: LocationStatus.denied,
+        ),
+      );
+
+      // The whole list still renders; only distance is missing.
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      expect(find.text('Chez Fatou'), findsOneWidget);
+      expect(find.textContaining('away'), findsNothing);
+      expect(find.text('Nearest'), findsNothing);
+    });
+
+    testWidgets('declining the rationale asks the platform for nothing',
+        (tester) async {
+      final location = FakeLocationSource(
+        granted: false,
+        status: LocationStatus.denied,
+      );
+      await browse(tester, results: [venue()], locationSource: location);
+
+      await tapChip(tester, 'Show distances');
+      expect(find.text('Show distances?'), findsOneWidget);
+
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+
+      expect(location.requestCount, 0);
+      expect(find.text('Nearest'), findsNothing);
+    });
+
+    testWidgets('a refusal at the OS level is explained, not an error',
+        (tester) async {
+      final location = FakeLocationSource(
+        granted: false,
+        status: LocationStatus.denied,
+      );
+      await browse(tester, results: [venue()], locationSource: location);
+
+      await tapChip(tester, 'Show distances');
+      await tester.tap(find.text('Allow'));
+      await tester.pumpAndSettle();
+
+      expect(location.requestCount, 1);
+      expect(find.textContaining('browsing works without it'), findsOneWidget);
+    });
+
+    testWidgets('location off is reported differently from a refusal',
+        (tester) async {
+      await browse(
+        tester,
+        results: [venue()],
+        locationSource: FakeLocationSource(
+          granted: false,
+          status: LocationStatus.servicesOff,
+        ),
+      );
+
+      await tapChip(tester, 'Show distances');
+      await tester.tap(find.text('Allow'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('switched off on this phone'), findsOneWidget);
+    });
+
+    testWidgets('with a fix, cards show how far away each venue is',
+        (tester) async {
+      await browse(
+        tester,
+        results: [venue()],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      // ~500 m north of the customer.
+      expect(find.textContaining('m away'), findsOneWidget);
+    });
+
+    testWidgets('sorting by distance appears only with a fix', (tester) async {
+      await browse(
+        tester,
+        results: [venue()],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      expect(find.text('Nearest'), findsOneWidget);
+      expect(find.text('Show distances'), findsNothing);
+    });
+
+    testWidgets('nearest first reorders the list', (tester) async {
+      await browse(
+        tester,
+        results: [
+          // Labé, ~253 km away, listed first by the API.
+          venue(id: 8, name: 'Far Venue', lat: '11.318056', lon: '-12.283056'),
+          venue(id: 7, name: 'Near Venue'),
+        ],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      List<String> order() => tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .where((s) => s == 'Near Venue' || s == 'Far Venue')
+          .toList();
+
+      expect(order(), ['Far Venue', 'Near Venue']);
+
+      await tapChip(tester, 'Nearest');
+
+      expect(order(), ['Near Venue', 'Far Venue']);
+    });
+
+    testWidgets('a venue with no coordinates shows no distance and sinks',
+        (tester) async {
+      await browse(
+        tester,
+        results: [
+          venue(id: 9, name: 'Unmapped', lat: null, lon: null),
+          venue(id: 7, name: 'Mapped'),
+        ],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      await tapChip(tester, 'Nearest');
+
+      final order = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .where((s) => s == 'Mapped' || s == 'Unmapped')
+          .toList();
+      // Unmapped goes last rather than sorting as if it were at the origin.
+      expect(order, ['Mapped', 'Unmapped']);
+    });
+  });
+
+  group('get directions', () {
+    Future<FakeDirectionsLauncher> openVenue(
+      WidgetTester tester, {
+      Object? lat = '9.509167',
+      Object? lon = '-13.712222',
+    }) async {
+      final launcher = FakeDirectionsLauncher();
+      final (:app, :backend, :store) =
+          buildApp(tester, directionsLauncher: launcher);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'latitude': lat, 'longitude': lon},
+        ],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'latitude': lat,
+        'longitude': lon,
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      return launcher;
+    }
+
+    testWidgets('a mapped venue offers directions', (tester) async {
+      await openVenue(tester);
+      expect(find.text('Get directions'), findsOneWidget);
+    });
+
+    testWidgets('an unmapped venue does not', (tester) async {
+      await openVenue(tester, lat: null, lon: null);
+      expect(find.text('Get directions'), findsNothing);
+    });
+
+    testWidgets('tapping hands the coordinates to the maps app',
+        (tester) async {
+      final launcher = await openVenue(tester);
+
+      await tester.tap(find.text('Get directions'));
+      await tester.pumpAndSettle();
+
+      expect(launcher.opened, hasLength(1));
+      expect(launcher.opened.single.latitude, closeTo(9.509167, 0.000001));
+      expect(launcher.opened.single.longitude, closeTo(-13.712222, 0.000001));
+      expect(launcher.lastLabel, 'Le Petit Baobab');
+    });
+
+    testWidgets('directions work without a location fix', (tester) async {
+      // Only the venue's coordinates are needed to navigate to it.
+      final launcher = await openVenue(tester);
+
+      await tester.tap(find.text('Get directions'));
+      await tester.pumpAndSettle();
+
+      expect(launcher.opened, hasLength(1));
+    });
+
+    testWidgets('a phone with no maps app is told so, not left silent',
+        (tester) async {
+      final launcher = FakeDirectionsLauncher(succeeds: false);
+      final (:app, :backend, :store) =
+          buildApp(tester, directionsLauncher: launcher);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {
+            ...establishmentJson(),
+            'latitude': '9.509167',
+            'longitude': '-13.712222',
+          },
+        ],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'latitude': '9.509167',
+        'longitude': '-13.712222',
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Get directions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No maps app found on this phone.'), findsOneWidget);
+    });
+  });
+
+  group('establishment branding', () {
+    Future<void> openVenue(WidgetTester tester, {String? preset}) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'theme_preset': preset},
+        ],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'theme_preset': preset,
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+    }
+
+    /// The theme actually in force inside the detail screen.
+    ColorScheme schemeInDetail(WidgetTester tester) {
+      final context = tester.element(find.text('Available times'));
+      return Theme.of(context).colorScheme;
+    }
+
+    // One test per preset, so each gets a fresh tester — sharing one leaves
+    // the previous screen in the tree and the assertion reads the old theme.
+    for (final preset in themePresets) {
+      testWidgets('the detail screen renders under ${preset.name}',
+          (tester) async {
+        await openVenue(tester, preset: preset.key);
+
+        // Intact under each one, not merely recoloured.
+        expect(find.text('Available times'), findsOneWidget);
+        expect(find.text('Kaloum, Conakry'), findsOneWidget);
+        expect(schemeInDetail(tester).primary, preset.accent);
+      });
+    }
+
+    testWidgets('a venue with no preset gets the default', (tester) async {
+      await openVenue(tester, preset: null);
+
+      expect(
+        schemeInDetail(tester).primary,
+        themePresetFor('ember').accent,
+      );
+    });
+
+    testWidgets('an unknown preset falls back rather than breaking',
+        (tester) async {
+      // A preset a newer server knows and this build does not.
+      await openVenue(tester, preset: 'neon_disco');
+
+      expect(find.text('Available times'), findsOneWidget);
+      expect(
+        schemeInDetail(tester).primary,
+        themePresetFor('ember').accent,
+      );
+    });
+
+    testWidgets('the browse screen keeps the app theme whatever the venue uses',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          // A loud preset that must not leak into the chrome.
+          {...establishmentJson(), 'theme_preset': 'bissap'},
+        ],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      final browseScheme =
+          Theme.of(tester.element(find.text('Find a table'))).colorScheme;
+      expect(
+        browseScheme.primary,
+        isNot(themePresetFor('bissap').accent),
+      );
+    });
+
+    testWidgets('leaving the detail screen restores the app theme',
+        (tester) async {
+      await openVenue(tester, preset: 'bissap');
+      final branded = schemeInDetail(tester).primary;
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      final browseScheme =
+          Theme.of(tester.element(find.text('Find a table'))).colorScheme;
+      expect(browseScheme.primary, isNot(branded));
     });
   });
 
@@ -741,6 +1491,101 @@ void main() {
     });
   });
 
+  group('sharing a photo', () {
+    Future<({FakeBackend backend, FakeImageSource picker})> openMyBookings(
+      WidgetTester tester, {
+      bool cancels = false,
+      String reservationStatus = 'completed',
+    }) async {
+      final picker = FakeImageSource(cancels: cancels);
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        bookingReferences: [testReference],
+        imageSource: picker,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(status: reservationStatus, canCancel: false),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bookings'));
+      await tester.pumpAndSettle();
+      return (backend: backend, picker: picker);
+    }
+
+    testWidgets('every booking offers to share a photo', (tester) async {
+      await openMyBookings(tester, reservationStatus: 'pending');
+
+      // Any status: someone turned away still has something to show.
+      expect(find.text('Add a photo'), findsOneWidget);
+    });
+
+    testWidgets('backing out of the picker does nothing', (tester) async {
+      final (:backend, :picker) = await openMyBookings(tester, cancels: true);
+
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      // No caption dialog, no request.
+      expect(find.text('Add a caption'), findsNothing);
+      expect(backend.requests.where((r) => r.method == 'POST'), isEmpty);
+    });
+
+    testWidgets('a picked photo is uploaded with the booking reference',
+        (tester) async {
+      final (:backend, :picker) = await openMyBookings(tester);
+      backend.on('POST', '/api/establishments/7/photos/', {
+        'id': 1,
+        'image': 'http://localhost:8000/media/establishments/7/a.jpg',
+        'caption': 'Great night',
+        'uploaded_by_role': 'customer',
+        'uploaded_by_role_display': 'Customer',
+        'created_at': '2026-07-28T20:00:00Z',
+      });
+
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add a caption'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).last, 'Great night');
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests
+          .firstWhere((r) => r.url.path == '/api/establishments/7/photos/');
+      // Multipart, carrying the reference that proves the visit.
+      expect(posted.headers['content-type'], contains('multipart/form-data'));
+      expect(posted.body, contains(testReference));
+      expect(find.text('Thanks — your photo is shared.'), findsOneWidget);
+    });
+
+    testWidgets('a rejected upload is reported', (tester) async {
+      final (:backend, :picker) = await openMyBookings(tester);
+      backend.on(
+        'POST',
+        '/api/establishments/7/photos/',
+        {'image': ['That image is too large. The limit is 5 MB.']},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('too large'), findsOneWidget);
+    });
+  });
+
   group('writing a review', () {
     Future<({FakeBackend backend, InMemoryBookingStore store})> openMyBookings(
       WidgetTester tester, {
@@ -761,7 +1606,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
       return (backend: backend, store: store);
     }
@@ -1312,7 +2157,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       expect(find.text('No bookings yet'), findsOneWidget);
@@ -1335,7 +2180,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       expect(find.text('Le Petit Baobab'), findsOneWidget);
@@ -1358,7 +2203,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       final paths = backend.requests.map((r) => r.url.path).toList();
@@ -1385,7 +2230,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
 
       expect(find.text('Le Petit Baobab'), findsOneWidget);
@@ -1413,7 +2258,7 @@ void main() {
 
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.tap(find.text('Bookings'));
       await tester.pumpAndSettle();
       return backend;
     }

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../directions.dart';
 import '../widgets/hours_section.dart';
 import '../widgets/menu_section.dart';
 import '../widgets/photos_section.dart';
@@ -17,11 +18,17 @@ class EstablishmentScreen extends StatefulWidget {
     required this.api,
     required this.store,
     required this.establishment,
+    required this.directionsLauncher,
+    this.here,
   });
 
   final SylibookingApi api;
   final BookingStore store;
   final Establishment establishment;
+  final DirectionsLauncher directionsLauncher;
+
+  /// The customer's position, when there is one.
+  final LatLng? here;
 
   @override
   State<EstablishmentScreen> createState() => _EstablishmentScreenState();
@@ -108,6 +115,34 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
     }
   }
 
+  /// How far the venue is, or null without both ends of the pair.
+  double? get _distance {
+    final here = widget.here;
+    final there = (_detail ?? widget.establishment).position;
+    if (here == null || there == null) return null;
+    return distanceKm(here, there);
+  }
+
+  Future<void> _openDirections() async {
+    final establishment = _detail ?? widget.establishment;
+    final destination = establishment.position;
+    if (destination == null) return;
+
+    final opened = await widget.directionsLauncher.open(
+      destination,
+      label: establishment.name,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('No maps app found on this phone.'),
+          ),
+        );
+    }
+  }
+
   Future<void> _openBooking(TimeOption option) async {
     final booked = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -128,6 +163,21 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
   @override
   Widget build(BuildContext context) {
     final establishment = _detail ?? widget.establishment;
+
+    // The venue's branding is scoped to this screen alone. Browse, the
+    // bottom of the stack, and every other screen keep the app's own theme,
+    // so moving between venues never makes the app itself look different.
+    return EstablishmentThemeScope(
+      presetKey: establishment.themePreset,
+      // Builder so the subtree reads the scoped theme rather than the outer
+      // one this method was built with.
+      child: Builder(
+        builder: (context) => _scaffold(context, establishment),
+      ),
+    );
+  }
+
+  Widget _scaffold(BuildContext context, Establishment establishment) {
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -158,6 +208,36 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (_distance case final km?) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.near_me,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          formatDistance(km),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  // Directions need the venue's coordinates, not the
+                  // customer's — offered even without a location fix.
+                  if (establishment.hasPosition) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _openDirections,
+                      icon: const Icon(Icons.directions, size: 18),
+                      label: const Text('Get directions'),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   HoursSection(establishment: establishment),
                   if (establishment.openingHours.isNotEmpty) ...[
@@ -374,7 +454,7 @@ class _DayPicker extends StatelessWidget {
                       children: [
                         Text(
                           offset == 0 ? 'Today' : DateFormat.E().format(day),
-                          style: const TextStyle(fontSize: 11),
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                         Text(DateFormat.MMMd().format(day)),
                       ],

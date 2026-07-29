@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:merchant_app/src/app.dart';
 import 'package:merchant_app/src/auth_controller.dart';
+import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -202,6 +203,84 @@ Map<String, dynamic> venueJson({
     };
 
 void main() {
+  group('app baseline theme', () {
+    /// Signed in on the reservation list, with the theme in force there.
+    Future<ThemeData> signedInTheme(
+      WidgetTester tester, {
+      List<Map<String, dynamic>>? venues,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': venues ?? [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      return Theme.of(tester.element(find.text('Reservations').first));
+    }
+
+    testWidgets('the merchant app runs on the same Ember baseline',
+        (tester) async {
+      final theme = await signedInTheme(tester);
+
+      // Was a teal seed before: two apps in one product should not look like
+      // two products.
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
+      expect(theme.colorScheme.onSurface, SylibookingTokens.onIvory);
+    });
+
+    testWidgets('merchant type comes from the house faces', (tester) async {
+      final theme = await signedInTheme(tester);
+
+      expect(
+        theme.textTheme.bodyMedium?.fontFamily,
+        contains(SylibookingTokens.bodyFont),
+      );
+      expect(
+        theme.textTheme.titleLarge?.fontFamily,
+        contains(SylibookingTokens.displayFont),
+      );
+    });
+
+    testWidgets('the venue picker is app chrome, not venue branding',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [
+          {...venueJson(id: 7), 'theme_preset': 'bissap'},
+          {...venueJson(id: 8, name: 'Chez Fatou'), 'theme_preset': 'harmattan'},
+        ],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+
+      final scheme =
+          Theme.of(tester.element(find.text('Choose a venue'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
+    });
+
+    testWidgets('the login screen is themed before any venue is known',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester);
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+
+      final scheme =
+          Theme.of(tester.element(find.text('Sign in'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
+    });
+  });
+
   group('login screen', () {
     testWidgets('is shown when there is no stored token', (tester) async {
       final (:auth, :backend) = buildAuth(tester);
@@ -1260,6 +1339,334 @@ void main() {
       await openMenu(tester, items: const []);
 
       expect(find.text('No menu yet'), findsOneWidget);
+    });
+  });
+
+  group('photos and menu pictures', () {
+    Future<({FakeBackend backend, FakeImageSource picker})> openManage(
+      WidgetTester tester, {
+      String role = 'owner',
+      bool cancels = false,
+      List<Map<String, dynamic>>? photos,
+      List<Map<String, dynamic>>? menu,
+    }) async {
+      final picker = FakeImageSource(cancels: cancels);
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': photos?.length ?? 0,
+        'next': null,
+        'results': photos ?? [],
+      });
+      backend.on('GET', '/api/merchant/establishments/7/menu/', {
+        'results': menu ??
+            [
+              {
+                'id': 1,
+                'name': 'Poulet braisé',
+                'description': '',
+                'category': 'food',
+                'price': '75000.00',
+                'is_available': true,
+                'image_url': null,
+              },
+            ],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, imageSource: picker),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      return (backend: backend, picker: picker);
+    }
+
+    testWidgets('an owner can reach the photos screen', (tester) async {
+      await openManage(tester);
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No photos yet'), findsOneWidget);
+      expect(find.text('Add photo'), findsOneWidget);
+    });
+
+    testWidgets('staff can look at photos but not add them', (tester) async {
+      await openManage(tester, role: 'staff');
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add photo'), findsNothing);
+      expect(
+        find.textContaining('An owner or manager adds photos here'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a picked photo is uploaded', (tester) async {
+      final (:backend, :picker) = await openManage(tester);
+      backend.on('POST', '/api/establishments/7/photos/', {
+        'id': 1,
+        'image': 'http://localhost:8000/media/establishments/7/a.jpg',
+        'caption': 'The terrace',
+        'uploaded_by_role': 'merchant',
+        'uploaded_by_role_display': 'Merchant',
+        'created_at': '2026-07-28T20:00:00Z',
+      });
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add photo'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'The terrace');
+      await tester.tap(find.text('Upload'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      // By method too: the screen GETs the same path to list photos.
+      final posted = backend.requests.firstWhere(
+        (r) =>
+            r.method == 'POST' &&
+            r.url.path == '/api/establishments/7/photos/',
+      );
+      expect(posted.headers['content-type'], contains('multipart/form-data'));
+      expect(find.text('Photo added.'), findsOneWidget);
+    });
+
+    testWidgets('backing out of the picker uploads nothing', (tester) async {
+      final (:backend, :picker) = await openManage(tester, cancels: true);
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add photo'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      expect(find.text('Add a caption'), findsNothing);
+      expect(backend.requests.where((r) => r.method == 'POST'), isEmpty);
+    });
+
+    testWidgets('an item with no picture shows a tappable placeholder',
+        (tester) async {
+      await openManage(tester);
+
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
+    });
+
+    testWidgets('staff see a plain placeholder, not an invitation',
+        (tester) async {
+      await openManage(tester, role: 'staff');
+
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.add_photo_alternate_outlined), findsNothing);
+      expect(find.byIcon(Icons.restaurant), findsOneWidget);
+    });
+
+    testWidgets('tapping the placeholder uploads a picture for the item',
+        (tester) async {
+      final (:backend, :picker) = await openManage(tester);
+      backend.on('PATCH', '/api/merchant/establishments/7/menu/1/', {
+        'id': 1,
+        'name': 'Poulet braisé',
+        'description': '',
+        'category': 'food',
+        'price': '75000.00',
+        'is_available': true,
+        'image_url': 'http://localhost:8000/media/menu/7/a.jpg',
+      });
+
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.add_photo_alternate_outlined));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      final patched = backend.requests
+          .firstWhere((r) => r.url.path.endsWith('/menu/1/'));
+      expect(patched.method, 'PATCH');
+      expect(patched.headers['content-type'], contains('multipart/form-data'));
+      expect(find.textContaining('Picture added'), findsOneWidget);
+    });
+  });
+
+  group('branding screen', () {
+    Future<FakeBackend> openBranding(
+      WidgetTester tester, {
+      String role = 'owner',
+      String preset = 'ember',
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/7/', {
+        'id': 7,
+        'name': 'Le Petit Baobab',
+        'type': 'lounge',
+        'city': 'Conakry',
+        'address': 'Kaloum',
+        'tagline': '',
+        'description': '',
+        'opening_hours': '',
+        'theme_preset': preset,
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Branding'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    /// The preview and the save button sit below the fold on a 360x900
+    /// phone, so they are not built until scrolled to.
+    Future<void> scrollDown(WidgetTester tester) async {
+      for (var i = 0; i < 5; i++) {
+        await tester.drag(
+          find.byKey(const Key('branding-list')),
+          const Offset(0, -400),
+        );
+        await tester.pumpAndSettle();
+      }
+    }
+
+    testWidgets('all five presets are offered', (tester) async {
+      await openBranding(tester);
+
+      for (final preset in themePresets) {
+        expect(find.text(preset.name), findsOneWidget, reason: preset.key);
+      }
+    });
+
+    testWidgets('each swatch shows the venue name in its own style',
+        (tester) async {
+      await openBranding(tester);
+
+      // Each visible swatch renders the venue's own name on the accent.
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+    });
+
+    testWidgets('the saved preset starts selected', (tester) async {
+      await openBranding(tester, preset: 'bissap');
+      await scrollDown(tester);
+
+      // Selected swatch is the only one with a filled check.
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(find.text('Saved'), findsOneWidget);
+    });
+
+    testWidgets('choosing a preset previews it before saving', (tester) async {
+      final backend = await openBranding(tester, preset: 'ember');
+
+      await tester.tap(find.text('Bissap'));
+      await tester.pumpAndSettle();
+      await scrollDown(tester);
+
+      // Preview re-themed, and nothing sent yet.
+      final previewScheme =
+          Theme.of(tester.element(find.text('Open until 02:00'))).colorScheme;
+      expect(previewScheme.primary, themePresetFor('bissap').accent);
+      expect(backend.requests.where((r) => r.method == 'PATCH'), isEmpty);
+      expect(find.text('Save branding'), findsOneWidget);
+    });
+
+    testWidgets('saving sends only the preset key', (tester) async {
+      final backend = await openBranding(tester);
+      backend.on('PATCH', '/api/merchant/establishments/7/', {
+        'id': 7,
+        'name': 'Le Petit Baobab',
+        'type': 'lounge',
+        'city': 'Conakry',
+        'address': 'Kaloum',
+        'tagline': '',
+        'description': '',
+        'opening_hours': '',
+        'theme_preset': 'indigo_soir',
+      });
+
+      await tester.tap(find.text('Indigo Soir'));
+      await tester.pumpAndSettle();
+      await scrollDown(tester);
+      await tester.tap(find.text('Save branding'));
+      await tester.pumpAndSettle();
+
+      final patched = backend.requests.firstWhere((r) => r.method == 'PATCH');
+      final body = jsonDecode(patched.body) as Map<String, dynamic>;
+      expect(body, {'theme_preset': 'indigo_soir'});
+      // No colours or fonts travel — only the key.
+      expect(body.containsKey('accent'), isFalse);
+      expect(find.text('Branding saved.'), findsOneWidget);
+    });
+
+    testWidgets('a refusal from the server is surfaced', (tester) async {
+      final backend = await openBranding(tester);
+      backend.on(
+        'PATCH',
+        '/api/merchant/establishments/7/',
+        {'detail': 'Your role here is staff. Editing the venue profile is '
+            'not something you can do.'},
+        status: 403,
+      );
+
+      await tester.tap(find.text('Bissap'));
+      await tester.pumpAndSettle();
+      await scrollDown(tester);
+      await tester.tap(find.text('Save branding'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('not something you can do'), findsOneWidget);
+    });
+
+    testWidgets('staff are not offered branding at all', (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: 'staff')],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Branding'), findsNothing);
+    });
+
+    testWidgets('the app chrome keeps its own theme', (tester) async {
+      await openBranding(tester, preset: 'bissap');
+
+      // The screen around the preview is the app's, not the venue's.
+      final chrome =
+          Theme.of(tester.element(find.text('Branding').first)).colorScheme;
+      expect(chrome.primary, isNot(themePresetFor('bissap').accent));
     });
   });
 

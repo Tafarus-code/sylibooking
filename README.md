@@ -182,6 +182,18 @@ average would drift the moment something was hidden.
 | `GET /api/establishments/{id}/photos/` | public, paginated |
 | `POST /api/establishments/{id}/photos/` | reservation reference, or merchant token |
 
+Both apps can upload. The customer sends a photo from any of their bookings in
+**My bookings**; the merchant adds venue photos and menu-item pictures from
+**Manage**. Picking an image goes through an `ImageSource` interface rather than
+calling `image_picker` directly, so the upload paths are exercised in widget
+tests — a platform channel cannot run in one.
+
+**A venue photo is profile work: owner and manager only.** The endpoint used to
+accept any member, which meant the server said yes to something the app never
+offered a staff user. Menu-item pictures follow the same rule, and are attached
+with a multipart `PATCH` separate from the JSON item update — otherwise every
+text edit would become an upload.
+
 Uploads land in `MEDIA_ROOT` (`backend/media/`, gitignored) and Django serves
 them **only when `DEBUG` is on**. In production a web server or object store
 must serve `MEDIA_URL`; `MAX_PHOTO_UPLOAD_BYTES` (5 MB) and
@@ -237,6 +249,54 @@ a customer on a flaky connection will tap twice.
 Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
 collapses the per-space availability grid into the times that are free, choosing
 the smallest space that seats the party so a couple does not take the VIP room.
+
+## Establishment branding
+
+Five curated presets — Ember (default), Palm Night, Harmattan, Bissap, Indigo
+Soir — each pairing a display font, a body font, an accent, and a text colour
+pre-verified against that accent for WCAG AA. **No colour picker and no font
+picker:** a merchant chooses a key, and `theme_preset` is the only thing stored.
+That is what lets every venue stay legible.
+
+`design/theme_presets.json` is the single source of truth. The backend reads it
+at import; `shared_client` mirrors it in Dart, and a test compares the two so
+they cannot drift. Contrast is **recomputed from the hex values** by tests on
+both sides, so "pre-verified" is checked rather than asserted.
+
+Theming is **scoped, never global**. `EstablishmentThemeScope` wraps only the
+customer's establishment detail screen and the merchant's branding preview.
+Bottom navigation, browse, settings and the venue switcher keep the app's own
+theme, so moving between venues never makes the app itself look like it changed.
+An unknown preset key falls back to the default rather than failing — a newer
+server may know presets an older build does not.
+
+Fonts come from `google_fonts` at runtime rather than being bundled per app.
+
+## Distance and directions
+
+No map SDK. Distance is computed client-side with the haversine formula in
+`shared_client/lib/src/geo.dart`, and "Get directions" hands off to a `geo:`
+URI — whatever maps app the customer already has and trusts, with an
+`https://google.com/maps` fallback for devices with no `geo:` handler.
+
+The whole feature is optional, and the app is built so that nothing depends on
+it:
+
+- **Browsing never opens with a permission prompt.** A fix is only requested on
+  launch if permission was already granted. Otherwise a "Show distances" chip
+  explains *why* before prompting, so a refusal is an informed one.
+- **Denied, GPS off, and no-fix are told apart** and get different wording. None
+  of them is an error state; the list renders exactly as before, minus distance.
+- **Sort-by-distance only exists once there is a position to sort by.**
+- **A venue with no coordinates has no distance** and sorts to the bottom rather
+  than behaving as if it were at the origin. Most venues start this way, since
+  `latitude`/`longitude` are optional.
+
+Directions need only the *venue's* coordinates, so that button works with no
+location permission at all.
+
+`latitude`/`longitude` arrive as **strings** — DRF serialises `DecimalField`
+that way — so the client parses either a string or a number.
 
 ## Merchant roles and venues
 

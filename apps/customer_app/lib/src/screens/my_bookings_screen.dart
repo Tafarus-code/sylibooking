@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../image_source.dart';
 import 'write_review_screen.dart';
 
 /// Bookings made on this device, re-read from the server so the status is live.
@@ -10,10 +11,16 @@ import 'write_review_screen.dart';
 /// There are no customer accounts yet, so the ids come from local storage and
 /// each is fetched by id. A booking made on another phone will not appear here.
 class MyBookingsScreen extends StatefulWidget {
-  const MyBookingsScreen({super.key, required this.api, required this.store});
+  const MyBookingsScreen({
+    super.key,
+    required this.api,
+    required this.store,
+    required this.imageSource,
+  });
 
   final SylibookingApi api;
   final BookingStore store;
+  final ImageSource imageSource;
 
   @override
   State<MyBookingsScreen> createState() => _MyBookingsScreenState();
@@ -137,6 +144,67 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     if ((posted ?? false) && mounted) {
       _notify('Thanks — your review is live.');
+    }
+  }
+
+  /// Share a photo from a visit.
+  ///
+  /// The reservation reference is the credential, so any booking qualifies —
+  /// including one that was cancelled, since someone turned away may still
+  /// have something worth showing.
+  Future<void> _addPhoto(Reservation reservation) async {
+    final picked = await widget.imageSource.pick();
+    if (picked == null) return;
+    // The picker takes the user out of the app; they may not come back to it.
+    if (!mounted) return;
+
+    final caption = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Add a caption'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Optional',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Share'),
+            ),
+          ],
+        );
+      },
+    );
+    if (caption == null) return;
+
+    setState(() => _cancelling.add(reservation.reference));
+    try {
+      await widget.api.uploadPhoto(
+        establishmentId: reservation.establishmentId!,
+        bytes: picked.bytes,
+        filename: picked.filename,
+        reservationReference: reservation.reference,
+        caption: caption,
+      );
+      _notify('Thanks — your photo is shared.');
+    } on ApiException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } on ApiUnreachableException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _cancelling.remove(reservation.reference));
+      }
     }
   }
 
@@ -271,8 +339,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     _StatusChip(status: reservation.status),
                   ],
                 ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed:
+                        busy ? null : () => _addPhoto(reservation),
+                    icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                    label: const Text('Add a photo'),
+                  ),
+                ),
                 if (reservation.status == ReservationStatus.completed) ...[
-                  const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -319,7 +396,8 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final (label, background, foreground) = switch (status) {
       ReservationStatus.pending => (
           'Pending',
@@ -356,10 +434,9 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: theme.textTheme.labelMedium?.copyWith(
           color: foreground,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

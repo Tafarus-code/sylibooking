@@ -59,10 +59,23 @@ class OpeningHoursSerializer(serializers.ModelSerializer):
 
 
 class MenuItemSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = MenuItem
-        fields = ['id', 'name', 'description', 'price']
+        fields = ['id', 'name', 'description', 'price', 'image']
         read_only_fields = fields
+
+    def get_image(self, item):
+        """Absolute, or null — most items will have none, especially early."""
+        if not item.image:
+            return None
+        request = self.context.get('request')
+        return (
+            request.build_absolute_uri(item.image.url)
+            if request
+            else item.image.url
+        )
 
 
 class MenuCategorySerializer(serializers.Serializer):
@@ -106,6 +119,7 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
             'space_count',
             'is_open_now',
             'closes_at',
+            'theme_preset',
         ]
 
     def get_is_open_now(self, establishment):
@@ -148,6 +162,7 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'menu',
             'average_rating',
             'review_count',
+            'theme_preset',
             'opening_hours',
             'spaces',
             'created_at',
@@ -192,7 +207,9 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
                 {
                     'category': value,
                     'category_display': label,
-                    'items': MenuItemSerializer(items, many=True).data,
+                    'items': MenuItemSerializer(
+                        items, many=True, context=self.context
+                    ).data,
                 }
             )
         return groups

@@ -67,12 +67,13 @@ class DashboardTestBase(APITestCase):
             reservation.save(update_fields=['status'])
         return reservation
 
-    def dashboard(self, **params):
+    def dashboard(self, establishment=None, **params):
+        """Figures for one venue. The endpoint no longer merges across them."""
+        params.setdefault(
+            'establishment', (establishment or self.establishment).pk
+        )
         query = '&'.join(f'{k}={v}' for k, v in params.items())
-        url = reverse('payment-dashboard')
-        if query:
-            url = f'{url}?{query}'
-        response = self.client.get(url)
+        response = self.client.get(f'{reverse("payment-dashboard")}?{query}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return response.data
 
@@ -86,7 +87,14 @@ class AccessTests(DashboardTestBase):
             [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
         )
 
-    def test_it_reports_only_the_callers_venues(self):
+    def test_a_venue_must_be_named(self):
+        """Figures are no longer merged, so the caller must say which venue."""
+        response = self.client.get(reverse('payment-dashboard'))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('establishment', response.data)
+
+    def test_it_reports_the_named_venue_only(self):
         self.book(Payment.Provider.ORANGE_MONEY, name='Mine')
         self.book(
             Payment.Provider.ORANGE_MONEY, space=self.other_space, name='Theirs'
@@ -99,28 +107,38 @@ class AccessTests(DashboardTestBase):
         )
         self.assertEqual(data['reservations']['total'], 1)
 
-    def test_a_user_staffing_nothing_sees_zeroes(self):
+    def test_a_venue_the_caller_has_no_membership_in_is_refused(self):
+        """Not an empty result — a refusal, even by direct API call."""
+        response = self.client.get(
+            f'{reverse("payment-dashboard")}?establishment={self.other.pk}'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_user_with_no_memberships_is_refused(self):
         outsider = User.objects.create_user('nobody', password='pw-for-tests')
-        self.book(Payment.Provider.ORANGE_MONEY)
         self.authenticate(outsider)
 
-        data = self.dashboard(date_from=self._from(), date_to=self._to())
+        response = self.client.get(
+            f'{reverse("payment-dashboard")}?establishment={self.establishment.pk}'
+        )
 
-        self.assertEqual(data['establishments'], [])
-        self.assertEqual(data['reservations']['total'], 0)
-        self.assertEqual(Decimal(data['payments']['collected']), Decimal('0.00'))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_a_superuser_sees_every_venue(self):
+    def test_a_superuser_may_read_any_venue(self):
         admin = User.objects.create_superuser('root', password='pw-for-tests')
-        self.book(Payment.Provider.ORANGE_MONEY, name='Mine')
         self.book(
             Payment.Provider.ORANGE_MONEY, space=self.other_space, name='Theirs'
         )
         self.authenticate(admin)
 
-        data = self.dashboard(date_from=self._from(), date_to=self._to())
+        data = self.dashboard(
+            establishment=self.other,
+            date_from=self._from(),
+            date_to=self._to(),
+        )
 
-        self.assertEqual(data['reservations']['total'], 2)
+        self.assertEqual(data['reservations']['total'], 1)
 
     def _from(self):
         return (timezone.localtime() - timedelta(days=1)).date().isoformat()

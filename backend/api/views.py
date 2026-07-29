@@ -10,6 +10,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from establishments.models import Establishment, Space
+from establishments.permissions import (
+    get_establishment_or_404,
+    require_operations_access,
+)
 from payments.models import Payment
 from payments.services import start_payment
 from reservations.availability import availability_for_establishment, is_space_available
@@ -143,15 +147,38 @@ class ReservationViewSet(
             .all()
         )
 
-        # Scope to the caller's own venues. Without this, any logged-in user
-        # would see every establishment's customer names and phone numbers.
         user = self.request.user
-        if not user.is_superuser:
-            queryset = queryset.filter(space__establishment__staff=user)
 
-        establishment = self.request.query_params.get('establishment')
-        if establishment:
-            queryset = queryset.filter(space__establishment_id=establishment)
+        # Listing is scoped to one venue, named explicitly. Merging every
+        # venue a user staffs was fine when nobody had two; with roles and
+        # multiple venues it hides which venue a booking belongs to.
+        establishment_id = self.request.query_params.get('establishment')
+        if self.action == 'list':
+            if not establishment_id:
+                raise ValidationError(
+                    {
+                        'establishment': (
+                            'Required. Pick a venue; listings are no longer '
+                            'merged across venues.'
+                        )
+                    }
+                )
+            establishment = get_establishment_or_404(establishment_id)
+            # Membership, not just a filter: asking for a venue you have no
+            # part in is refused rather than quietly returning nothing.
+            require_operations_access(user, establishment)
+            queryset = queryset.filter(space__establishment=establishment)
+        else:
+            # Detail routes and actions stay scoped by membership across all
+            # the caller's venues; the object itself names the venue.
+            if not user.is_superuser:
+                queryset = queryset.filter(
+                    space__establishment__memberships__user=user
+                )
+            if establishment_id:
+                queryset = queryset.filter(
+                    space__establishment_id=establishment_id
+                )
 
         status_ = self.request.query_params.get('status')
         if status_:

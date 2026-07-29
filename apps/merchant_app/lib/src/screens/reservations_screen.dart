@@ -53,6 +53,8 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
 
     try {
       final results = await _api.allReservations(
+        // One venue, the selected one. The server refuses any other.
+        establishmentId: widget.auth.selectedVenueId!,
         from: today,
         to: _range == DateRange.today
             ? today
@@ -157,12 +159,8 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = widget.auth.user;
-    final venue = switch (user?.establishments) {
-      null || [] => 'No venue assigned',
-      [final only] => only.name,
-      final many => '${many.length} venues',
-    };
+    final auth = widget.auth;
+    final venue = auth.selectedVenue?.name ?? 'No venue';
 
     return Scaffold(
       appBar: AppBar(
@@ -170,10 +168,24 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Reservations'),
-            Text(venue, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              // The role is shown because it decides what the rest of the app
+              // will let this person do.
+              auth.selectedVenue == null
+                  ? venue
+                  : '$venue · ${auth.selectedVenue!.roleDisplay}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
         actions: [
+          // Only for accounts that actually have somewhere to switch to.
+          if (auth.hasMultipleVenues)
+            IconButton(
+              icon: const Icon(Icons.swap_horiz),
+              onPressed: auth.changeVenue,
+              tooltip: 'Switch venue',
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
@@ -181,7 +193,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: widget.auth.signOut,
+            onPressed: auth.signOut,
             tooltip: 'Sign out',
           ),
         ],

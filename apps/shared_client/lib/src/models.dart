@@ -174,6 +174,65 @@ class MenuCategory {
       );
 }
 
+/// A user's standing at one establishment.
+enum MerchantRole {
+  owner,
+  manager,
+  staff,
+  unknown;
+
+  static MerchantRole parse(String? value) => switch (value) {
+        'owner' => MerchantRole.owner,
+        'manager' => MerchantRole.manager,
+        'staff' => MerchantRole.staff,
+        _ => MerchantRole.unknown,
+      };
+
+  /// Editing the venue: hours, menu, photos, description.
+  bool get canEditProfile =>
+      this == MerchantRole.owner || this == MerchantRole.manager;
+
+  /// Adding, removing or re-roling members. Owner alone.
+  bool get canManageStaff => this == MerchantRole.owner;
+
+  /// Marking a dish sold out — the one thing staff may change on the menu.
+  bool get canToggleMenuAvailability => this != MerchantRole.unknown;
+}
+
+/// An establishment as it appears in the merchant's own venue list.
+class MerchantVenue {
+  const MerchantVenue({
+    required this.id,
+    required this.name,
+    required this.city,
+    required this.role,
+    required this.roleDisplay,
+    this.type = '',
+    this.tagline = '',
+  });
+
+  final int id;
+  final String name;
+  final String city;
+  final String type;
+  final String tagline;
+
+  /// What this user may do here. The server enforces the same rules; this is
+  /// only so the app does not offer a control that would be refused.
+  final MerchantRole role;
+  final String roleDisplay;
+
+  factory MerchantVenue.fromJson(Map<String, dynamic> json) => MerchantVenue(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+        city: json['city'] as String? ?? '',
+        type: json['type'] as String? ?? '',
+        tagline: json['tagline'] as String? ?? '',
+        role: MerchantRole.parse(json['role'] as String?),
+        roleDisplay: json['role_display'] as String? ?? '',
+      );
+}
+
 class Review {
   const Review({
     required this.id,

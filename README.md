@@ -238,6 +238,41 @@ Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
 collapses the per-space availability grid into the times that are free, choosing
 the smallest space that seats the party so a couple does not take the VIP room.
 
+## Merchant roles and venues
+
+`MerchantMembership` is the through model for `Establishment.staff`: access and
+authority are the same relationship, so one row carries both who may work here
+and how far that goes.
+
+| | Owner | Manager | Staff |
+| --- | :-: | :-: | :-: |
+| Reservations, confirm/cancel, payment status | ✓ | ✓ | ✓ |
+| Toggle menu availability (sold out) | ✓ | ✓ | ✓ |
+| Edit profile: hours, menu, photos, description | ✓ | ✓ | — |
+| Add/remove members, change roles | ✓ | — | — |
+
+**Staff toggling availability is deliberate**, and the one exception to profile
+editing. Marking a dish sold out is a floor decision taken mid-service; routing
+it through a manager would mean customers ordering things the kitchen has run
+out of. The toggle endpoint accepts nothing but `is_available`, so it cannot be
+used as a back door into pricing.
+
+Three rules worth knowing:
+
+- **A non-member gets 404, a member with too low a role gets 403.** Confirming
+  that a venue exists and that you merely lack rights tells an outsider more
+  than they need; a member is entitled to know why.
+- **Role changes take effect on the caller's very next request.** Permissions
+  are read from the database per request and never cached on the token, so no
+  re-login is needed — and revoking access is immediate.
+- **The last owner cannot be demoted or removed.** A venue nobody can
+  administer is not a state worth allowing.
+
+Listings are **no longer merged across venues**. `GET /api/reservations/` and
+the payments dashboard both require `?establishment=<id>` and refuse a venue the
+caller has no membership in. Merchants with one venue never see a switcher; the
+app only offers one to accounts that have somewhere to switch to.
+
 ## Merchant payments dashboard
 
 `GET /api/dashboard/payments/?date_from=&date_to=` — scoped to the caller's own

@@ -93,7 +93,7 @@ void main() {
       fake.on('GET', '/api/reservations/', {'count': 0, 'results': []});
 
       await api.login('amadou', 'pw');
-      await api.reservations();
+      await api.reservations(establishmentId: 7);
 
       expect(fake.lastRequest.headers['Authorization'], 'Token abc123');
     });
@@ -147,7 +147,7 @@ void main() {
         'results': [reservationJson()],
       });
 
-      final page = await api.reservations();
+      final page = await api.reservations(establishmentId: 7);
 
       expect(page.count, 1);
       final booking = page.results.single;

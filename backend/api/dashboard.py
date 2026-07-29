@@ -15,7 +15,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from establishments.models import Establishment
+from establishments.permissions import (
+    get_establishment_or_404,
+    require_operations_access,
+)
 from payments.models import Payment
 from reservations.models import Reservation
 
@@ -31,13 +34,6 @@ def _parse_date(raw, field):
         raise ValidationError(
             {field: f'"{raw}" is not a valid YYYY-MM-DD date.'}
         ) from None
-
-
-def visible_establishments(user):
-    """Venues this user may see figures for."""
-    if user.is_superuser:
-        return Establishment.objects.all()
-    return Establishment.objects.filter(staff=user)
 
 
 class PaymentDashboardView(APIView):
@@ -60,7 +56,22 @@ class PaymentDashboardView(APIView):
             _parse_date(request.query_params.get('date_to'), 'date_to') or today
         )
 
-        establishments = visible_establishments(request.user)
+        # One venue at a time, named explicitly: a merged figure across venues
+        # is not a number any single venue's owner can act on.
+        establishment_id = request.query_params.get('establishment')
+        if not establishment_id:
+            raise ValidationError(
+                {
+                    'establishment': (
+                        'Required. Pick a venue; figures are no longer merged '
+                        'across venues.'
+                    )
+                }
+            )
+        establishment = get_establishment_or_404(establishment_id)
+        require_operations_access(request.user, establishment)
+        establishments = [establishment]
+
         reservations = Reservation.objects.filter(
             space__establishment__in=establishments,
             datetime__date__gte=date_from,

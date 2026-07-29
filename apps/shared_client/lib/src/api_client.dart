@@ -197,11 +197,13 @@ class SylibookingApi {
 
   // --- Reservations -------------------------------------------------------
 
-  /// Merchant-side listing. Scoped server-side to the caller's own venues.
+  /// Merchant-side listing for one venue.
   ///
+  /// [establishmentId] is required — listings are no longer merged across
+  /// venues, and the server refuses one the caller has no membership in.
   /// [date] matches one day; [from]/[to] match an inclusive range.
   Future<Page<Reservation>> reservations({
-    int? establishmentId,
+    required int establishmentId,
     ReservationStatus? status,
     DateTime? date,
     DateTime? from,
@@ -209,7 +211,7 @@ class SylibookingApi {
     int? page,
   }) async {
     final json = await _get('/reservations/', {
-      if (establishmentId != null) 'establishment': '$establishmentId',
+      'establishment': '$establishmentId',
       if (status != null) 'status': status.wireValue,
       if (date != null) 'date': formatDate(date),
       if (from != null) 'date_from': formatDate(from),
@@ -224,7 +226,7 @@ class SylibookingApi {
   /// A week at a busy venue exceeds one page, and a merchant scrolling their
   /// calendar should not silently see only the first twenty.
   Future<List<Reservation>> allReservations({
-    int? establishmentId,
+    required int establishmentId,
     ReservationStatus? status,
     DateTime? date,
     DateTime? from,
@@ -382,16 +384,30 @@ class SylibookingApi {
     return Photo.fromJson(json as Map<String, dynamic>);
   }
 
+  // --- Merchant venues ----------------------------------------------------
+
+  /// The venues this user has a membership in, with their role at each.
+  Future<List<MerchantVenue>> merchantVenues() async {
+    final json = await _get('/merchant/establishments/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => MerchantVenue.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   // --- Merchant dashboard -------------------------------------------------
 
-  /// Takings, outstanding money, and bookings worth chasing.
+  /// Takings, outstanding money, and bookings worth chasing, for one venue.
   ///
-  /// Defaults to the last 30 days server-side. Scoped to the caller's venues.
+  /// [establishmentId] is required: figures are no longer merged across
+  /// venues, and the server refuses a venue the caller has no part in.
   Future<PaymentDashboard> paymentDashboard({
+    required int establishmentId,
     DateTime? from,
     DateTime? to,
   }) async {
     final json = await _get('/dashboard/payments/', {
+      'establishment': '$establishmentId',
       if (from != null) 'date_from': formatDate(from),
       if (to != null) 'date_to': formatDate(to),
     });

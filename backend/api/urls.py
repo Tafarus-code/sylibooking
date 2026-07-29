@@ -8,6 +8,16 @@ from .customer_views import (
     ReservationByReferenceView,
 )
 from .dashboard import PaymentDashboardView
+from .merchant import (
+    MerchantEstablishmentProfileView,
+    MerchantEstablishmentsView,
+    MerchantHoursView,
+    MerchantMenuAvailabilityView,
+    MerchantMenuItemView,
+    MerchantMenuView,
+    MerchantStaffMemberView,
+    MerchantStaffView,
+)
 from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
 
@@ -40,6 +50,48 @@ urlpatterns = [
         'dashboard/payments/',
         PaymentDashboardView.as_view(),
         name='payment-dashboard',
+    ),
+    # Merchant-facing. Every route carries the establishment id, and every
+    # handler checks membership against it.
+    path(
+        'merchant/establishments/',
+        MerchantEstablishmentsView.as_view(),
+        name='merchant-establishments',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/',
+        MerchantEstablishmentProfileView.as_view(),
+        name='merchant-establishment-profile',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/hours/',
+        MerchantHoursView.as_view(),
+        name='merchant-hours',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/menu/',
+        MerchantMenuView.as_view(),
+        name='merchant-menu',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/menu/<int:item_id>/',
+        MerchantMenuItemView.as_view(),
+        name='merchant-menu-item',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/menu/<int:item_id>/availability/',
+        MerchantMenuAvailabilityView.as_view(),
+        name='merchant-menu-availability',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/staff/',
+        MerchantStaffView.as_view(),
+        name='merchant-staff',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/staff/<int:membership_id>/',
+        MerchantStaffMemberView.as_view(),
+        name='merchant-staff-member',
     ),
     # Before the router, so these are not taken for viewset detail routes.
     path(

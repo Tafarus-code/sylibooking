@@ -52,6 +52,13 @@ class MerchantPaymentTestBase(APITestCase):
             reservation.refresh_from_db()
         return reservation
 
+    def list_reservations(self, establishment=None):
+        """Listing is scoped to one venue now, so name it."""
+        target = establishment or self.establishment
+        return self.client.get(
+            f'{reverse("reservation-list")}?establishment={target.pk}'
+        )
+
     def row_for(self, response, customer_name):
         for row in response.data['results']:
             if row['customer_name'] == customer_name:
@@ -63,9 +70,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
     def test_cash_booking_reports_cash_and_no_payment_status(self):
         self.make_booking(hour=19)
 
-        row = self.row_for(
-            self.client.get(reverse('reservation-list')), 'Mariama Diallo'
-        )
+        row = self.row_for(self.list_reservations(), 'Mariama Diallo')
 
         self.assertEqual(row['payment_provider'], 'cash_on_arrival')
         self.assertEqual(row['payment_provider_display'], 'Cash on arrival')
@@ -75,9 +80,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
     def test_paid_orange_money_booking_reports_the_provider(self):
         self.make_booking(hour=19, provider=Payment.Provider.ORANGE_MONEY)
 
-        row = self.row_for(
-            self.client.get(reverse('reservation-list')), 'Mariama Diallo'
-        )
+        row = self.row_for(self.list_reservations(), 'Mariama Diallo')
 
         self.assertEqual(row['payment_provider'], 'orange_money')
         self.assertEqual(row['payment_provider_display'], 'Orange Money')
@@ -87,9 +90,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
     def test_paid_mtn_booking_reports_mtn(self):
         self.make_booking(hour=19, provider=Payment.Provider.MTN_MONEY)
 
-        row = self.row_for(
-            self.client.get(reverse('reservation-list')), 'Mariama Diallo'
-        )
+        row = self.row_for(self.list_reservations(), 'Mariama Diallo')
 
         self.assertEqual(row['payment_provider'], 'mtn_money')
         self.assertEqual(row['payment_provider_display'], 'MTN Mobile Money')
@@ -100,9 +101,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
         """The merchant must not read an unpaid booking as a cash one."""
         self.make_booking(hour=19, provider=Payment.Provider.ORANGE_MONEY)
 
-        row = self.row_for(
-            self.client.get(reverse('reservation-list')), 'Mariama Diallo'
-        )
+        row = self.row_for(self.list_reservations(), 'Mariama Diallo')
 
         self.assertEqual(row['payment_provider'], 'orange_money')
         self.assertEqual(row['payment_status'], Payment.Status.PENDING)
@@ -112,9 +111,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
     def test_a_failed_payment_shows_as_failed(self):
         self.make_booking(hour=19, provider=Payment.Provider.ORANGE_MONEY)
 
-        row = self.row_for(
-            self.client.get(reverse('reservation-list')), 'Mariama Diallo'
-        )
+        row = self.row_for(self.list_reservations(), 'Mariama Diallo')
 
         self.assertEqual(row['payment_status'], Payment.Status.FAILED)
         self.assertFalse(row['is_paid'])
@@ -122,9 +119,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
     def test_the_list_carries_amount_and_reference_for_reconciliation(self):
         self.make_booking(hour=19, provider=Payment.Provider.ORANGE_MONEY)
 
-        row = self.row_for(
-            self.client.get(reverse('reservation-list')), 'Mariama Diallo'
-        )
+        row = self.row_for(self.list_reservations(), 'Mariama Diallo')
 
         self.assertEqual(Decimal(row['payment']['amount']), Decimal('50000'))
         self.assertTrue(row['payment']['provider_reference'])
@@ -140,7 +135,7 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
             hour=22, provider=Payment.Provider.MTN_MONEY, name='MTN Customer'
         )
 
-        response = self.client.get(reverse('reservation-list'))
+        response = self.list_reservations()
 
         self.assertIsNone(self.row_for(response, 'Cash Customer')['payment_status'])
         self.assertTrue(self.row_for(response, 'Orange Customer')['is_paid'])
@@ -158,10 +153,11 @@ class PaymentVisibleInListTests(MerchantPaymentTestBase):
                 name=f'Customer {hour}',
             )
 
-        with self.assertNumQueries(4):
-            # count, page of reservations, prefetched payments, and the
-            # session/auth lookup for the token.
-            self.client.get(reverse('reservation-list'))
+        # Token lookup, the establishment, the membership check, count, the
+        # page itself, and one prefetch for payments. Six regardless of how
+        # many bookings there are — that is what this guards.
+        with self.assertNumQueries(6):
+            self.list_reservations()
 
 
 class PaymentVisibleInDetailTests(MerchantPaymentTestBase):
@@ -304,7 +300,7 @@ class ConfirmationRuleTests(MerchantPaymentTestBase):
         )
         cash = self.make_booking(hour=21, name='Cash')
 
-        response = self.client.get(reverse('reservation-list'))
+        response = self.list_reservations()
 
         self.assertFalse(self.row_for(response, 'Unpaid')['can_confirm'])
         self.assertTrue(self.row_for(response, 'Cash')['can_confirm'])

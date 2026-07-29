@@ -49,6 +49,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
 
     try {
       final dashboard = await widget.auth.api.paymentDashboard(
+        establishmentId: widget.auth.selectedVenueId!,
         from: today.subtract(Duration(days: _window.daysBack)),
         to: today,
       );

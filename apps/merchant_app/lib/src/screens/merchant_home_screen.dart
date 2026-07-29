@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../auth_controller.dart';
+import '../image_source.dart';
 import 'manage_screen.dart';
 import 'payments_dashboard_screen.dart';
 import 'reservations_screen.dart';
 
 /// The signed-in shell: tonight's bookings, and the money behind them.
 class MerchantHomeScreen extends StatefulWidget {
-  const MerchantHomeScreen({super.key, required this.auth});
+  const MerchantHomeScreen({
+    super.key,
+    required this.auth,
+    required this.imageSource,
+  });
 
   final AuthController auth;
+  final ImageSource imageSource;
 
   @override
   State<MerchantHomeScreen> createState() => _MerchantHomeScreenState();
@@ -28,7 +34,7 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
         children: [
           ReservationsScreen(auth: widget.auth),
           PaymentsDashboardScreen(auth: widget.auth),
-          ManageScreen(auth: widget.auth),
+          ManageScreen(auth: widget.auth, imageSource: widget.imageSource),
         ],
       ),
       bottomNavigationBar: NavigationBar(

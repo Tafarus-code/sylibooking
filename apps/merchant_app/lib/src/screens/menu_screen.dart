@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../auth_controller.dart';
+import '../image_source.dart';
 
 /// The venue's menu.
 ///
@@ -9,9 +10,14 @@ import '../auth_controller.dart';
 /// mid-service. Everything else about an item is owner and manager work, so
 /// those controls are absent for staff rather than shown and refused.
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({super.key, required this.auth});
+  const MenuScreen({
+    super.key,
+    required this.auth,
+    required this.imageSource,
+  });
 
   final AuthController auth;
+  final ImageSource imageSource;
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -107,6 +113,35 @@ class _MenuScreenState extends State<MenuScreen> {
       ),
     );
     if ((saved ?? false) && mounted) await _load();
+  }
+
+  Future<void> _pickImage(MerchantMenuItem item) async {
+    final picked = await widget.imageSource.pick();
+    if (picked == null) return;
+
+    setState(() => _busy.add(item.id));
+    try {
+      final updated = await widget.auth.api.uploadMenuItemImage(
+        establishmentId: _venueId,
+        itemId: item.id,
+        bytes: picked.bytes,
+        filename: picked.filename,
+      );
+      if (!mounted) return;
+      setState(() {
+        _items = [
+          for (final existing in _items)
+            existing.id == updated.id ? updated : existing,
+        ];
+      });
+      _notify('Picture added to ${item.name}.');
+    } on ApiException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } on ApiUnreachableException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _busy.remove(item.id));
+    }
   }
 
   Future<void> _delete(MerchantMenuItem item) async {
@@ -243,6 +278,13 @@ class _MenuScreenState extends State<MenuScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
                 child: Row(
                   children: [
+                    // A thumbnail when there is one, a placeholder the owner
+                    // can tap when there is not.
+                    _Thumbnail(
+                      item: item,
+                      onTap: _canEdit ? () => _pickImage(item) : null,
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,12 +322,28 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                     if (_canEdit)
                       PopupMenuButton<String>(
-                        onSelected: (choice) => choice == 'edit'
-                            ? _edit(item: item)
-                            : _delete(item),
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(value: 'delete', child: Text('Remove')),
+                        onSelected: (choice) => switch (choice) {
+                          'edit' => _edit(item: item),
+                          'image' => _pickImage(item),
+                          _ => _delete(item),
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit'),
+                          ),
+                          PopupMenuItem(
+                            value: 'image',
+                            child: Text(
+                              item.imageUrl == null
+                                  ? 'Add a picture'
+                                  : 'Replace picture',
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Remove'),
+                          ),
                         ],
                       ),
                   ],
@@ -294,6 +352,51 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
         ],
       ],
+    );
+  }
+}
+
+/// The item's picture, or a tappable placeholder for adding one.
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({required this.item, this.onTap});
+
+  final MerchantMenuItem item;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final url = item.imageUrl;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: url == null
+              ? Container(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Icon(
+                    // Only hint at adding one if this person may.
+                    onTap == null
+                        ? Icons.restaurant
+                        : Icons.add_photo_alternate_outlined,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, _, _) => Container(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
+        ),
+      ),
     );
   }
 }

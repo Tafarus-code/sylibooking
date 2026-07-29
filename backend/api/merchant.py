@@ -27,6 +27,8 @@ from establishments.permissions import (
     require_staff_management,
 )
 
+from .reviews import validate_photo_file  # noqa: E402  (after app imports)
+
 User = get_user_model()
 
 
@@ -107,6 +109,20 @@ class OpeningHoursWriteSerializer(serializers.ModelSerializer):
 
 
 class MenuItemWriteSerializer(serializers.ModelSerializer):
+    """Menu item, image included.
+
+    The image is optional everywhere: most items will never have one, and a
+    merchant on a slow connection should not be blocked from adding a dish
+    because a photo will not upload.
+    """
+
+    image = serializers.ImageField(
+        required=False,
+        allow_null=True,
+        validators=[validate_photo_file],
+    )
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = MenuItem
         fields = [
@@ -116,8 +132,21 @@ class MenuItemWriteSerializer(serializers.ModelSerializer):
             'category',
             'price',
             'is_available',
+            'image',
+            'image_url',
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'image_url']
+        extra_kwargs = {'image': {'write_only': True}}
+
+    def get_image_url(self, item):
+        if not item.image:
+            return None
+        request = self.context.get('request')
+        return (
+            request.build_absolute_uri(item.image.url)
+            if request
+            else item.image.url
+        )
 
 
 class MembershipSerializer(serializers.ModelSerializer):
@@ -279,14 +308,20 @@ class MerchantMenuView(APIView):
         require_operations_access(request.user, establishment)
         items = establishment.menu_items.all()
         return Response(
-            {'results': MenuItemWriteSerializer(items, many=True).data}
+            {
+                'results': MenuItemWriteSerializer(
+                    items, many=True, context={'request': request}
+                ).data
+            }
         )
 
     def post(self, request, pk):
         establishment = get_establishment_or_404(pk)
         require_profile_access(request.user, establishment)
 
-        serializer = MenuItemWriteSerializer(data=request.data)
+        serializer = MenuItemWriteSerializer(
+            data=request.data, context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save(establishment=establishment)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -308,7 +343,10 @@ class MerchantMenuItemView(APIView):
 
         item = self.get_item(establishment, item_id)
         serializer = MenuItemWriteSerializer(
-            item, data=request.data, partial=True
+            item,
+            data=request.data,
+            partial=True,
+            context={'request': request},
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -347,7 +385,9 @@ class MerchantMenuAvailabilityView(APIView):
 
         item.is_available = bool(request.data['is_available'])
         item.save(update_fields=['is_available'])
-        return Response(MenuItemWriteSerializer(item).data)
+        return Response(
+            MenuItemWriteSerializer(item, context={'request': request}).data
+        )
 
 
 # --- Staff ----------------------------------------------------------------

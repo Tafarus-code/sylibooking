@@ -9,6 +9,20 @@ from django.core.validators import (
 from django.db import models
 
 
+def _scattered_upload_path(folder, establishment_id, filename):
+    """A stable folder per venue, with an unguessable filename.
+
+    The original name is discarded: it can carry a person's name or a path
+    from their phone, and two uploads called IMG_0001.jpg must not collide.
+    """
+    extension = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
+    return f'{folder}/{establishment_id}/{uuid.uuid4().hex}.{extension}'
+
+
+def menu_item_upload_path(instance, filename):
+    return _scattered_upload_path('menu', instance.establishment_id, filename)
+
+
 class Establishment(models.Model):
     """A venue that takes reservations — a hookah lounge or a restaurant.
 
@@ -227,6 +241,17 @@ class MenuItem(models.Model):
         decimal_places=2,
         help_text='In Guinean francs.',
     )
+    image = models.ImageField(
+        upload_to=menu_item_upload_path,
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=settings.ALLOWED_PHOTO_EXTENSIONS
+            )
+        ],
+        help_text='Optional. Most items will not have one, especially at first.',
+    )
     is_available = models.BooleanField(
         default=True,
         help_text='Unavailable items are hidden from customers, not deleted.',
@@ -318,14 +343,9 @@ class MerchantMembership(models.Model):
 
 
 def photo_upload_path(instance, filename):
-    """Scatter uploads per establishment, with an unguessable filename.
-
-    The original filename is discarded: it can carry a customer's name or a
-    path from their phone, and two people uploading IMG_0001.jpg must not
-    collide.
-    """
-    extension = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
-    return f'establishments/{instance.establishment_id}/{uuid.uuid4().hex}.{extension}'
+    return _scattered_upload_path(
+        'establishments', instance.establishment_id, filename
+    )
 
 
 class Review(models.Model):

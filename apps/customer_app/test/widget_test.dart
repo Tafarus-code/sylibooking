@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
+import 'package:customer_app/src/image_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -249,6 +250,7 @@ Map<String, dynamic> paymentJson({
   WidgetTester tester, {
   List<String>? bookingReferences,
   ({String name, String phone})? customer,
+  ImageSource? imageSource,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -269,6 +271,7 @@ Map<String, dynamic> paymentJson({
         httpClient: backend.client,
       ),
       store: store,
+      imageSource: imageSource,
     ),
     backend: backend,
     store: store,
@@ -738,6 +741,101 @@ void main() {
       await openVenue(tester);
 
       expect(find.byType(Image), findsNothing);
+    });
+  });
+
+  group('sharing a photo', () {
+    Future<({FakeBackend backend, FakeImageSource picker})> openMyBookings(
+      WidgetTester tester, {
+      bool cancels = false,
+      String reservationStatus = 'completed',
+    }) async {
+      final picker = FakeImageSource(cancels: cancels);
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        bookingReferences: [testReference],
+        imageSource: picker,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(status: reservationStatus, canCancel: false),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.receipt_long));
+      await tester.pumpAndSettle();
+      return (backend: backend, picker: picker);
+    }
+
+    testWidgets('every booking offers to share a photo', (tester) async {
+      await openMyBookings(tester, reservationStatus: 'pending');
+
+      // Any status: someone turned away still has something to show.
+      expect(find.text('Add a photo'), findsOneWidget);
+    });
+
+    testWidgets('backing out of the picker does nothing', (tester) async {
+      final (:backend, :picker) = await openMyBookings(tester, cancels: true);
+
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      // No caption dialog, no request.
+      expect(find.text('Add a caption'), findsNothing);
+      expect(backend.requests.where((r) => r.method == 'POST'), isEmpty);
+    });
+
+    testWidgets('a picked photo is uploaded with the booking reference',
+        (tester) async {
+      final (:backend, :picker) = await openMyBookings(tester);
+      backend.on('POST', '/api/establishments/7/photos/', {
+        'id': 1,
+        'image': 'http://localhost:8000/media/establishments/7/a.jpg',
+        'caption': 'Great night',
+        'uploaded_by_role': 'customer',
+        'uploaded_by_role_display': 'Customer',
+        'created_at': '2026-07-28T20:00:00Z',
+      });
+
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add a caption'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).last, 'Great night');
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests
+          .firstWhere((r) => r.url.path == '/api/establishments/7/photos/');
+      // Multipart, carrying the reference that proves the visit.
+      expect(posted.headers['content-type'], contains('multipart/form-data'));
+      expect(posted.body, contains(testReference));
+      expect(find.text('Thanks — your photo is shared.'), findsOneWidget);
+    });
+
+    testWidgets('a rejected upload is reported', (tester) async {
+      final (:backend, :picker) = await openMyBookings(tester);
+      backend.on(
+        'POST',
+        '/api/establishments/7/photos/',
+        {'image': ['That image is too large. The limit is 5 MB.']},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Add a photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('too large'), findsOneWidget);
     });
   });
 

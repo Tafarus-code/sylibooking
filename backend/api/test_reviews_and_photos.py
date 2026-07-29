@@ -16,7 +16,13 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from establishments.models import Establishment, Photo, Review, Space
+from establishments.models import (
+    Establishment,
+    MerchantMembership,
+    Photo,
+    Review,
+    Space,
+)
 from reservations.models import Reservation
 
 
@@ -371,7 +377,11 @@ class PhotoUploadTests(ReviewsTestBase):
     def setUp(self):
         super().setUp()
         self.staff = User.objects.create_user('amadou', password='pw-for-tests')
-        self.establishment.staff.add(self.staff)
+        MerchantMembership.objects.create(
+            user=self.staff,
+            establishment=self.establishment,
+            role=MerchantMembership.Role.OWNER,
+        )
 
     def authenticate(self, user):
         token, _ = Token.objects.get_or_create(user=user)
@@ -442,6 +452,42 @@ class PhotoUploadTests(ReviewsTestBase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_a_staff_role_member_cannot_upload_a_venue_photo(self):
+        """A venue photo is profile work, and the app hides the control.
+
+        Membership alone used to be enough here, which meant the server said
+        yes to something the app never offered.
+        """
+        floor = User.objects.create_user('aissatou', password='pw-for-tests')
+        MerchantMembership.objects.create(
+            user=floor,
+            establishment=self.establishment,
+            role=MerchantMembership.Role.STAFF,
+        )
+        self.authenticate(floor)
+
+        response = self.client.post(
+            self.photos_url(), {'image': make_image()}, format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Photo.objects.count(), 0)
+
+    def test_a_manager_can_upload_a_venue_photo(self):
+        manager = User.objects.create_user('ibrahima', password='pw-for-tests')
+        MerchantMembership.objects.create(
+            user=manager,
+            establishment=self.establishment,
+            role=MerchantMembership.Role.MANAGER,
+        )
+        self.authenticate(manager)
+
+        response = self.client.post(
+            self.photos_url(), {'image': make_image()}, format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
     def test_merchant_staff_upload_official_photos(self):
         self.authenticate(self.staff)
 
@@ -458,7 +504,11 @@ class PhotoUploadTests(ReviewsTestBase):
 
     def test_staff_of_another_venue_cannot_upload_here(self):
         outsider = User.objects.create_user('fatou', password='pw-for-tests')
-        self.other.staff.add(outsider)
+        MerchantMembership.objects.create(
+            user=outsider,
+            establishment=self.other,
+            role=MerchantMembership.Role.OWNER,
+        )
         self.authenticate(outsider)
 
         response = self.client.post(

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../auth_controller.dart';
+import '../image_source.dart';
 import 'hours_screen.dart';
 import 'menu_screen.dart';
+import 'photos_screen.dart';
 import 'profile_screen.dart';
 import 'staff_screen.dart';
 
@@ -12,9 +14,14 @@ import 'staff_screen.dart';
 /// server rejects them either way, but a button that always fails is a lie.
 /// The menu is the exception: staff belong there to mark items sold out.
 class ManageScreen extends StatelessWidget {
-  const ManageScreen({super.key, required this.auth});
+  const ManageScreen({
+    super.key,
+    required this.auth,
+    required this.imageSource,
+  });
 
   final AuthController auth;
+  final ImageSource imageSource;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +69,23 @@ class ManageScreen extends StatelessWidget {
             subtitle: role.canEditProfile
                 ? 'Items, prices, and what is sold out'
                 : 'Mark items sold out',
-            onTap: () => _open(context, MenuScreen(auth: auth)),
+            onTap: () => _open(
+              context,
+              MenuScreen(auth: auth, imageSource: imageSource),
+            ),
+          ),
+
+          // Everyone may look at the photos; only owners and managers add.
+          _Entry(
+            icon: Icons.photo_library_outlined,
+            title: 'Photos',
+            subtitle: role.canEditProfile
+                ? 'What customers see of the room'
+                : 'What customers see of the room (view only)',
+            onTap: () => _open(
+              context,
+              PhotosScreen(auth: auth, imageSource: imageSource),
+            ),
           ),
 
           if (role.canEditProfile) ...[

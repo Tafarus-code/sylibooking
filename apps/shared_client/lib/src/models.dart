@@ -132,6 +132,7 @@ class MenuItem {
     required this.name,
     required this.price,
     this.description = '',
+    this.imageUrl,
   });
 
   final int id;
@@ -141,11 +142,15 @@ class MenuItem {
   /// Guinean francs.
   final String price;
 
+  /// Null for most items; a picture is optional.
+  final String? imageUrl;
+
   factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
         id: json['id'] as int,
         name: json['name'] as String? ?? '',
         description: json['description'] as String? ?? '',
         price: '${json['price'] ?? ''}',
+        imageUrl: json['image'] as String?,
       );
 }
 
@@ -242,6 +247,7 @@ class MerchantMenuItem {
     required this.price,
     required this.isAvailable,
     this.description = '',
+    this.imageUrl,
   });
 
   final int id;
@@ -252,6 +258,9 @@ class MerchantMenuItem {
   final String category;
   final String price;
   final bool isAvailable;
+
+  /// Null for most items — a picture is optional.
+  final String? imageUrl;
 
   String get categoryDisplay => switch (category) {
         'food' => 'Food',
@@ -267,6 +276,7 @@ class MerchantMenuItem {
         category: category,
         price: price,
         isAvailable: isAvailable ?? this.isAvailable,
+        imageUrl: imageUrl,
       );
 
   factory MerchantMenuItem.fromJson(Map<String, dynamic> json) =>
@@ -277,6 +287,7 @@ class MerchantMenuItem {
         category: json['category'] as String? ?? '',
         price: '${json['price'] ?? ''}',
         isAvailable: json['is_available'] as bool? ?? true,
+        imageUrl: json['image_url'] as String?,
       );
 }
 

@@ -182,6 +182,18 @@ average would drift the moment something was hidden.
 | `GET /api/establishments/{id}/photos/` | public, paginated |
 | `POST /api/establishments/{id}/photos/` | reservation reference, or merchant token |
 
+Both apps can upload. The customer sends a photo from any of their bookings in
+**My bookings**; the merchant adds venue photos and menu-item pictures from
+**Manage**. Picking an image goes through an `ImageSource` interface rather than
+calling `image_picker` directly, so the upload paths are exercised in widget
+tests — a platform channel cannot run in one.
+
+**A venue photo is profile work: owner and manager only.** The endpoint used to
+accept any member, which meant the server said yes to something the app never
+offered a staff user. Menu-item pictures follow the same rule, and are attached
+with a multipart `PATCH` separate from the JSON item update — otherwise every
+text edit would become an upload.
+
 Uploads land in `MEDIA_ROOT` (`backend/media/`, gitignored) and Django serves
 them **only when `DEBUG` is on**. In production a web server or object store
 must serve `MEDIA_URL`; `MAX_PHOTO_UPLOAD_BYTES` (5 MB) and

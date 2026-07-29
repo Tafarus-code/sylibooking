@@ -13,7 +13,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from establishments.models import Establishment, Photo, Review
+from establishments.models import (
+    Establishment,
+    MerchantMembership,
+    Photo,
+    Review,
+)
 from reservations.models import Reservation
 
 
@@ -152,12 +157,22 @@ class PhotoCreateSerializer(serializers.Serializer):
         self.establishment = establishment
         self.user = user
 
-    def _merchant_owns_establishment(self):
+    def _merchant_may_upload(self):
+        """Owner or manager — a venue photo is profile work.
+
+        Membership alone is not enough: staff can run the floor but do not
+        speak for how the venue presents itself, and the app hides the control
+        from them. The two must agree.
+        """
         if self.user is None or not self.user.is_authenticated:
             return False
         if self.user.is_superuser:
             return True
-        return self.establishment.staff.filter(pk=self.user.pk).exists()
+
+        membership = MerchantMembership.objects.filter(
+            user=self.user, establishment=self.establishment
+        ).first()
+        return membership is not None and membership.can_edit_profile
 
     def validate(self, attrs):
         reference = attrs.get('reservation_reference')
@@ -180,7 +195,7 @@ class PhotoCreateSerializer(serializers.Serializer):
             attrs['uploaded_by_role'] = Photo.UploaderRole.CUSTOMER
             return attrs
 
-        if self._merchant_owns_establishment():
+        if self._merchant_may_upload():
             attrs['reservation'] = None
             attrs['uploaded_by_role'] = Photo.UploaderRole.MERCHANT
             return attrs

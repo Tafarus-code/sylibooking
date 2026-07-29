@@ -492,6 +492,34 @@ class SylibookingApi {
     return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Attach or replace an item's picture.
+  ///
+  /// Separate from [updateMenuItem] because it is multipart; the rest of the
+  /// item is JSON, and mixing the two would make every text edit an upload.
+  Future<MerchantMenuItem> uploadMenuItemImage({
+    required int establishmentId,
+    required int itemId,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final request = http.MultipartRequest(
+      'PATCH',
+      _uri('/merchant/establishments/$establishmentId/menu/$itemId/'),
+    );
+    if (isAuthenticated) {
+      request.headers['Authorization'] = 'Token $token';
+    }
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: filename),
+    );
+
+    final json = await _send(() async {
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    });
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<MerchantMenuItem> updateMenuItem(
     int establishmentId,
     int itemId,

@@ -4,15 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../image_source.dart';
 import 'establishment_screen.dart';
 import 'my_bookings_screen.dart';
 
 /// Discovery: what is open near me, and what kind of place is it.
 class BrowseScreen extends StatefulWidget {
-  const BrowseScreen({super.key, required this.api, required this.store});
+  const BrowseScreen({
+    super.key,
+    required this.api,
+    required this.store,
+    required this.imageSource,
+  });
 
   final SylibookingApi api;
   final BookingStore store;
+  final ImageSource imageSource;
 
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
@@ -96,6 +103,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 builder: (_) => MyBookingsScreen(
                   api: widget.api,
                   store: widget.store,
+                  imageSource: widget.imageSource,
                 ),
               ),
             ),

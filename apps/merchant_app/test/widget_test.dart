@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:merchant_app/src/app.dart';
 import 'package:merchant_app/src/auth_controller.dart';
+import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -1260,6 +1261,168 @@ void main() {
       await openMenu(tester, items: const []);
 
       expect(find.text('No menu yet'), findsOneWidget);
+    });
+  });
+
+  group('photos and menu pictures', () {
+    Future<({FakeBackend backend, FakeImageSource picker})> openManage(
+      WidgetTester tester, {
+      String role = 'owner',
+      bool cancels = false,
+      List<Map<String, dynamic>>? photos,
+      List<Map<String, dynamic>>? menu,
+    }) async {
+      final picker = FakeImageSource(cancels: cancels);
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': photos?.length ?? 0,
+        'next': null,
+        'results': photos ?? [],
+      });
+      backend.on('GET', '/api/merchant/establishments/7/menu/', {
+        'results': menu ??
+            [
+              {
+                'id': 1,
+                'name': 'Poulet braisé',
+                'description': '',
+                'category': 'food',
+                'price': '75000.00',
+                'is_available': true,
+                'image_url': null,
+              },
+            ],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, imageSource: picker),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      return (backend: backend, picker: picker);
+    }
+
+    testWidgets('an owner can reach the photos screen', (tester) async {
+      await openManage(tester);
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No photos yet'), findsOneWidget);
+      expect(find.text('Add photo'), findsOneWidget);
+    });
+
+    testWidgets('staff can look at photos but not add them', (tester) async {
+      await openManage(tester, role: 'staff');
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add photo'), findsNothing);
+      expect(
+        find.textContaining('An owner or manager adds photos here'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a picked photo is uploaded', (tester) async {
+      final (:backend, :picker) = await openManage(tester);
+      backend.on('POST', '/api/establishments/7/photos/', {
+        'id': 1,
+        'image': 'http://localhost:8000/media/establishments/7/a.jpg',
+        'caption': 'The terrace',
+        'uploaded_by_role': 'merchant',
+        'uploaded_by_role_display': 'Merchant',
+        'created_at': '2026-07-28T20:00:00Z',
+      });
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add photo'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'The terrace');
+      await tester.tap(find.text('Upload'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      // By method too: the screen GETs the same path to list photos.
+      final posted = backend.requests.firstWhere(
+        (r) =>
+            r.method == 'POST' &&
+            r.url.path == '/api/establishments/7/photos/',
+      );
+      expect(posted.headers['content-type'], contains('multipart/form-data'));
+      expect(find.text('Photo added.'), findsOneWidget);
+    });
+
+    testWidgets('backing out of the picker uploads nothing', (tester) async {
+      final (:backend, :picker) = await openManage(tester, cancels: true);
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add photo'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      expect(find.text('Add a caption'), findsNothing);
+      expect(backend.requests.where((r) => r.method == 'POST'), isEmpty);
+    });
+
+    testWidgets('an item with no picture shows a tappable placeholder',
+        (tester) async {
+      await openManage(tester);
+
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
+    });
+
+    testWidgets('staff see a plain placeholder, not an invitation',
+        (tester) async {
+      await openManage(tester, role: 'staff');
+
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.add_photo_alternate_outlined), findsNothing);
+      expect(find.byIcon(Icons.restaurant), findsOneWidget);
+    });
+
+    testWidgets('tapping the placeholder uploads a picture for the item',
+        (tester) async {
+      final (:backend, :picker) = await openManage(tester);
+      backend.on('PATCH', '/api/merchant/establishments/7/menu/1/', {
+        'id': 1,
+        'name': 'Poulet braisé',
+        'description': '',
+        'category': 'food',
+        'price': '75000.00',
+        'is_available': true,
+        'image_url': 'http://localhost:8000/media/menu/7/a.jpg',
+      });
+
+      await tester.tap(find.text('Menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.add_photo_alternate_outlined));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCount, 1);
+      final patched = backend.requests
+          .firstWhere((r) => r.url.path.endsWith('/menu/1/'));
+      expect(patched.method, 'PATCH');
+      expect(patched.headers['content-type'], contains('multipart/form-data'));
+      expect(find.textContaining('Picture added'), findsOneWidget);
     });
   });
 

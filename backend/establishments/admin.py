@@ -1,6 +1,22 @@
 from django.contrib import admin
 
-from .models import Establishment, MenuItem, OpeningHours, Photo, Review, Space
+from .models import (
+    Establishment,
+    MenuItem,
+    MerchantMembership,
+    OpeningHours,
+    Photo,
+    Review,
+    Space,
+)
+
+
+class MerchantMembershipInline(admin.TabularInline):
+    """Who has access here, and in what capacity."""
+
+    model = MerchantMembership
+    extra = 1
+    autocomplete_fields = ['user']
 
 
 class SpaceInline(admin.TabularInline):
@@ -28,8 +44,22 @@ class EstablishmentAdmin(admin.ModelAdmin):
     list_display = ['name', 'type', 'city', 'created_at']
     list_filter = ['type', 'city']
     search_fields = ['name', 'address']
-    filter_horizontal = ['staff']
-    inlines = [OpeningHoursInline, SpaceInline, MenuItemInline]
+    inlines = [
+        MerchantMembershipInline,
+        OpeningHoursInline,
+        SpaceInline,
+        MenuItemInline,
+    ]
+
+
+@admin.register(MerchantMembership)
+class MerchantMembershipAdmin(admin.ModelAdmin):
+    list_display = ['user', 'establishment', 'role', 'created_at']
+    list_editable = ['role']
+    list_filter = ['role', 'establishment']
+    search_fields = ['user__username', 'establishment__name']
+    list_select_related = ['user', 'establishment']
+    autocomplete_fields = ['user']
 
 
 @admin.register(Review)

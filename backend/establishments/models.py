@@ -58,13 +58,24 @@ class Establishment(models.Model):
             'anything the apps compute from.'
         ),
     )
+    description = models.TextField(
+        blank=True,
+        help_text='Longer blurb shown on the customer detail screen.',
+    )
+    tagline = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='One line, e.g. "Rooftop chicha over Kaloum".',
+    )
     staff = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
+        through='MerchantMembership',
         related_name='establishments',
         help_text=(
-            'Users who may see and manage this establishment\'s reservations '
-            'in the merchant app.'
+            'Users who may see and manage this establishment in the merchant '
+            'app. What each may actually do is decided by their membership '
+            'role, not by this field.'
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -226,6 +237,84 @@ class MenuItem(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.get_category_display()}) — {self.price}'
+
+
+class MerchantMembership(models.Model):
+    """A user's standing at one establishment.
+
+    The through model for ``Establishment.staff``. Access and authority are
+    the same relationship — being listed is what grants access, and the role
+    is what decides how far it goes — so one row carries both rather than
+    keeping a separate permissions table in step with a membership table.
+    """
+
+    class Role(models.TextChoices):
+        OWNER = 'owner', 'Owner'
+        MANAGER = 'manager', 'Manager'
+        STAFF = 'staff', 'Staff'
+
+    #: May edit the venue's public profile: hours, menu, photos, description.
+    PROFILE_ROLES = frozenset({Role.OWNER, Role.MANAGER})
+    #: May add, remove and re-role other members. Deliberately owner alone.
+    MEMBERSHIP_ROLES = frozenset({Role.OWNER})
+    #: May run the floor: reservations, confirmations, payment status.
+    OPERATIONS_ROLES = frozenset({Role.OWNER, Role.MANAGER, Role.STAFF})
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='merchant_memberships',
+    )
+    establishment = models.ForeignKey(
+        Establishment,
+        on_delete=models.CASCADE,
+        related_name='memberships',
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.STAFF,
+        help_text=(
+            'Owner: everything, including managing who else has access. '
+            'Manager: the venue and its profile, but not the staff list. '
+            'Staff: day-to-day floor work, plus toggling menu availability.'
+        ),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['establishment', 'role', 'user']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'establishment'],
+                name='unique_membership_per_user_per_establishment',
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.user} — {self.get_role_display()} at '
+            f'{self.establishment.name}'
+        )
+
+    @property
+    def can_edit_profile(self):
+        return self.role in self.PROFILE_ROLES
+
+    @property
+    def can_manage_staff(self):
+        return self.role in self.MEMBERSHIP_ROLES
+
+    @property
+    def can_toggle_menu_availability(self):
+        """The one operational exception.
+
+        Staff cannot edit a menu item, but they can mark it sold out — that
+        is a floor decision made mid-service, and routing it through a
+        manager would mean customers ordering things the kitchen has run out
+        of.
+        """
+        return self.role in self.OPERATIONS_ROLES
 
 
 def photo_upload_path(instance, filename):

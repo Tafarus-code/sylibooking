@@ -166,6 +166,12 @@ final cancelButton = find.text('Cancel');
   addTearDown(tester.view.reset);
 
   final backend = FakeBackend();
+  // Every signed-in path loads the venue list. One venue by default, so the
+  // switcher stays out of the way; tests that need several override this.
+  backend.on('GET', '/api/merchant/establishments/', {
+    'results': [venueJson()],
+  });
+
   final auth = AuthController(
     api: SylibookingApi(
       baseUrl: 'http://localhost:8000/api',
@@ -175,6 +181,25 @@ final cancelButton = find.text('Cancel');
   );
   return (auth: auth, backend: backend);
 }
+
+Map<String, dynamic> venueJson({
+  int id = 7,
+  String name = 'Le Petit Baobab',
+  String city = 'Conakry',
+  String role = 'owner',
+}) =>
+    {
+      'id': id,
+      'name': name,
+      'type': 'lounge',
+      'city': city,
+      'address': 'Kaloum',
+      'tagline': '',
+      'role': role,
+      'role_display': role[0].toUpperCase() + role.substring(1),
+      'can_edit_profile': role == 'owner' || role == 'manager',
+      'can_manage_staff': role == 'owner',
+    };
 
 void main() {
   group('login screen', () {
@@ -243,7 +268,8 @@ void main() {
 
       // Twice now: the app bar title and the navigation destination.
       expect(find.text('Reservations'), findsWidgets);
-      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      // The subtitle names the venue and the role at it.
+      expect(find.text('Le Petit Baobab · Owner'), findsOneWidget);
       expect(find.text('Mariama Diallo'), findsOneWidget);
     });
 
@@ -925,6 +951,150 @@ void main() {
       await openDashboard(tester, failDashboard: true);
 
       expect(find.text('Try again'), findsOneWidget);
+    });
+  });
+
+  group('venue switcher', () {
+    Future<({AuthController auth, FakeBackend backend})> signIn(
+      WidgetTester tester, {
+      required List<Map<String, dynamic>> venues,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {'results': venues});
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/dashboard/payments/', {
+        'period': {'from': '2026-07-01', 'to': '2026-07-30'},
+        'establishments': [],
+        'reservations': {'total': 0},
+        'payments': {
+          'collected': '0.00',
+          'awaiting': '0.00',
+          'failed': '0.00',
+          'completed_count': 0,
+          'pending_count': 0,
+          'failed_count': 0,
+        },
+        'by_provider': [],
+        'needs_attention': [],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      return (auth: auth, backend: backend);
+    }
+
+    testWidgets('a single-venue user never sees the switcher', (tester) async {
+      await signIn(tester, venues: [venueJson()]);
+
+      expect(find.text('Choose a venue'), findsNothing);
+      expect(find.byIcon(Icons.swap_horiz), findsNothing);
+      // Straight into the app.
+      expect(find.text('Reservations'), findsWidgets);
+    });
+
+    testWidgets('a staff-role single-venue user also skips it',
+        (tester) async {
+      await signIn(tester, venues: [venueJson(role: 'staff')]);
+
+      expect(find.text('Choose a venue'), findsNothing);
+      expect(find.text('Le Petit Baobab · Staff'), findsOneWidget);
+    });
+
+    testWidgets('a multi-venue user must choose first', (tester) async {
+      await signIn(tester, venues: [
+        venueJson(id: 7, name: 'Le Petit Baobab'),
+        venueJson(id: 8, name: 'Chez Fatou', city: 'Labé', role: 'manager'),
+      ]);
+
+      expect(find.text('Choose a venue'), findsOneWidget);
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      expect(find.text('Chez Fatou'), findsOneWidget);
+      // Not in the app yet.
+      expect(find.byType(NavigationBar), findsNothing);
+    });
+
+    testWidgets('the picker shows the role at each venue', (tester) async {
+      await signIn(tester, venues: [
+        venueJson(id: 7, name: 'Le Petit Baobab', role: 'owner'),
+        venueJson(id: 8, name: 'Chez Fatou', role: 'manager'),
+      ]);
+
+      expect(find.text('Owner'), findsOneWidget);
+      expect(find.text('Manager'), findsOneWidget);
+    });
+
+    testWidgets('choosing a venue enters the app scoped to it',
+        (tester) async {
+      final (:auth, :backend) = await signIn(tester, venues: [
+        venueJson(id: 7, name: 'Le Petit Baobab'),
+        venueJson(id: 8, name: 'Chez Fatou', role: 'manager'),
+      ]);
+
+      await tester.tap(find.text('Chez Fatou'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chez Fatou · Manager'), findsOneWidget);
+      final listed = backend.requests
+          .where((r) => r.url.path == '/api/reservations/')
+          .last;
+      expect(listed.url.queryParameters['establishment'], '8');
+    });
+
+    testWidgets('a multi-venue user can switch from inside the app',
+        (tester) async {
+      final (:auth, :backend) = await signIn(tester, venues: [
+        venueJson(id: 7, name: 'Le Petit Baobab'),
+        venueJson(id: 8, name: 'Chez Fatou', role: 'manager'),
+      ]);
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.swap_horiz));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a venue'), findsOneWidget);
+
+      await tester.tap(find.text('Chez Fatou'));
+      await tester.pumpAndSettle();
+
+      final listed = backend.requests
+          .where((r) => r.url.path == '/api/reservations/')
+          .last;
+      expect(listed.url.queryParameters['establishment'], '8');
+    });
+
+    testWidgets('reservations are requested for the selected venue only',
+        (tester) async {
+      final (:auth, :backend) = await signIn(tester, venues: [venueJson()]);
+
+      final listed = backend.requests
+          .where((r) => r.url.path == '/api/reservations/')
+          .last;
+      expect(listed.url.queryParameters['establishment'], '7');
+    });
+
+    testWidgets('the dashboard is requested for the selected venue only',
+        (tester) async {
+      final (:auth, :backend) = await signIn(tester, venues: [venueJson()]);
+
+      await tester.tap(find.byIcon(Icons.payments_outlined));
+      await tester.pumpAndSettle();
+
+      final asked = backend.requests
+          .where((r) => r.url.path == '/api/dashboard/payments/')
+          .last;
+      expect(asked.url.queryParameters['establishment'], '7');
+    });
+
+    testWidgets('an account with no venue is told so', (tester) async {
+      await signIn(tester, venues: const []);
+
+      expect(find.text('No venue yet'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
     });
   });
 

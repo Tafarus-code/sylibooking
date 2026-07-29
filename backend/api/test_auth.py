@@ -57,6 +57,14 @@ class MerchantAuthTestBase(APITestCase):
         )
 
 
+    def list_url(self, establishment):
+        return f'{reverse("reservation-list")}?establishment={establishment.pk}'
+
+    def list_for(self, establishment):
+        """Listing names one venue now; it is no longer merged."""
+        return self.client.get(self.list_url(establishment))
+
+
 class LoginTests(MerchantAuthTestBase):
     def test_valid_credentials_return_a_token(self):
         response = self.client.post(
@@ -99,7 +107,7 @@ class LoginTests(MerchantAuthTestBase):
     def test_token_authenticates_subsequent_requests(self):
         token = Token.objects.create(user=self.baobab_staff)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
-        response = self.client.get(reverse('reservation-list'))
+        response = self.list_for(self.baobab)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_me_requires_a_token(self):
@@ -136,31 +144,43 @@ class ReservationScopingTests(MerchantAuthTestBase):
 
     def test_merchant_only_sees_their_own_reservations(self):
         self.authenticate(self.baobab_staff)
-        response = self.client.get(reverse('reservation-list'))
+        response = self.list_for(self.baobab)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(
             response.data['results'][0]['customer_name'], 'Mariama Diallo'
         )
 
-    def test_other_merchants_bookings_are_invisible(self):
+    def test_asking_for_another_venue_is_refused_not_merely_empty(self):
+        """A direct API call for someone else's venue is turned away."""
         self.authenticate(self.fatou_staff)
-        names = [
-            row['customer_name']
-            for row in self.client.get(reverse('reservation-list')).data['results']
-        ]
-        self.assertNotIn('Mariama Diallo', names)
 
-    def test_staff_of_no_establishment_sees_nothing(self):
+        response = self.list_for(self.baobab)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_user_with_no_membership_is_refused(self):
         outsider = User.objects.create_user('outsider', password='pw-for-tests')
         self.authenticate(outsider)
-        response = self.client.get(reverse('reservation-list'))
-        self.assertEqual(response.data['count'], 0)
 
-    def test_superuser_sees_everything(self):
+        response = self.list_for(self.baobab)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_venue_must_be_named(self):
+        self.authenticate(self.baobab_staff)
+
+        response = self.client.get(reverse('reservation-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('establishment', response.data)
+
+    def test_a_superuser_may_list_any_single_venue(self):
         admin = User.objects.create_superuser('root', password='pw-for-tests')
         self.authenticate(admin)
-        response = self.client.get(reverse('reservation-list'))
-        self.assertEqual(response.data['count'], 2)
+
+        # One venue's bookings, not both venues merged.
+        self.assertEqual(self.list_for(self.baobab).data['count'], 1)
+        self.assertEqual(self.list_for(self.fatou).data['count'], 1)
 
     def test_merchant_cannot_confirm_another_venues_booking(self):
         self.authenticate(self.baobab_staff)
@@ -195,6 +215,7 @@ class ReservationScopingTests(MerchantAuthTestBase):
         response = self.client.get(
             reverse('reservation-list'),
             {
+                'establishment': self.baobab.pk,
                 'date_from': today.isoformat(),
                 'date_to': (today + timedelta(days=6)).isoformat(),
             },
@@ -204,6 +225,7 @@ class ReservationScopingTests(MerchantAuthTestBase):
         response = self.client.get(
             reverse('reservation-list'),
             {
+                'establishment': self.baobab.pk,
                 'date_from': (today + timedelta(days=3)).isoformat(),
                 'date_to': (today + timedelta(days=6)).isoformat(),
             },
@@ -212,8 +234,11 @@ class ReservationScopingTests(MerchantAuthTestBase):
 
     def test_malformed_date_range_is_rejected(self):
         self.authenticate(self.baobab_staff)
+        # Params go in the dict, not the URL: the test client replaces a
+        # path's query string when data is supplied.
         response = self.client.get(
-            reverse('reservation-list'), {'date_from': '01-08-2026'}
+            reverse('reservation-list'),
+            {'establishment': self.baobab.pk, 'date_from': '01-08-2026'},
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('date_from', response.data)

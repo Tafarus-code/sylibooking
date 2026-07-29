@@ -259,9 +259,13 @@ class ReservationMerchantTests(APITestBase):
         self.lounge.staff.add(self.staff)
         self.reservation = self.book()
 
+    def list_reservations(self, **params):
+        params.setdefault('establishment', self.lounge.pk)
+        return self.client.get(reverse('reservation-list'), params)
+
     def test_listing_requires_authentication(self):
         """Customer names and phone numbers must not be public."""
-        response = self.client.get(reverse('reservation-list'))
+        response = self.list_reservations()
         self.assertIn(
             response.status_code,
             [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
@@ -269,27 +273,24 @@ class ReservationMerchantTests(APITestBase):
 
     def test_authenticated_merchant_can_list(self):
         self.client.force_authenticate(self.staff)
-        response = self.client.get(reverse('reservation-list'))
+        response = self.list_reservations()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
 
     def test_list_can_be_filtered_by_date(self):
         self.client.force_authenticate(self.staff)
-        response = self.client.get(
-            reverse('reservation-list'), {'date': self.day.isoformat()}
-        )
+        response = self.list_reservations(date=self.day.isoformat())
         self.assertEqual(response.data['count'], 1)
 
         other_day = (self.day + timedelta(days=3)).isoformat()
-        response = self.client.get(reverse('reservation-list'), {'date': other_day})
+        response = self.list_reservations(date=other_day)
         self.assertEqual(response.data['count'], 0)
 
-    def test_list_can_be_filtered_by_establishment(self):
+    def test_a_venue_the_merchant_does_not_staff_is_refused(self):
+        """Scoping is enforced, not merely filtered to nothing."""
         self.client.force_authenticate(self.staff)
-        response = self.client.get(
-            reverse('reservation-list'), {'establishment': self.restaurant.pk}
-        )
-        self.assertEqual(response.data['count'], 0)
+        response = self.list_reservations(establishment=self.restaurant.pk)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_confirm_requires_authentication(self):
         response = self.client.post(

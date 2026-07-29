@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'auth_controller.dart';
 import 'screens/login_screen.dart';
 import 'screens/merchant_home_screen.dart';
+import 'screens/venue_picker_screen.dart';
 
 /// Root widget. Shows login or the reservation list depending on auth state.
 class MerchantApp extends StatefulWidget {
@@ -35,12 +36,17 @@ class _MerchantAppState extends State<MerchantApp> {
         builder: (context, _) => switch (widget.auth.state) {
           AuthState.unknown => const _Splash(),
           AuthState.signedOut => LoginScreen(auth: widget.auth),
-          AuthState.signedIn => MerchantHomeScreen(
-              // Rebuild the screen from scratch per session, so one merchant's
-              // bookings never linger after another signs in.
-              key: ValueKey(widget.auth.user?.id),
-              auth: widget.auth,
-            ),
+          AuthState.choosingVenue => VenuePickerScreen(auth: widget.auth),
+          AuthState.signedIn => widget.auth.selectedVenue == null
+              ? NoVenueScreen(auth: widget.auth)
+              : MerchantHomeScreen(
+                  // Keyed on the venue as well as the user: switching venues
+                  // must refetch, not show the previous venue's bookings.
+                  key: ValueKey(
+                    '${widget.auth.user?.id}-${widget.auth.selectedVenueId}',
+                  ),
+                  auth: widget.auth,
+                ),
         },
       ),
     );

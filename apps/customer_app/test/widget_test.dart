@@ -5,6 +5,7 @@ import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
 import 'package:customer_app/src/location_source.dart';
+import 'package:customer_app/src/widgets/menu_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -84,8 +85,11 @@ List<Map<String, dynamic>> weekClosedOn(int closedDay) => [
 Map<String, dynamic> menuGroup(
   String category,
   String display,
-  List<(String, String)> items,
-) =>
+  List<(String, String)> items, {
+  /// Picture URL per item name. Most items have none, which is the norm.
+  Map<String, String>? images,
+  String description = '',
+}) =>
     {
       'category': category,
       'category_display': display,
@@ -94,8 +98,9 @@ Map<String, dynamic> menuGroup(
           {
             'id': index + 1,
             'name': item.$1,
-            'description': '',
+            'description': description,
             'price': item.$2,
+            'image': images?[item.$1],
           },
       ],
     };
@@ -1358,6 +1363,110 @@ void main() {
       expect(find.text('Drink'), findsOneWidget);
       expect(find.text('Food'), findsNothing);
       expect(find.text('Chicha flavour'), findsNothing);
+    });
+
+    testWidgets('every dish is a card', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [
+            ('Poulet braisé', '75000.00'),
+            ('Poisson braisé', '85000.00'),
+          ]),
+          menuGroup('drink', 'Drink', [('Jus de gingembre', '20000.00')]),
+        ]),
+      );
+
+      expect(find.byType(MenuItemCard), findsNWidgets(3));
+    });
+
+    testWidgets('a dish with a picture shows it', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup(
+            'food',
+            'Food',
+            [('Poulet braisé', '75000.00')],
+            images: {
+              'Poulet braisé': 'http://localhost:8000/media/poulet.jpg',
+            },
+          ),
+        ]),
+      );
+
+      final image = tester.widget<Image>(
+        find.descendant(
+          of: find.byType(MenuItemCard),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (image.image as NetworkImage).url,
+        'http://localhost:8000/media/poulet.jpg',
+      );
+    });
+
+    testWidgets('a dish with no picture still gets a card', (tester) async {
+      // The common case for a while yet: merchants type the menu in long
+      // before they photograph it.
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+        ]),
+      );
+
+      expect(find.byType(MenuItemCard), findsOneWidget);
+      expect(find.text('Poulet braisé'), findsOneWidget);
+      expect(find.byIcon(Icons.restaurant_menu), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+    });
+
+    testWidgets('a description is shown under the price when there is one',
+        (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup(
+            'food',
+            'Food',
+            [('Poulet braisé', '75000.00')],
+            description: 'Grilled over charcoal, served with attiéké.',
+          ),
+        ]),
+      );
+
+      expect(
+        find.text('Grilled over charcoal, served with attiéké.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a long menu lays out at 360dp without overflowing',
+        (tester) async {
+      // Two columns of cards, long names, no picture: the layout that would
+      // break first.
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [
+            for (var i = 0; i < 9; i++)
+              ('Poulet braisé aux épices numéro $i', '75000.00'),
+          ]),
+        ]),
+      );
+
+      // Reaching the bottom of the section is the assertion: an overflow or a
+      // failed layout would have thrown by now.
+      // .first is the screen's own ListView; the pickers further down have
+      // horizontal scrollables of their own.
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Available times'), findsOneWidget);
     });
   });
 

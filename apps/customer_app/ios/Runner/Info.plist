@@ -49,5 +49,7 @@
 	<string>Choose a photo from your visit to share with other customers.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo of your visit to share with other customers.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Show how far each venue is from you. Your location stays on your phone.</string>
 </dict>
 </plist>

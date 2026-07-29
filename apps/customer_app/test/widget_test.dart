@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
+import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
+import 'package:customer_app/src/location_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -251,6 +253,8 @@ Map<String, dynamic> paymentJson({
   List<String>? bookingReferences,
   ({String name, String phone})? customer,
   ImageSource? imageSource,
+  LocationSource? locationSource,
+  DirectionsLauncher? directionsLauncher,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -272,6 +276,14 @@ Map<String, dynamic> paymentJson({
       ),
       store: store,
       imageSource: imageSource,
+      // Default: no location at all, which is the state most tests want and
+      // the one the app must never depend on.
+      locationSource: locationSource ??
+          FakeLocationSource(
+            granted: false,
+            status: LocationStatus.unknown,
+          ),
+      directionsLauncher: directionsLauncher ?? FakeDirectionsLauncher(),
     ),
     backend: backend,
     store: store,
@@ -344,6 +356,323 @@ void main() {
 
       expect(find.text('Could not load places'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+    });
+  });
+
+  group('distance and directions', () {
+    // Kaloum, Conakry — the customer's position in these tests.
+    const here = LatLng(9.509167, -13.712222);
+
+    Map<String, dynamic> venue({
+      int id = 7,
+      String name = 'Le Petit Baobab',
+      Object? lat = '9.513667',
+      Object? lon = '-13.712222',
+    }) =>
+        {
+          ...establishmentJson(id: id, name: name),
+          'latitude': lat,
+          'longitude': lon,
+        };
+
+    /// The filter chips scroll horizontally; at 360dp the later ones sit
+    /// off-screen, so bring one into view before tapping it.
+    Future<void> tapChip(WidgetTester tester, String label) async {
+      await tester.ensureVisible(find.text(label));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
+    Future<FakeBackend> browse(
+      WidgetTester tester, {
+      required List<Map<String, dynamic>> results,
+      LocationSource? locationSource,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        locationSource: locationSource,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': results.length,
+        'next': null,
+        'results': results,
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('no location means no distance and no sort option',
+        (tester) async {
+      await browse(tester, results: [venue()]);
+
+      expect(find.textContaining('away'), findsNothing);
+      expect(find.text('Nearest'), findsNothing);
+      // The way in is offered instead.
+      expect(find.text('Show distances'), findsOneWidget);
+    });
+
+    testWidgets('a denied permission leaves browsing intact', (tester) async {
+      await browse(
+        tester,
+        results: [venue(), venue(id: 8, name: 'Chez Fatou')],
+        locationSource: FakeLocationSource(
+          granted: false,
+          status: LocationStatus.denied,
+        ),
+      );
+
+      // The whole list still renders; only distance is missing.
+      expect(find.text('Le Petit Baobab'), findsOneWidget);
+      expect(find.text('Chez Fatou'), findsOneWidget);
+      expect(find.textContaining('away'), findsNothing);
+      expect(find.text('Nearest'), findsNothing);
+    });
+
+    testWidgets('declining the rationale asks the platform for nothing',
+        (tester) async {
+      final location = FakeLocationSource(
+        granted: false,
+        status: LocationStatus.denied,
+      );
+      await browse(tester, results: [venue()], locationSource: location);
+
+      await tapChip(tester, 'Show distances');
+      expect(find.text('Show distances?'), findsOneWidget);
+
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+
+      expect(location.requestCount, 0);
+      expect(find.text('Nearest'), findsNothing);
+    });
+
+    testWidgets('a refusal at the OS level is explained, not an error',
+        (tester) async {
+      final location = FakeLocationSource(
+        granted: false,
+        status: LocationStatus.denied,
+      );
+      await browse(tester, results: [venue()], locationSource: location);
+
+      await tapChip(tester, 'Show distances');
+      await tester.tap(find.text('Allow'));
+      await tester.pumpAndSettle();
+
+      expect(location.requestCount, 1);
+      expect(find.textContaining('browsing works without it'), findsOneWidget);
+    });
+
+    testWidgets('location off is reported differently from a refusal',
+        (tester) async {
+      await browse(
+        tester,
+        results: [venue()],
+        locationSource: FakeLocationSource(
+          granted: false,
+          status: LocationStatus.servicesOff,
+        ),
+      );
+
+      await tapChip(tester, 'Show distances');
+      await tester.tap(find.text('Allow'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('switched off on this phone'), findsOneWidget);
+    });
+
+    testWidgets('with a fix, cards show how far away each venue is',
+        (tester) async {
+      await browse(
+        tester,
+        results: [venue()],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      // ~500 m north of the customer.
+      expect(find.textContaining('m away'), findsOneWidget);
+    });
+
+    testWidgets('sorting by distance appears only with a fix', (tester) async {
+      await browse(
+        tester,
+        results: [venue()],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      expect(find.text('Nearest'), findsOneWidget);
+      expect(find.text('Show distances'), findsNothing);
+    });
+
+    testWidgets('nearest first reorders the list', (tester) async {
+      await browse(
+        tester,
+        results: [
+          // Labé, ~253 km away, listed first by the API.
+          venue(id: 8, name: 'Far Venue', lat: '11.318056', lon: '-12.283056'),
+          venue(id: 7, name: 'Near Venue'),
+        ],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      List<String> order() => tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .where((s) => s == 'Near Venue' || s == 'Far Venue')
+          .toList();
+
+      expect(order(), ['Far Venue', 'Near Venue']);
+
+      await tapChip(tester, 'Nearest');
+
+      expect(order(), ['Near Venue', 'Far Venue']);
+    });
+
+    testWidgets('a venue with no coordinates shows no distance and sinks',
+        (tester) async {
+      await browse(
+        tester,
+        results: [
+          venue(id: 9, name: 'Unmapped', lat: null, lon: null),
+          venue(id: 7, name: 'Mapped'),
+        ],
+        locationSource: FakeLocationSource(position: here),
+      );
+
+      await tapChip(tester, 'Nearest');
+
+      final order = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .where((s) => s == 'Mapped' || s == 'Unmapped')
+          .toList();
+      // Unmapped goes last rather than sorting as if it were at the origin.
+      expect(order, ['Mapped', 'Unmapped']);
+    });
+  });
+
+  group('get directions', () {
+    Future<FakeDirectionsLauncher> openVenue(
+      WidgetTester tester, {
+      Object? lat = '9.509167',
+      Object? lon = '-13.712222',
+    }) async {
+      final launcher = FakeDirectionsLauncher();
+      final (:app, :backend, :store) =
+          buildApp(tester, directionsLauncher: launcher);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {...establishmentJson(), 'latitude': lat, 'longitude': lon},
+        ],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'latitude': lat,
+        'longitude': lon,
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      return launcher;
+    }
+
+    testWidgets('a mapped venue offers directions', (tester) async {
+      await openVenue(tester);
+      expect(find.text('Get directions'), findsOneWidget);
+    });
+
+    testWidgets('an unmapped venue does not', (tester) async {
+      await openVenue(tester, lat: null, lon: null);
+      expect(find.text('Get directions'), findsNothing);
+    });
+
+    testWidgets('tapping hands the coordinates to the maps app',
+        (tester) async {
+      final launcher = await openVenue(tester);
+
+      await tester.tap(find.text('Get directions'));
+      await tester.pumpAndSettle();
+
+      expect(launcher.opened, hasLength(1));
+      expect(launcher.opened.single.latitude, closeTo(9.509167, 0.000001));
+      expect(launcher.opened.single.longitude, closeTo(-13.712222, 0.000001));
+      expect(launcher.lastLabel, 'Le Petit Baobab');
+    });
+
+    testWidgets('directions work without a location fix', (tester) async {
+      // Only the venue's coordinates are needed to navigate to it.
+      final launcher = await openVenue(tester);
+
+      await tester.tap(find.text('Get directions'));
+      await tester.pumpAndSettle();
+
+      expect(launcher.opened, hasLength(1));
+    });
+
+    testWidgets('a phone with no maps app is told so, not left silent',
+        (tester) async {
+      final launcher = FakeDirectionsLauncher(succeeds: false);
+      final (:app, :backend, :store) =
+          buildApp(tester, directionsLauncher: launcher);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {
+            ...establishmentJson(),
+            'latitude': '9.509167',
+            'longitude': '-13.712222',
+          },
+        ],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'latitude': '9.509167',
+        'longitude': '-13.712222',
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Get directions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No maps app found on this phone.'), findsOneWidget);
     });
   });
 

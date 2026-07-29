@@ -250,6 +250,32 @@ Customers pick a *time*, not a table. `bookableTimes()` in `shared_client`
 collapses the per-space availability grid into the times that are free, choosing
 the smallest space that seats the party so a couple does not take the VIP room.
 
+## Distance and directions
+
+No map SDK. Distance is computed client-side with the haversine formula in
+`shared_client/lib/src/geo.dart`, and "Get directions" hands off to a `geo:`
+URI — whatever maps app the customer already has and trusts, with an
+`https://google.com/maps` fallback for devices with no `geo:` handler.
+
+The whole feature is optional, and the app is built so that nothing depends on
+it:
+
+- **Browsing never opens with a permission prompt.** A fix is only requested on
+  launch if permission was already granted. Otherwise a "Show distances" chip
+  explains *why* before prompting, so a refusal is an informed one.
+- **Denied, GPS off, and no-fix are told apart** and get different wording. None
+  of them is an error state; the list renders exactly as before, minus distance.
+- **Sort-by-distance only exists once there is a position to sort by.**
+- **A venue with no coordinates has no distance** and sorts to the bottom rather
+  than behaving as if it were at the origin. Most venues start this way, since
+  `latitude`/`longitude` are optional.
+
+Directions need only the *venue's* coordinates, so that button works with no
+location permission at all.
+
+`latitude`/`longitude` arrive as **strings** — DRF serialises `DecimalField`
+that way — so the client parses either a string or a number.
+
 ## Merchant roles and venues
 
 `MerchantMembership` is the through model for `Establishment.staff`: access and

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
 import 'booking_store.dart';
+import 'directions.dart';
 import 'image_source.dart';
+import 'location_source.dart';
 import 'screens/browse_screen.dart';
 
 class CustomerApp extends StatelessWidget {
@@ -11,6 +13,8 @@ class CustomerApp extends StatelessWidget {
     required this.api,
     required this.store,
     this.imageSource,
+    this.locationSource,
+    this.directionsLauncher,
   });
 
   final SylibookingApi api;
@@ -18,6 +22,8 @@ class CustomerApp extends StatelessWidget {
 
   /// Injected so widget tests can drive uploads without a platform channel.
   final ImageSource? imageSource;
+  final LocationSource? locationSource;
+  final DirectionsLauncher? directionsLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +38,9 @@ class CustomerApp extends StatelessWidget {
         api: api,
         store: store,
         imageSource: imageSource ?? DeviceImageSource(),
+        locationSource: locationSource ?? const DeviceLocationSource(),
+        directionsLauncher:
+            directionsLauncher ?? const DeviceDirectionsLauncher(),
       ),
     );
   }

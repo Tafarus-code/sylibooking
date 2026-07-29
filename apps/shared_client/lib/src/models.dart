@@ -4,6 +4,8 @@
 /// back, they send plain maps, so there is no `toJson` to drift out of sync.
 library;
 
+import 'geo.dart';
+
 enum EstablishmentType {
   lounge,
   restaurant,
@@ -121,6 +123,13 @@ class OpeningHours {
         runsPastMidnight: json['runs_past_midnight'] as bool? ?? false,
       );
 }
+
+double? _toDouble(Object? value) => switch (value) {
+      null => null,
+      final num n => n.toDouble(),
+      final String s => double.tryParse(s),
+      _ => null,
+    };
 
 /// Django sends times as `HH:MM:SS`; nobody wants to read the seconds.
 String _hhmm(String value) =>
@@ -516,6 +525,8 @@ class Establishment {
     this.reviewCount = 0,
     this.tagline = '',
     this.description = '',
+    this.latitude,
+    this.longitude,
   });
 
   final int id;
@@ -560,8 +571,23 @@ class Establishment {
   final String tagline;
   final String description;
 
+  /// Null for venues whose coordinates were never recorded, which is most of
+  /// them at first — nothing may assume a position exists.
+  final double? latitude;
+  final double? longitude;
+
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
+
+  /// Many venues have no coordinates recorded, so distance is never assumed.
+  LatLng? get position {
+    final lat = latitude;
+    final lon = longitude;
+    if (lat == null || lon == null) return null;
+    return LatLng(lat, lon);
+  }
+
+  bool get hasPosition => position != null;
 
   /// "Open until 02:00", "Closed today", or "Hours not listed".
   String get openSummary {
@@ -602,6 +628,9 @@ class Establishment {
         reviewCount: json['review_count'] as int? ?? 0,
         tagline: json['tagline'] as String? ?? '',
         description: json['description'] as String? ?? '',
+        // DRF serialises DecimalField as a string, so accept either.
+        latitude: _toDouble(json['latitude']),
+        longitude: _toDouble(json['longitude']),
       );
 }
 

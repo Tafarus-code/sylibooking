@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../directions.dart';
 import '../image_source.dart';
+import '../location_source.dart';
 import 'establishment_screen.dart';
 import 'my_bookings_screen.dart';
 
@@ -15,11 +17,15 @@ class BrowseScreen extends StatefulWidget {
     required this.api,
     required this.store,
     required this.imageSource,
+    required this.locationSource,
+    required this.directionsLauncher,
   });
 
   final SylibookingApi api;
   final BookingStore store;
   final ImageSource imageSource;
+  final LocationSource locationSource;
+  final DirectionsLauncher directionsLauncher;
 
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
@@ -34,10 +40,107 @@ class _BrowseScreenState extends State<BrowseScreen> {
   String? _error;
   EstablishmentType? _typeFilter;
 
+  LatLng? _here;
+  LocationStatus _locationStatus = LocationStatus.unknown;
+  bool _sortByDistance = false;
+
+  /// Sorting by distance is only offered once there is a position to sort by.
+  bool get _canSortByDistance => _here != null;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _locateIfAlreadyAllowed();
+  }
+
+  /// Only asks the system for a fix if permission is already granted.
+  ///
+  /// Browsing must not open with a permission dialog: distance is a
+  /// convenience, and a prompt before the customer has seen anything is the
+  /// fastest way to get a permanent "no".
+  Future<void> _locateIfAlreadyAllowed() async {
+    if (!await widget.locationSource.hasPermission()) return;
+    await _locate();
+  }
+
+  Future<void> _locate() async {
+    final result = await widget.locationSource.current();
+    if (!mounted) return;
+    setState(() {
+      _here = result.position;
+      _locationStatus = result.status;
+      // Nothing to sort by if the fix did not arrive.
+      if (_here == null) _sortByDistance = false;
+    });
+  }
+
+  /// Explains why before prompting, so a refusal is an informed one.
+  Future<void> _askForLocation() async {
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Show distances?'),
+        content: const Text(
+          'Sylibooking can show how far each place is and sort by what is '
+          'nearest. Your location stays on your phone — it is never sent to '
+          'us or to the venues.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Allow'),
+          ),
+        ],
+      ),
+    );
+    if (!(agreed ?? false)) return;
+
+    await _locate();
+    if (!mounted || _here != null) return;
+
+    // Nothing arrived. Say why, once, and carry on — browsing never depended
+    // on this.
+    final message = switch (_locationStatus) {
+      LocationStatus.denied =>
+        'No problem — browsing works without it. You can allow location later '
+            'in your phone settings.',
+      LocationStatus.servicesOff =>
+        'Location is switched off on this phone. Turn it on to see distances.',
+      _ => 'Could not get a location just now. Distances are unavailable.',
+    };
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Distance from here, or null when either end has no coordinates.
+  double? _distanceTo(Establishment establishment) {
+    final here = _here;
+    final there = establishment.position;
+    if (here == null || there == null) return null;
+    return distanceKm(here, there);
+  }
+
+  List<Establishment> get _visible {
+    if (!_sortByDistance || _here == null) return _establishments;
+
+    final sorted = [..._establishments];
+    sorted.sort((a, b) {
+      final da = _distanceTo(a);
+      final db = _distanceTo(b);
+      // Venues with no coordinates sink to the bottom rather than sorting as
+      // if they were at the origin.
+      if (da == null && db == null) return a.name.compareTo(b.name);
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da.compareTo(db);
+    });
+    return sorted;
   }
 
   @override
@@ -165,6 +268,28 @@ class _BrowseScreenState extends State<BrowseScreen> {
                             },
                           ),
                         ),
+                      // Sorting by distance appears only once there is a
+                      // position to sort by; otherwise this is the way in.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: _canSortByDistance
+                            ? FilterChip(
+                                avatar: const Icon(Icons.near_me, size: 16),
+                                label: const Text('Nearest'),
+                                selected: _sortByDistance,
+                                onSelected: (selected) => setState(
+                                  () => _sortByDistance = selected,
+                                ),
+                              )
+                            : ActionChip(
+                                avatar: const Icon(
+                                  Icons.near_me_outlined,
+                                  size: 16,
+                                ),
+                                label: const Text('Show distances'),
+                                onPressed: _askForLocation,
+                              ),
+                      ),
                     ],
                   ),
                 ),
@@ -197,19 +322,24 @@ class _BrowseScreenState extends State<BrowseScreen> {
       );
     }
 
+    final visible = _visible;
+
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _establishments.length,
+      itemCount: visible.length,
       itemBuilder: (context, index) {
-        final establishment = _establishments[index];
+        final establishment = visible[index];
         return _EstablishmentTile(
           establishment: establishment,
+          distanceKm: _distanceTo(establishment),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => EstablishmentScreen(
                 api: widget.api,
                 store: widget.store,
                 establishment: establishment,
+                here: _here,
+                directionsLauncher: widget.directionsLauncher,
               ),
             ),
           ),
@@ -220,10 +350,17 @@ class _BrowseScreenState extends State<BrowseScreen> {
 }
 
 class _EstablishmentTile extends StatelessWidget {
-  const _EstablishmentTile({required this.establishment, required this.onTap});
+  const _EstablishmentTile({
+    required this.establishment,
+    required this.onTap,
+    this.distanceKm,
+  });
 
   final Establishment establishment;
   final VoidCallback onTap;
+
+  /// Null when there is no fix, or the venue has no coordinates.
+  final double? distanceKm;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +395,32 @@ class _EstablishmentTile extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
             const SizedBox(height: 4),
-            _OpenIndicator(establishment: establishment),
+            // Both halves flex: "Open until 02:00 · 253 km away" does not fit
+            // across a 360dp phone otherwise.
+            Row(
+              children: [
+                Flexible(
+                  child: _OpenIndicator(establishment: establishment),
+                ),
+                if (distanceKm case final km?) ...[
+                  Text(
+                    ' · ',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      formatDistance(km),
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
         trailing: const Icon(Icons.chevron_right),

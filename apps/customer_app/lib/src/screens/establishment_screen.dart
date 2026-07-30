@@ -396,20 +396,20 @@ class _PartySizePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+    // Wrap, not a scroller: twelve small chips fit two rows on the narrowest
+    // phone, so hiding half of them behind a sideways swipe bought nothing and
+    // cost the customer the ability to see the choice at all.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
           for (var size = 1; size <= max; size++)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ChoiceChip(
-                label: Text('$size'),
-                selected: value == size,
-                onSelected: (_) => onChanged(size),
-              ),
+            ChoiceChip(
+              label: Text('$size'),
+              selected: value == size,
+              onSelected: (_) => onChanged(size),
             ),
         ],
       ),
@@ -433,38 +433,37 @@ class _DayPicker extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    return SizedBox(
+    // Two weeks of dates is genuinely too many to lay out at once, so this one
+    // stays a strip — but a strip that can be dragged with a mouse and says so.
+    return HorizontalStrip(
       height: 64,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          for (var offset = 0; offset < days; offset++)
-            Builder(
-              builder: (context) {
-                final day = today.add(Duration(days: offset));
-                final isSelected = day == selected;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ChoiceChip(
-                    selected: isSelected,
-                    onSelected: (_) => onChanged(day),
-                    label: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          offset == 0 ? 'Today' : DateFormat.E().format(day),
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                        Text(DateFormat.MMMd().format(day)),
-                      ],
-                    ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      children: [
+        for (var offset = 0; offset < days; offset++)
+          Builder(
+            builder: (context) {
+              final day = today.add(Duration(days: offset));
+              final isSelected = day == selected;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  selected: isSelected,
+                  onSelected: (_) => onChanged(day),
+                  label: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        offset == 0 ? 'Today' : DateFormat.E().format(day),
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      Text(DateFormat.MMMd().format(day)),
+                    ],
                   ),
-                );
-              },
-            ),
-        ],
-      ),
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 }

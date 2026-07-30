@@ -138,48 +138,43 @@ class BrowseFilters extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SizedBox(
+    // A strip, not a Wrap: a second row of chips would cost the browse screen
+    // vertical space it cannot spare in landscape. HorizontalStrip is what
+    // makes the chips past the edge reachable with a mouse rather than only a
+    // thumb, and shows that they are there.
+    return HorizontalStrip(
       height: 44,
-      // SingleChildScrollView, not ListView: a handful of chips, all of which
-      // should exist whether or not they are currently on screen — a lazily
-      // built row means a filter that has scrolled off is not merely invisible
-      // but absent, which breaks find-by-label for tests and semantics alike.
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            for (final (value, label) in options)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: FilterChip(
-                  label: Text(label),
-                  selected: isSelected(value),
-                  onSelected: (_) => onSelected(value),
-                  showCheckmark: false,
-                  // Filled ember when active, outlined when not.
-                  //
-                  // The label is onPrimary (white), not dark: dark text on
-                  // ember measures about 3.1:1, below the 4.5:1 AA needs.
-                  // White on ember is the pairing the presets verify at 4.93:1.
-                  selectedColor: theme.colorScheme.primary,
-                  backgroundColor: Colors.transparent,
-                  labelStyle: theme.textTheme.labelLarge?.copyWith(
-                    color: isSelected(value)
-                        ? theme.colorScheme.onPrimary
-                        : theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  side: BorderSide(
-                    color: isSelected(value)
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline,
-                  ),
-                ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      children: [
+        for (final (value, label) in options)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FilterChip(
+              label: Text(label),
+              selected: isSelected(value),
+              onSelected: (_) => onSelected(value),
+              showCheckmark: false,
+              // Filled ember when active, outlined when not.
+              //
+              // The label is onPrimary (white), not dark: dark text on ember
+              // measures about 3.1:1, below the 4.5:1 AA needs. White on ember
+              // is the pairing the presets verify at 4.93:1.
+              selectedColor: theme.colorScheme.primary,
+              backgroundColor: Colors.transparent,
+              labelStyle: theme.textTheme.labelLarge?.copyWith(
+                color: isSelected(value)
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
               ),
-          ],
-        ),
-      ),
+              side: BorderSide(
+                color: isSelected(value)
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

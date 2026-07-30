@@ -458,6 +458,45 @@ void main() {
       expect(card.height, lessThan(landscapePhoneSize.height));
     });
 
+    testWidgets('every party size is on screen, none hidden past the edge',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      // Scroll past the pickers, so the whole party-size block is laid out
+      // rather than just its heading.
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      // Twelve small chips fit two rows on the narrowest phone, so none of
+      // them should be sitting off the right edge waiting to be swiped to.
+      for (final size in ['1', '6', '12']) {
+        final rect = tester.getRect(find.widgetWithText(ChoiceChip, size));
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width), reason: size);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: size);
+      }
+    });
+
+    testWidgets('the strips that do scroll can be dragged with a mouse',
+        (tester) async {
+      await walkTheApp(tester, desktopSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Day'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      // Two weeks of dates genuinely cannot all be laid out, so the day picker
+      // stays a strip — but on a desktop a bare horizontal ListView takes no
+      // wheel and no drag, which leaves the far dates unreachable.
+      expect(find.byType(HorizontalStrip), findsWidgets);
+    });
+
     testWidgets('venues are one column on a phone', (tester) async {
       await walkTheApp(tester, phoneSize);
 

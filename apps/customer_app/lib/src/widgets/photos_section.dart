@@ -27,21 +27,20 @@ class PhotosSection extends StatelessWidget {
     }
     if (photos.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
+    // A carousel is the right shape for photos, but it has to be draggable
+    // with a mouse and show that more exists past the edge.
+    return HorizontalStrip(
       height: 140,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: photos.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final photo = photos[index];
-          return _PhotoThumb(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        for (final (index, photo) in photos.indexed) ...[
+          if (index > 0) const SizedBox(width: 8),
+          _PhotoThumb(
             photo: photo,
             onTap: onTapPhoto == null ? null : () => onTapPhoto!(photo),
-          );
-        },
-      ),
+          ),
+        ],
+      ],
     );
   }
 }

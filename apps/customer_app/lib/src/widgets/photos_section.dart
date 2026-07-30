@@ -27,20 +27,42 @@ class PhotosSection extends StatelessWidget {
     }
     if (photos.isEmpty) return const SizedBox.shrink();
 
-    // A carousel is the right shape for photos, but it has to be draggable
-    // with a mouse and show that more exists past the edge.
-    return HorizontalStrip(
-      height: 140,
+    // A grid, not a carousel. Sideways scrolling hid most of a venue's
+    // pictures behind a gesture nobody makes, and the page already scrolls
+    // downwards — so the photos go the same way as the menu cards.
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        for (final (index, photo) in photos.indexed) ...[
-          if (index > 0) const SizedBox(width: 8),
-          _PhotoThumb(
-            photo: photo,
-            onTap: onTapPhoto == null ? null : () => onTapPhoto!(photo),
-          ),
-        ],
-      ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 8.0;
+          // 160 keeps a phone on two columns; wider windows fit more.
+          final columns = columnsForWidth(
+            constraints.maxWidth,
+            targetCardWidth: 160,
+            max: 5,
+          );
+          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final photo in photos)
+                SizedBox(
+                  width: width,
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: _PhotoThumb(
+                      photo: photo,
+                      onTap:
+                          onTapPhoto == null ? null : () => onTapPhoto!(photo),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -60,8 +82,7 @@ class _PhotoThumb extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: 180,
+        child: SizedBox.expand(
           child: Stack(
             fit: StackFit.expand,
             children: [

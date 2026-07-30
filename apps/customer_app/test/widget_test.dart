@@ -339,13 +339,30 @@ void main() {
           ),
         ],
       });
-      for (final id in [7, 8, 9]) {
+      for (final id in [8, 9]) {
         backend.on('GET', '/api/establishments/$id/photos/', {
           'count': 0,
           'next': null,
           'results': [],
         });
       }
+      // A venue with a real album, which is where the sideways-scrolling
+      // photo strip used to hide most of the pictures.
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 8,
+        'next': null,
+        'results': [
+          for (var i = 1; i <= 8; i++)
+            {
+              'id': i,
+              'image_url': 'http://localhost:8000/media/venue$i.jpg',
+              'caption': 'Rooftop',
+              'uploaded_by_role': 'merchant',
+              'uploaded_by_role_display': 'The venue',
+              'created_at': '2026-08-01T18:00:00Z',
+            },
+        ],
+      });
       backend.on('GET', '/api/establishments/7/', {
         ...establishmentDetailJson(menu: [
           menuGroup('food', 'Food', [
@@ -480,21 +497,58 @@ void main() {
       }
     });
 
-    testWidgets('the strips that do scroll can be dragged with a mouse',
+    testWidgets('the day is chosen from a dropdown, not a sideways swipe',
         (tester) async {
-      await walkTheApp(tester, desktopSize);
+      await walkTheApp(tester, phoneSize);
       await tester.tap(find.text('Le Petit Baobab').first);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Day'),
+        find.text('Available times'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
 
-      // Two weeks of dates genuinely cannot all be laid out, so the day picker
-      // stays a strip — but on a desktop a bare horizontal ListView takes no
-      // wheel and no drag, which leaves the far dates unreachable.
-      expect(find.byType(HorizontalStrip), findsWidgets);
+      // Two weeks of dates never fitted across a phone, and the ones past the
+      // edge were reachable only by a gesture that is invisible on touch and
+      // impossible with a mouse.
+      expect(find.byType(DropdownButtonFormField<DateTime>), findsOneWidget);
+      expect(find.textContaining('Today'), findsWidgets);
+    });
+
+    testWidgets('a later date can be picked without any horizontal scrolling',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<DateTime>));
+      await tester.pumpAndSettle();
+
+      // The far end of the fortnight, reachable in the open menu.
+      expect(find.textContaining('Tomorrow'), findsWidgets);
+    });
+
+    testWidgets('every venue photo is on screen, none past the right edge',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+
+      // Photos wrap downwards like the menu cards. A customer should not have
+      // to swipe sideways to find out a venue has eight pictures.
+      final tiles = find.byType(ClipRRect).evaluate();
+      expect(tiles, isNotEmpty);
+      for (final tile in tiles) {
+        final box = tile.renderObject as RenderBox;
+        final left = box.localToGlobal(Offset.zero).dx;
+        expect(left, greaterThanOrEqualTo(0));
+        expect(left + box.size.width, lessThanOrEqualTo(phoneSize.width));
+      }
     });
 
     testWidgets('venues are one column on a phone', (tester) async {

@@ -433,37 +433,45 @@ class _DayPicker extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Two weeks of dates is genuinely too many to lay out at once, so this one
-    // stays a strip — but a strip that can be dragged with a mouse and says so.
-    return HorizontalStrip(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      children: [
-        for (var offset = 0; offset < days; offset++)
-          Builder(
-            builder: (context) {
-              final day = today.add(Duration(days: offset));
-              final isSelected = day == selected;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(
-                  selected: isSelected,
-                  onSelected: (_) => onChanged(day),
-                  label: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        offset == 0 ? 'Today' : DateFormat.E().format(day),
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                      Text(DateFormat.MMMd().format(day)),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-      ],
+    // A dropdown, not a row of chips. Two weeks of dates never fitted across a
+    // phone, and the ones past the edge were reachable only by a sideways
+    // swipe — a gesture that is invisible, and impossible with a mouse.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: DropdownButtonFormField<DateTime>(
+        initialValue: selected,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          prefixIcon: Icon(Icons.calendar_today_outlined),
+          isDense: true,
+        ),
+        items: [
+          for (var offset = 0; offset < days; offset++)
+            _dayItem(today.add(Duration(days: offset)), offset),
+        ],
+        onChanged: (day) {
+          if (day != null) onChanged(day);
+        },
+      ),
+    );
+  }
+
+  DropdownMenuItem<DateTime> _dayItem(DateTime day, int offset) {
+    // "Today" and "Tomorrow" carry more than a weekday name does, and those
+    // are the two days most bookings are for.
+    final label = switch (offset) {
+      0 => 'Today',
+      1 => 'Tomorrow',
+      _ => DateFormat.EEEE().format(day),
+    };
+
+    return DropdownMenuItem(
+      value: day,
+      child: Text(
+        '$label · ${DateFormat.MMMd().format(day)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }

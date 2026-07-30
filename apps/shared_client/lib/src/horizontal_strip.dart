@@ -42,6 +42,10 @@ class HorizontalStrip extends StatefulWidget {
 }
 
 class _HorizontalStripState extends State<HorizontalStrip> {
+  /// Height reserved under the content for the scrollbar, so the bar never
+  /// sits on top of what it is scrolling.
+  static const _barBand = 10.0;
+
   final _controller = ScrollController();
 
   @override
@@ -56,7 +60,7 @@ class _HorizontalStripState extends State<HorizontalStrip> {
 
     return SizedBox(
       // Room for the scrollbar underneath, so it never sits on the content.
-      height: widget.height + 10,
+      height: widget.height + _barBand,
       child: ScrollConfiguration(
         behavior: const DragAnywhereScrollBehavior(),
         child: Scrollbar(
@@ -75,14 +79,25 @@ class _HorizontalStripState extends State<HorizontalStrip> {
                 SingleChildScrollView(
                   controller: _controller,
                   scrollDirection: Axis.horizontal,
-                  padding: widget.padding.copyWith(bottom: 10),
-                  child: Row(children: widget.children),
+                  padding: widget.padding.copyWith(bottom: _barBand),
+                  // The explicit height and stretch are what a horizontal
+                  // ListView gave for free: without them the row is only as
+                  // tall as its tallest child's intrinsic height, the strip
+                  // collapses, and the scrollbar ends up drawn across the
+                  // content instead of beneath it.
+                  child: SizedBox(
+                    height: widget.height,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: widget.children,
+                    ),
+                  ),
                 ),
                 // A fade at the trailing edge: the cheapest way to show that
                 // an item is cut off on purpose and not by accident.
                 Positioned(
                   top: 0,
-                  bottom: 10,
+                  bottom: _barBand,
                   right: 0,
                   child: IgnorePointer(
                     child: _EdgeFade(colour: surface),

@@ -97,6 +97,24 @@ void main() {
       expect(tester.getSize(find.byType(HorizontalStrip)).height, 70);
     });
 
+    testWidgets('children fill the strip and stop above the scrollbar',
+        (tester) async {
+      await pump(tester);
+
+      // A horizontal ListView stretches its children to the cross axis for
+      // free; a Row does not, and without an explicit height the strip
+      // collapses to its tallest child and the bar lands across the content.
+      // The Center fills the child box, so its rect is the box the strip
+      // handed the child — the text inside it is centred and would not be.
+      final child = tester.getRect(
+        find.ancestor(of: find.text('item 0'), matching: find.byType(Center)),
+      );
+      final strip = tester.getRect(find.byType(HorizontalStrip));
+
+      expect(child.top, strip.top);
+      expect(child.bottom, strip.bottom - 10);
+    });
+
     testWidgets('short content still lays out', (tester) async {
       // One item in a wide window: nothing to scroll, nothing to fade.
       await pump(tester, items: 1, size: const Size(1440, 900));

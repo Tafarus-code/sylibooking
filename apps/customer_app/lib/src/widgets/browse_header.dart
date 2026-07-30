@@ -30,11 +30,19 @@ class BrowseHeader extends StatelessWidget {
     return 'Bonsoir';
   }
 
+  /// Below this the greeting is dropped and only the search field is kept.
+  ///
+  /// A phone in landscape has about 360dp of height for everything. Spending a
+  /// third of it on "Bonsoir, Fatou" pushes the first venue off the screen,
+  /// which is the one thing this screen exists to show.
+  static const _shortWindow = 500.0;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = (customerName ?? '').trim();
     final firstName = name.isEmpty ? null : name.split(' ').first;
+    final short = MediaQuery.sizeOf(context).height < _shortWindow;
 
     return Stack(
       children: [
@@ -59,24 +67,35 @@ class BrowseHeader extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, short ? 8 : 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                firstName == null ? _greeting : '$_greeting, $firstName',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+              if (short)
+                // The subtitle carries on alone: it names the screen, which
+                // the greeting never did.
+                Text(
+                  'Find a table',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else ...[
+                Text(
+                  firstName == null ? _greeting : '$_greeting, $firstName',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Find a table',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: 2),
+                Text(
+                  'Find a table',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+              ],
+              SizedBox(height: short ? 8 : 14),
               TextField(
                 controller: controller,
                 onChanged: onChanged,

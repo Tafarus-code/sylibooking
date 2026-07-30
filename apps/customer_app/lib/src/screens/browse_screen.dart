@@ -241,7 +241,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: Column(
+        // Header, filters and list share one measure, so the search field does
+        // not stretch to a desktop's full width while the cards stay centred.
+        child: ContentColumn(
+          maxWidth: ContentWidth.list,
+          child: Column(
           children: [
             BrowseHeader(
               controller: _searchController,
@@ -287,6 +291,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               child: RefreshIndicator(onRefresh: _load, child: _body()),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -319,29 +324,65 @@ class _BrowseScreenState extends State<BrowseScreen> {
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: visible.length,
-      itemBuilder: (context, index) {
-        final establishment = visible[index];
-        _ensureCover(establishment);
-        return EstablishmentCard(
-          establishment: establishment,
-          coverUrl: _covers[establishment.id],
-          distanceKm: _distanceTo(establishment),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => EstablishmentScreen(
-                api: widget.api,
-                store: widget.store,
-                establishment: establishment,
-                here: _here,
-                directionsLauncher: widget.directionsLauncher,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // One column on a phone, more as the window allows. Driven by the card
+        // width the design wants, not by a device guess.
+        final columns = columnsForWidth(constraints.maxWidth);
+
+        if (columns == 1) {
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: visible.length,
+            itemBuilder: (context, index) => _card(visible[index]),
+          );
+        }
+
+        // Tall enough for the cover plus two lines of text under it. A grid
+        // cell is a fixed box, so this leans generous: empty space at the
+        // bottom of a card is survivable, a clipped rating line is not.
+        final cellWidth = constraints.maxWidth / columns;
+        var cellHeight = cellWidth / 0.92;
+
+        // Except on a short window, where a card taller than the viewport
+        // means never seeing a whole one. The card gives the cover back the
+        // height instead of overflowing.
+        final ceiling = constraints.maxHeight * 0.75;
+        if (constraints.hasBoundedHeight && cellHeight > ceiling) {
+          cellHeight = ceiling;
+        }
+
+        return GridView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            childAspectRatio: cellWidth / cellHeight,
           ),
+          itemCount: visible.length,
+          itemBuilder: (context, index) => _card(visible[index]),
         );
       },
+    );
+  }
+
+  Widget _card(Establishment establishment) {
+    _ensureCover(establishment);
+    return EstablishmentCard(
+      establishment: establishment,
+      coverUrl: _covers[establishment.id],
+      distanceKm: _distanceTo(establishment),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EstablishmentScreen(
+            api: widget.api,
+            store: widget.store,
+            establishment: establishment,
+            here: _here,
+            directionsLauncher: widget.directionsLauncher,
+          ),
+        ),
+      ),
     );
   }
 }

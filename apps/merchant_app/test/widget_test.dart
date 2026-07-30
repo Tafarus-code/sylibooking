@@ -8,6 +8,7 @@ import 'package:merchant_app/src/app.dart';
 import 'package:merchant_app/src/auth_controller.dart';
 import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
+import 'package:merchant_app/src/widgets/reservation_card.dart';
 import 'package:shared_client/shared_client.dart';
 
 /// Canned backend. Routes are keyed "METHOD /path".
@@ -155,14 +156,27 @@ Map<String, dynamic> unpaidBooking({
 final confirmButton = find.text('Confirm');
 final cancelButton = find.text('Cancel');
 
+/// The three shapes the app has to survive, in logical pixels.
+///
+/// A merchant might work the door on a phone and do the books on a laptop, so
+/// all three are real. 834x1112 is an iPad in portrait, 1440x900 a laptop.
+const phoneSize = Size(360, 900);
+const tabletSize = Size(834, 1112);
+const desktopSize = Size(1440, 900);
+
+/// A phone turned sideways: short, not narrow. The shape that catches anything
+/// assuming vertical room, and the one a rail has least height to work with.
+const landscapePhoneSize = Size(900, 360);
+
 ({AuthController auth, FakeBackend backend}) buildAuth(
   WidgetTester tester, {
   String? storedToken,
+  Size size = phoneSize,
 }) {
   // A merchant reads this on a phone in a dim lounge, not on an 800x600
   // desktop surface. Testing at 360x900 is what surfaced two overflow bugs in
   // the customer app, so this app is held to the same width.
-  tester.view.physicalSize = const Size(1080, 2700);
+  tester.view.physicalSize = size * 3.0;
   tester.view.devicePixelRatio = 3.0;
   addTearDown(tester.view.reset);
 
@@ -203,6 +217,146 @@ Map<String, dynamic> venueJson({
     };
 
 void main() {
+  group('phone, tablet and desktop', () {
+    /// Signs in at [size] and walks every tab.
+    ///
+    /// A RenderFlex overflow or a failed layout throws inside pump, so walking
+    /// the app at a size is itself the assertion.
+    Future<void> walkTheApp(WidgetTester tester, Size size) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 3,
+        'next': null,
+        'results': [
+          paidBooking(),
+          unpaidBooking(id: 2, customer: 'Ibrahima Sory Barry'),
+          booking(id: 3, customer: 'Aïssatou Bah', status: 'confirmed'),
+        ],
+      });
+      backend.on('GET', '/api/dashboard/payments/', {
+        'period': {'from': '2026-07-01', 'to': '2026-07-30'},
+        'establishments': [
+          {'id': 7, 'name': 'Le Petit Baobab'},
+        ],
+        'reservations': {
+          'total': 10,
+          'pending': 2,
+          'confirmed': 6,
+          'cancelled': 1,
+          'completed': 1,
+        },
+        'payments': {
+          'collected': '150000.00',
+          'awaiting': '50000.00',
+          'failed': '25000.00',
+          'completed_count': 3,
+          'pending_count': 1,
+          'failed_count': 1,
+        },
+        'by_provider': [
+          {
+            'provider': 'orange_money',
+            'provider_display': 'Orange Money',
+            'bookings': 3,
+            'collected': '150000.00',
+            'awaiting': '50000.00',
+          },
+        ],
+        'needs_attention': [unpaidBooking(id: 2)],
+      });
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+
+      for (final tab in ['Payments', 'Manage', 'Reservations']) {
+        await tester.tap(find.text(tab).last);
+        await tester.pumpAndSettle();
+      }
+    }
+
+    testWidgets('the app survives a phone', (tester) async {
+      await walkTheApp(tester, phoneSize);
+    });
+
+    testWidgets('the app survives a tablet', (tester) async {
+      await walkTheApp(tester, tabletSize);
+    });
+
+    testWidgets('the app survives a desktop window', (tester) async {
+      await walkTheApp(tester, desktopSize);
+    });
+
+    testWidgets('the app survives a phone in landscape', (tester) async {
+      await walkTheApp(tester, landscapePhoneSize);
+    });
+
+    testWidgets('a phone gets a bottom bar, not a rail', (tester) async {
+      await walkTheApp(tester, phoneSize);
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+    });
+
+    testWidgets('a tablet gets a rail, not a bottom bar', (tester) async {
+      await walkTheApp(tester, tabletSize);
+
+      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+    });
+
+    testWidgets('a desktop window gets an extended rail', (tester) async {
+      await walkTheApp(tester, desktopSize);
+
+      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect(rail.extended, isTrue);
+    });
+
+    testWidgets('booking rows stop widening past a readable measure',
+        (tester) async {
+      await walkTheApp(tester, desktopSize);
+
+      // A card stretched across a 1440px window puts the customer's name and
+      // the Confirm button a screen apart.
+      final card = tester.getSize(find.byType(ReservationCard).first);
+      expect(card.width, lessThanOrEqualTo(ContentWidth.list));
+    });
+
+    // One test per size, so each gets a fresh tester: pumping a second app
+    // into a tester that is still settling the first one never settles.
+    for (final (label, size) in [
+      ('a phone', phoneSize),
+      ('a tablet', tabletSize),
+      ('a desktop window', desktopSize),
+    ]) {
+      testWidgets('the venue picker lays out on $label', (tester) async {
+        final (:auth, :backend) = buildAuth(
+          tester,
+          storedToken: 'stored-token',
+          size: size,
+        );
+        backend.on('GET', '/api/auth/me/', user());
+        backend.on('GET', '/api/merchant/establishments/', {
+          'results': [
+            venueJson(),
+            venueJson(id: 8, name: 'Chez Fatou', city: 'Labé', role: 'manager'),
+          ],
+        });
+
+        await tester.pumpWidget(MerchantApp(auth: auth));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Choose a venue'), findsOneWidget);
+      });
+    }
+  });
+
   group('app baseline theme', () {
     /// Signed in on the reservation list, with the theme in force there.
     Future<ThemeData> signedInTheme(

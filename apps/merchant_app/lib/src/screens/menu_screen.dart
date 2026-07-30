@@ -202,7 +202,7 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Text(_error!, textAlign: TextAlign.center),
           const SizedBox(height: 16),
@@ -214,7 +214,7 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_items.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Icon(
             Icons.restaurant_menu,
@@ -248,7 +248,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 88),
+      padding: contentInsets(context, maxWidth: ContentWidth.list).copyWith(bottom: 88),
       children: [
         if (!_canEdit)
           Padding(

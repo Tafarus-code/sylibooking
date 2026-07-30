@@ -5,6 +5,8 @@ import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
 import 'package:customer_app/src/location_source.dart';
+import 'package:customer_app/src/widgets/establishment_card.dart';
+import 'package:customer_app/src/widgets/menu_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -84,8 +86,11 @@ List<Map<String, dynamic>> weekClosedOn(int closedDay) => [
 Map<String, dynamic> menuGroup(
   String category,
   String display,
-  List<(String, String)> items,
-) =>
+  List<(String, String)> items, {
+  /// Picture URL per item name. Most items have none, which is the norm.
+  Map<String, String>? images,
+  String description = '',
+}) =>
     {
       'category': category,
       'category_display': display,
@@ -94,8 +99,9 @@ Map<String, dynamic> menuGroup(
           {
             'id': index + 1,
             'name': item.$1,
-            'description': '',
+            'description': description,
             'price': item.$2,
+            'image': images?[item.$1],
           },
       ],
     };
@@ -248,6 +254,19 @@ Map<String, dynamic> paymentJson({
       'created_at': '2026-08-01T18:00:00Z',
     };
 
+/// The three shapes the apps have to survive, in logical pixels.
+///
+/// Phone is the default everywhere; the other two are used by the responsive
+/// tests. Real sizes, not round numbers: 360x900 is the commonest Android
+/// phone here, 834x1112 an iPad in portrait, 1440x900 a laptop.
+const phoneSize = Size(360, 900);
+const tabletSize = Size(834, 1112);
+const desktopSize = Size(1440, 900);
+
+/// A phone turned sideways: short, not narrow. The shape that catches anything
+/// assuming vertical room, and the one a rail has least height to work with.
+const landscapePhoneSize = Size(900, 360);
+
 ({Widget app, FakeBackend backend, InMemoryBookingStore store}) buildApp(
   WidgetTester tester, {
   List<String>? bookingReferences,
@@ -255,11 +274,12 @@ Map<String, dynamic> paymentJson({
   ImageSource? imageSource,
   LocationSource? locationSource,
   DirectionsLauncher? directionsLauncher,
+  Size size = phoneSize,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
   // 360x900 instead so what a customer can reach, the tests can reach.
-  tester.view.physicalSize = const Size(1080, 2700);
+  tester.view.physicalSize = size * 3.0;
   tester.view.devicePixelRatio = 3.0;
   addTearDown(tester.view.reset);
 
@@ -291,6 +311,192 @@ Map<String, dynamic> paymentJson({
 }
 
 void main() {
+  group('phone, tablet and desktop', () {
+    /// Drives one venue's whole journey at [size]: browse, detail with menu,
+    /// hours, photos and reviews, then every other tab.
+    ///
+    /// A RenderFlex overflow, an unbounded constraint or a failed layout throws
+    /// inside pump, so walking the app at a size *is* the assertion — there is
+    /// no separate "did it overflow" check to forget to write.
+    Future<void> walkTheApp(WidgetTester tester, Size size) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        size: size,
+        customer: (name: 'Fatou Diallo', phone: '+224620000000'),
+        bookingReferences: ['ref-1'],
+      );
+
+      backend.on('GET', '/api/establishments/', {
+        'count': 3,
+        'next': null,
+        'results': [
+          establishmentJson(),
+          establishmentJson(id: 8, name: 'Chez Fatou', type: 'restaurant'),
+          establishmentJson(
+            id: 9,
+            name: 'Le Nimba, terrasse et salon privé',
+            isOpenNow: false,
+          ),
+        ],
+      });
+      for (final id in [7, 8, 9]) {
+        backend.on('GET', '/api/establishments/$id/photos/', {
+          'count': 0,
+          'next': null,
+          'results': [],
+        });
+      }
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [
+            ('Poulet braisé', '75000.00'),
+            ('Poisson braisé aux épices', '85000.00'),
+            ('Riz gras', '40000.00'),
+          ]),
+          menuGroup('chicha_flavor', 'Chicha flavour', [
+            ('Menthe', '50000.00'),
+            ('Pomme', '50000.00'),
+          ]),
+        ]),
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/reservations/by-reference/ref-1/', {
+        ...reservationJson(),
+        'establishment_name': 'Le Petit Baobab',
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      // Browse, then into a venue and back.
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Kaloum, Conakry'), findsOneWidget);
+
+      // All the way down the venue screen: hours, photos, menu, reviews and
+      // the booking pickers each get laid out at this size.
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Every other tab.
+      for (final tab in ['Bookings', 'Favourites', 'Profile', 'Browse']) {
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+      }
+    }
+
+    testWidgets('the app survives a phone', (tester) async {
+      await walkTheApp(tester, phoneSize);
+    });
+
+    testWidgets('the app survives a tablet', (tester) async {
+      await walkTheApp(tester, tabletSize);
+    });
+
+    testWidgets('the app survives a desktop window', (tester) async {
+      await walkTheApp(tester, desktopSize);
+    });
+
+    testWidgets('the app survives a phone in landscape', (tester) async {
+      await walkTheApp(tester, landscapePhoneSize);
+    });
+
+    testWidgets('a phone gets a bottom bar, not a rail', (tester) async {
+      await walkTheApp(tester, phoneSize);
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+    });
+
+    testWidgets('a tablet gets a rail, not a bottom bar', (tester) async {
+      await walkTheApp(tester, tabletSize);
+
+      // A bottom bar on a tablet is a thumb target where there is no thumb.
+      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+    });
+
+    testWidgets('a desktop window gets an extended rail', (tester) async {
+      await walkTheApp(tester, desktopSize);
+
+      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect(rail.extended, isTrue);
+    });
+
+    testWidgets('a short window drops the greeting for the search field',
+        (tester) async {
+      await walkTheApp(tester, landscapePhoneSize);
+
+      // 360dp of height cannot afford "Bonsoir, Fatou" above the fold.
+      expect(find.text('Find a table'), findsOneWidget);
+      expect(find.textContaining('Fatou,'), findsNothing);
+      expect(find.textContaining('Bonsoir'), findsNothing);
+    });
+
+    testWidgets('a whole venue card fits in a landscape window',
+        (tester) async {
+      await walkTheApp(tester, landscapePhoneSize);
+
+      // A card taller than the viewport means never seeing one in full, and
+      // tapping it means scrolling to a target you cannot see.
+      final card = tester.getSize(find.byType(EstablishmentCard).first);
+      expect(card.height, lessThan(landscapePhoneSize.height));
+    });
+
+    testWidgets('venues are one column on a phone', (tester) async {
+      await walkTheApp(tester, phoneSize);
+
+      expect(find.byType(GridView), findsNothing);
+    });
+
+    testWidgets('venues fill the width on a desktop window', (tester) async {
+      await walkTheApp(tester, desktopSize);
+
+      final grid = tester.widget<GridView>(find.byType(GridView));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, greaterThan(1));
+    });
+
+    testWidgets('content stops widening past a readable measure',
+        (tester) async {
+      await walkTheApp(tester, desktopSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+
+      // The venue name is prose, and prose set across 1400px cannot be read.
+      final width = tester.getSize(find.text('Kaloum, Conakry')).width;
+      expect(width, lessThanOrEqualTo(ContentWidth.reading));
+    });
+
+    testWidgets('the menu adds columns rather than stretching cards',
+        (tester) async {
+      await walkTheApp(tester, desktopSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+
+      final cardWidth =
+          tester.getSize(find.byType(MenuItemCard).first).width;
+      // A dish card that grew to half a desktop window would be absurd.
+      expect(cardWidth, lessThan(320));
+    });
+  });
+
   group('app baseline theme', () {
     /// Browse with one venue, and the theme in force on that screen.
     Future<ThemeData> browseTheme(
@@ -1358,6 +1564,110 @@ void main() {
       expect(find.text('Drink'), findsOneWidget);
       expect(find.text('Food'), findsNothing);
       expect(find.text('Chicha flavour'), findsNothing);
+    });
+
+    testWidgets('every dish is a card', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [
+            ('Poulet braisé', '75000.00'),
+            ('Poisson braisé', '85000.00'),
+          ]),
+          menuGroup('drink', 'Drink', [('Jus de gingembre', '20000.00')]),
+        ]),
+      );
+
+      expect(find.byType(MenuItemCard), findsNWidgets(3));
+    });
+
+    testWidgets('a dish with a picture shows it', (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup(
+            'food',
+            'Food',
+            [('Poulet braisé', '75000.00')],
+            images: {
+              'Poulet braisé': 'http://localhost:8000/media/poulet.jpg',
+            },
+          ),
+        ]),
+      );
+
+      final image = tester.widget<Image>(
+        find.descendant(
+          of: find.byType(MenuItemCard),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (image.image as NetworkImage).url,
+        'http://localhost:8000/media/poulet.jpg',
+      );
+    });
+
+    testWidgets('a dish with no picture still gets a card', (tester) async {
+      // The common case for a while yet: merchants type the menu in long
+      // before they photograph it.
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+        ]),
+      );
+
+      expect(find.byType(MenuItemCard), findsOneWidget);
+      expect(find.text('Poulet braisé'), findsOneWidget);
+      expect(find.byIcon(Icons.restaurant_menu), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+    });
+
+    testWidgets('a description is shown under the price when there is one',
+        (tester) async {
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup(
+            'food',
+            'Food',
+            [('Poulet braisé', '75000.00')],
+            description: 'Grilled over charcoal, served with attiéké.',
+          ),
+        ]),
+      );
+
+      expect(
+        find.text('Grilled over charcoal, served with attiéké.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a long menu lays out at 360dp without overflowing',
+        (tester) async {
+      // Two columns of cards, long names, no picture: the layout that would
+      // break first.
+      await openVenue(
+        tester,
+        detail: establishmentDetailJson(menu: [
+          menuGroup('food', 'Food', [
+            for (var i = 0; i < 9; i++)
+              ('Poulet braisé aux épices numéro $i', '75000.00'),
+          ]),
+        ]),
+      );
+
+      // Reaching the bottom of the section is the assertion: an overflow or a
+      // failed layout would have thrown by now.
+      // .first is the screen's own ListView; the pickers further down have
+      // horizontal scrollables of their own.
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Available times'), findsOneWidget);
     });
   });
 

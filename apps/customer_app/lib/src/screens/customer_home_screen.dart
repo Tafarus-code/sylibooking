@@ -37,7 +37,31 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AdaptiveScaffold(
+      selectedIndex: _index,
+      onDestinationSelected: (index) => setState(() => _index = index),
+      destinations: const [
+        AdaptiveDestination(
+          label: 'Browse',
+          icon: Icons.search,
+          selectedIcon: Icons.search,
+        ),
+        AdaptiveDestination(
+          label: 'Bookings',
+          icon: Icons.receipt_long_outlined,
+          selectedIcon: Icons.receipt_long,
+        ),
+        AdaptiveDestination(
+          label: 'Favourites',
+          icon: Icons.favorite_border,
+          selectedIcon: Icons.favorite,
+        ),
+        AdaptiveDestination(
+          label: 'Profile',
+          icon: Icons.person_outline,
+          selectedIcon: Icons.person,
+        ),
+      ],
       // IndexedStack: switching tabs should not re-fetch the list or lose the
       // customer's place in it.
       body: IndexedStack(
@@ -68,32 +92,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             detail:
                 'Bookings are kept on this phone and identified by their '
                 'reference, so there is no account to show yet.',
-          ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (index) => setState(() => _index = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.search),
-            selectedIcon: Icon(Icons.search),
-            label: 'Browse',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Bookings',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.favorite_border),
-            selectedIcon: Icon(Icons.favorite),
-            label: 'Favourites',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
           ),
         ],
       ),

@@ -267,6 +267,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     final days = byDay.keys.toList()..sort();
 
     return ListView.builder(
+      padding: contentInsets(context, maxWidth: ContentWidth.list),
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: days.length,
       itemBuilder: (context, index) {
@@ -339,7 +340,7 @@ class _Message extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(32, 80, 32, 32),
+          padding: contentInsets(context, minHorizontal: 32).copyWith(top: 80, bottom: 32),
           child: Column(
             children: [
               Icon(icon, size: 56, color: theme.colorScheme.onSurfaceVariant),

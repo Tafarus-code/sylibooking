@@ -78,7 +78,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Write a review')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: contentInsets(context, vertical: 16, minHorizontal: 16),
         children: [
           Text(
             reservation.establishmentName,

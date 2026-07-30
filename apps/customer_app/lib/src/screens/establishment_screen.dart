@@ -186,7 +186,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 32),
+          padding: contentInsets(context).copyWith(bottom: 32),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

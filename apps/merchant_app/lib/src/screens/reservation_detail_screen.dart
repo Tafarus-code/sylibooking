@@ -24,7 +24,7 @@ class ReservationDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Reservation')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: contentInsets(context, vertical: 16, minHorizontal: 16),
         children: [
           Text(reservation.customerName, style: theme.textTheme.headlineSmall),
           const SizedBox(height: 4),

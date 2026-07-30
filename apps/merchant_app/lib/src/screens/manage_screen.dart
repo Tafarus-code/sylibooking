@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 import '../auth_controller.dart';
 import '../image_source.dart';
@@ -43,6 +44,7 @@ class ManageScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
+        padding: contentInsets(context),
         children: [
           if (venue != null)
             Padding(

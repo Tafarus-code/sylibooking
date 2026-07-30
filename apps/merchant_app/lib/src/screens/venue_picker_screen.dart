@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 import '../auth_controller.dart';
 
@@ -37,7 +38,7 @@ class VenuePickerScreen extends StatelessWidget {
             : null,
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: contentInsets(context, vertical: 8),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

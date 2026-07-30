@@ -237,7 +237,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (_error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Icon(Icons.cloud_off, size: 56, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(height: 16),
@@ -255,7 +255,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (_reservations.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Icon(
             Icons.receipt_long,
@@ -281,6 +281,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
 
     return ListView.builder(
+      padding: contentInsets(context, maxWidth: ContentWidth.list),
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _reservations.length,
       itemBuilder: (context, index) {

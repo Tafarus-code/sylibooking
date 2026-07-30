@@ -130,7 +130,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
         automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: contentInsets(context, vertical: 24, minHorizontal: 24),
         children: [
           const SizedBox(height: 16),
           if (settling)

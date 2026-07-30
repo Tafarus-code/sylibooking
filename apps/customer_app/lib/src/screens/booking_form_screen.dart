@@ -114,7 +114,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: contentInsets(context, vertical: 16, minHorizontal: 16),
           children: [
             Card(
               child: Padding(

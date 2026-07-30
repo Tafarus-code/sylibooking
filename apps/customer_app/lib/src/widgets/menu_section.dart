@@ -44,10 +44,19 @@ class MenuSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // Two columns, measured rather than assumed: the section is
-                // laid out inside the detail screen, whose width this widget
-                // does not get to decide.
-                final cardWidth = (constraints.maxWidth - _gap) / 2;
+                // Measured rather than assumed: the section is laid out inside
+                // the detail screen, whose width this widget does not get to
+                // decide — and on a tablet or desktop that is far more than
+                // two cards' worth.
+                // 160 keeps the phone on two columns, which is the layout the
+                // cards were drawn for; wider windows simply fit more of them.
+                final columns = columnsForWidth(
+                  constraints.maxWidth,
+                  targetCardWidth: 160,
+                  max: 5,
+                );
+                final cardWidth =
+                    (constraints.maxWidth - _gap * (columns - 1)) / columns;
 
                 // Wrap rather than a grid: a dish with a two-line name makes
                 // its own card taller instead of overflowing a fixed cell.

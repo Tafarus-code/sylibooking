@@ -31,59 +31,64 @@ class EstablishmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final cover = Stack(
+      fit: StackFit.expand,
+      children: [
+        _Cover(establishment: establishment, coverUrl: coverUrl),
+        Positioned(
+          top: 10,
+          left: 10,
+          child: _StatusBadge(establishment: establishment),
+        ),
+        if (distanceKm case final km?)
+          Positioned(
+            bottom: 10,
+            right: 10,
+            child: _Badge(label: formatDistance(km), icon: Icons.near_me),
+          ),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _Cover(establishment: establishment, coverUrl: coverUrl),
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: _StatusBadge(establishment: establishment),
-                    ),
-                    if (distanceKm case final km?)
-                      Positioned(
-                        bottom: 10,
-                        right: 10,
-                        child: _Badge(
-                          label: formatDistance(km),
-                          icon: Icons.near_me,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // In a list the card is free to be as tall as its cover needs;
+                // in a grid cell the height is already decided, so the cover
+                // takes what is left after the text rather than overflowing it.
+                if (constraints.hasBoundedHeight)
+                  Expanded(child: cover)
+                else
+                  AspectRatio(aspectRatio: 16 / 9, child: cover),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        establishment.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        // Display face: the one piece of type that carries the
+                        // house voice on this screen.
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 4),
+                      _RatingLine(establishment: establishment),
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      establishment.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      // Display face: the one piece of type that carries the
-                      // house voice on this screen.
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _RatingLine(establishment: establishment),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 import '../auth_controller.dart';
 import '../image_source.dart';
@@ -26,7 +27,26 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AdaptiveScaffold(
+      selectedIndex: _index,
+      onDestinationSelected: (index) => setState(() => _index = index),
+      destinations: const [
+        AdaptiveDestination(
+          label: 'Reservations',
+          icon: Icons.event_note_outlined,
+          selectedIcon: Icons.event_note,
+        ),
+        AdaptiveDestination(
+          label: 'Payments',
+          icon: Icons.payments_outlined,
+          selectedIcon: Icons.payments,
+        ),
+        AdaptiveDestination(
+          label: 'Manage',
+          icon: Icons.tune_outlined,
+          selectedIcon: Icons.tune,
+        ),
+      ],
       // IndexedStack rather than rebuilding: switching to payments and back
       // should not throw away the day's list and re-fetch it.
       body: IndexedStack(
@@ -35,27 +55,6 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
           ReservationsScreen(auth: widget.auth),
           PaymentsDashboardScreen(auth: widget.auth),
           ManageScreen(auth: widget.auth, imageSource: widget.imageSource),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (index) => setState(() => _index = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.event_note_outlined),
-            selectedIcon: Icon(Icons.event_note),
-            label: 'Reservations',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.payments_outlined),
-            selectedIcon: Icon(Icons.payments),
-            label: 'Payments',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune),
-            label: 'Manage',
-          ),
         ],
       ),
     );

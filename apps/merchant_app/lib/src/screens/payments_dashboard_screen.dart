@@ -119,7 +119,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
     if (_error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Icon(Icons.cloud_off, size: 56, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(height: 16),
@@ -135,7 +135,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
     return ListView(
       key: const Key('payments-dashboard-list'),
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+      padding: contentInsets(context, maxWidth: ContentWidth.list, minHorizontal: 12).copyWith(top: 12, bottom: 32),
       children: [
         Text(
           '${DateFormat.MMMd().format(dashboard.from)} – '

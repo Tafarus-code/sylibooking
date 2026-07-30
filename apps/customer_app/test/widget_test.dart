@@ -5,9 +5,11 @@ import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
 import 'package:customer_app/src/location_source.dart';
+import 'package:customer_app/src/screens/photo_viewer_screen.dart';
 import 'package:customer_app/src/widgets/establishment_card.dart';
 import 'package:customer_app/src/widgets/menu_section.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -587,6 +589,183 @@ void main() {
           tester.getSize(find.byType(MenuItemCard).first).width;
       // A dish card that grew to half a desktop window would be absurd.
       expect(cardWidth, lessThan(320));
+    });
+  });
+
+  group('viewing a photo full screen', () {
+    /// The venue screen with an album of four, ready to tap into.
+    Future<void> openVenue(WidgetTester tester, {Size size = phoneSize}) async {
+      final (:app, :backend, :store) = buildApp(tester, size: size);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 4,
+        'next': null,
+        'results': [
+          for (var i = 1; i <= 4; i++)
+            {
+              'id': i,
+              'image_url': 'http://localhost:8000/media/venue$i.jpg',
+              'caption': 'Photo $i',
+              'uploaded_by_role': 'merchant',
+              'uploaded_by_role_display': 'The venue',
+              'created_at': '2026-08-01T18:00:00Z',
+            },
+        ],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+    }
+
+    /// Taps the thumbnail at [index] in the grid, found by its caption —
+    /// byType(InkWell) also matches the buttons elsewhere on the screen.
+    Future<void> tapThumb(WidgetTester tester, int index) async {
+      await tester.tap(find.text('Photo ${index + 1}'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('tapping a photo opens it full screen', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      expect(find.byType(PhotoViewerScreen), findsOneWidget);
+      expect(find.text('1 of 4'), findsOneWidget);
+    });
+
+    testWidgets('it opens at the photo that was tapped, not the first',
+        (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 2);
+
+      expect(find.text('3 of 4'), findsOneWidget);
+    });
+
+    testWidgets('the next arrow moves to the next photo', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      await tester.tap(find.byTooltip('Next photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 4'), findsOneWidget);
+    });
+
+    testWidgets('the previous arrow goes back', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 2);
+
+      await tester.tap(find.byTooltip('Previous photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 4'), findsOneWidget);
+    });
+
+    testWidgets('there is no arrow past either end', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+      expect(find.byTooltip('Previous photo'), findsNothing);
+
+      // Walk to the last one.
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byTooltip('Next photo'));
+        await tester.pumpAndSettle();
+      }
+
+      expect(find.text('4 of 4'), findsOneWidget);
+      expect(find.byTooltip('Next photo'), findsNothing);
+    });
+
+    testWidgets('swiping moves between photos', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      await tester.drag(find.byType(PageView), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 4'), findsOneWidget);
+    });
+
+    testWidgets('closing returns to the venue and its photo grid',
+        (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 1);
+
+      await tester.tap(find.byTooltip('Back to photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PhotoViewerScreen), findsNothing);
+      expect(find.text('Available times'), findsOneWidget);
+    });
+
+    testWidgets('the caption travels with the photo', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+      expect(find.text('Photo 1'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Next photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Photo 2'), findsWidgets);
+    });
+
+    testWidgets('arrow keys move, and escape closes', (tester) async {
+      // A desktop window has no swipe, so the keyboard has to work.
+      await openVenue(tester, size: desktopSize);
+      await tapThumb(tester, 0);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.text('2 of 4'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('1 of 4'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(PhotoViewerScreen), findsNothing);
+    });
+
+    testWidgets('it opens on a tablet and a desktop window too',
+        (tester) async {
+      await openVenue(tester, size: tabletSize);
+      await tapThumb(tester, 0);
+
+      expect(find.text('1 of 4'), findsOneWidget);
+    });
+
+    testWidgets('a small photo is scaled up to the window, not left tiny',
+        (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      // Several of the real uploads are small. Full screen has to mean full
+      // screen — a Center would hand the image loose constraints and leave a
+      // 200px picture marooned in the middle of a black page.
+      final image = tester.getSize(
+        find.descendant(
+          of: find.byType(PhotoViewerScreen),
+          matching: find.byType(Image),
+        ).first,
+      );
+      expect(image.width, phoneSize.width);
     });
   });
 

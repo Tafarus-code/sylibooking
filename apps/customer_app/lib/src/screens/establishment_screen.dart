@@ -10,6 +10,7 @@ import '../widgets/photos_section.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/reviews_section.dart';
 import 'booking_form_screen.dart';
+import 'photo_viewer_screen.dart';
 
 /// Pick a day, a party size, and a time.
 class EstablishmentScreen extends StatefulWidget {
@@ -143,6 +144,15 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
     }
   }
 
+  /// Opens the album full screen at the picture that was tapped.
+  void _openPhoto(int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PhotoViewerScreen(photos: _photos, initialIndex: index),
+      ),
+    );
+  }
+
   Future<void> _openBooking(TimeOption option) async {
     final booked = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -254,7 +264,11 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
             ),
             if (_photos.isNotEmpty || _loadingExtras) ...[
               const SizedBox(height: 16),
-              PhotosSection(photos: _photos, loading: _loadingExtras),
+              PhotosSection(
+                photos: _photos,
+                loading: _loadingExtras,
+                onTapPhoto: _openPhoto,
+              ),
             ],
             if (establishment.hasMenu) ...[
               const Divider(height: 32),

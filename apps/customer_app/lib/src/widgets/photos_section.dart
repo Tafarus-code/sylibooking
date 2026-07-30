@@ -15,7 +15,10 @@ class PhotosSection extends StatelessWidget {
 
   final List<Photo> photos;
   final bool loading;
-  final void Function(Photo photo)? onTapPhoto;
+
+  /// Takes the position, not the photo: opening one picture full screen means
+  /// opening the album at that point, so the rest is a swipe away.
+  final void Function(int index)? onTapPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +50,7 @@ class PhotosSection extends StatelessWidget {
             spacing: gap,
             runSpacing: gap,
             children: [
-              for (final photo in photos)
+              for (final (index, photo) in photos.indexed)
                 SizedBox(
                   width: width,
                   child: AspectRatio(
@@ -55,7 +58,7 @@ class PhotosSection extends StatelessWidget {
                     child: _PhotoThumb(
                       photo: photo,
                       onTap:
-                          onTapPhoto == null ? null : () => onTapPhoto!(photo),
+                          onTapPhoto == null ? null : () => onTapPhoto!(index),
                     ),
                   ),
                 ),

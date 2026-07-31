@@ -8,7 +8,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from establishments.models import Establishment, Space
+from establishments.models import Establishment, OpeningHours, Space
 from reservations.models import Reservation
 
 
@@ -66,6 +66,38 @@ class EstablishmentEndpointTests(APITestBase):
         by_name = {row['name']: row for row in response.data['results']}
         self.assertEqual(by_name['Le Petit Baobab']['space_count'], 2)
         self.assertEqual(by_name['Chez Fatou']['space_count'], 0)
+
+    def test_the_list_carries_todays_hours(self):
+        """The browse card needs this, and for a long time it was not sent.
+
+        Without `today` the card cannot tell "closed right now" from "this
+        venue never recorded its hours", so every row on browse read "Hours
+        not listed" however complete the record was. The app tests did not
+        catch it because their fixture included a field the real endpoint
+        never sent — so this asserts against the endpoint itself.
+        """
+        OpeningHours.objects.create(
+            establishment=self.lounge,
+            day_of_week=timezone.localdate().weekday(),
+            opens=time(11, 0),
+            closes=time(23, 0),
+        )
+
+        response = self.client.get(reverse('establishment-list'))
+        row = next(
+            r for r in response.data['results'] if r['name'] == 'Le Petit Baobab'
+        )
+
+        self.assertIsNotNone(row['today'])
+        self.assertEqual(row['today']['opens'], '11:00:00')
+
+    def test_a_venue_with_no_hours_says_so_rather_than_guessing(self):
+        response = self.client.get(reverse('establishment-list'))
+        row = next(
+            r for r in response.data['results'] if r['name'] == 'Chez Fatou'
+        )
+
+        self.assertIsNone(row['today'])
 
     def test_filter_by_city_is_case_insensitive(self):
         response = self.client.get(reverse('establishment-list'), {'city': 'conakry'})

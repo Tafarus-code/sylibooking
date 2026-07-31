@@ -15,17 +15,27 @@ enum DateRange {
   final String label;
 }
 
-/// The merchant's home screen: what is booked, and act on it.
-class ReservationsScreen extends StatefulWidget {
-  const ReservationsScreen({super.key, required this.auth});
+/// What is booked, and act on it.
+///
+/// A body rather than a screen: the venue desk owns the bar above it, so this
+/// and the orders queue share one venue name, one switcher and one refresh.
+class ReservationsView extends StatefulWidget {
+  const ReservationsView({
+    super.key,
+    required this.auth,
+    this.reloadToken = 0,
+  });
 
   final AuthController auth;
 
+  /// Bumped by the desk's refresh button.
+  final int reloadToken;
+
   @override
-  State<ReservationsScreen> createState() => _ReservationsScreenState();
+  State<ReservationsView> createState() => _ReservationsViewState();
 }
 
-class _ReservationsScreenState extends State<ReservationsScreen> {
+class _ReservationsViewState extends State<ReservationsView> {
   DateRange _range = DateRange.today;
   List<Reservation> _reservations = const [];
   bool _loading = true;
@@ -40,6 +50,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(ReservationsView old) {
+    super.didUpdateWidget(old);
+    if (widget.reloadToken != old.reloadToken) _load();
   }
 
   Future<void> _load() async {
@@ -159,63 +175,28 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = widget.auth;
-    final venue = auth.selectedVenue?.name ?? 'No venue';
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Reservations'),
-            Text(
-              // The role is shown because it decides what the rest of the app
-              // will let this person do.
-              auth.selectedVenue == null
-                  ? venue
-                  : '$venue · ${auth.selectedVenue!.roleDisplay}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          // Only for accounts that actually have somewhere to switch to.
-          if (auth.hasMultipleVenues)
-            IconButton(
-              icon: const Icon(Icons.swap_horiz),
-              onPressed: auth.changeVenue,
-              tooltip: 'Switch venue',
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : _load,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: auth.signOut,
-            tooltip: 'Sign out',
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: SegmentedButton<DateRange>(
-              segments: [
-                for (final range in DateRange.values)
-                  ButtonSegment(value: range, label: Text(range.label)),
-              ],
-              selected: {_range},
-              onSelectionChanged: (selection) {
-                setState(() => _range = selection.first);
-                _load();
-              },
-            ),
+    return Column(
+      children: [
+        // The date range belongs to this queue alone, so it sits in the body
+        // rather than in the bar the two queues share.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: SegmentedButton<DateRange>(
+            segments: [
+              for (final range in DateRange.values)
+                ButtonSegment(value: range, label: Text(range.label)),
+            ],
+            selected: {_range},
+            onSelectionChanged: (selection) {
+              setState(() => _range = selection.first);
+              _load();
+            },
           ),
         ),
-      ),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
+        Expanded(
+          child: RefreshIndicator(onRefresh: _load, child: _body()),
+        ),
+      ],
     );
   }
 

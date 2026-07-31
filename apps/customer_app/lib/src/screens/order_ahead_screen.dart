@@ -3,12 +3,14 @@ import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../widgets/menu_section.dart';
 import 'order_checkout_screen.dart';
 
 /// Build a basket from a restaurant's menu, then go and pay for it.
 ///
-/// Pickup only: there is no address to enter and no delivery to schedule, so
-/// the whole flow is what, when, and how it is paid for.
+/// Part of the restaurant's own page rather than app chrome, so it sits inside
+/// that venue's theme scope and carries its branding — the customer has not
+/// left the restaurant, they have started ordering from it.
 class OrderAheadScreen extends StatefulWidget {
   const OrderAheadScreen({
     super.key,
@@ -57,9 +59,17 @@ class _OrderAheadScreenState extends State<OrderAheadScreen> {
         _loading = false;
       });
     } on ApiException catch (e) {
-      if (mounted) setState(() => (_error = e.message, _loading = false).$1);
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
     } on ApiUnreachableException catch (e) {
-      if (mounted) setState(() => (_error = e.message, _loading = false).$1);
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
     }
   }
 
@@ -92,6 +102,33 @@ class _OrderAheadScreenState extends State<OrderAheadScreen> {
         _quantities[item.id] = quantity;
       }
     });
+  }
+
+  /// Every dish in the basket, for the review sheet.
+  List<({MenuItem item, int quantity})> get _basket => [
+        for (final category in _menu)
+          for (final item in category.items)
+            if ((_quantities[item.id] ?? 0) > 0)
+              (item: item, quantity: _quantities[item.id]!),
+      ];
+
+  Future<void> _reviewCart() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => _CartSheet(
+        basket: _basket,
+        total: _total,
+        onChanged: (item, quantity) {
+          _setQuantity(item, quantity);
+          // The sheet is built from this state, so it has to be rebuilt too.
+          (sheetContext as Element).markNeedsBuild();
+          if (_itemCount == 0) Navigator.of(sheetContext).pop();
+        },
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkout() async {
@@ -128,9 +165,10 @@ class _OrderAheadScreenState extends State<OrderAheadScreen> {
       body: _body(),
       bottomNavigationBar: _itemCount == 0
           ? null
-          : _CartBar(
+          : CartBar(
               itemCount: _itemCount,
               total: _total,
+              onReview: _reviewCart,
               onCheckout: _checkout,
             ),
     );
@@ -159,131 +197,15 @@ class _OrderAheadScreenState extends State<OrderAheadScreen> {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: contentInsets(context).copyWith(bottom: 24),
+      padding: contentInsets(context).copyWith(top: 8, bottom: 24),
       children: [
-        for (final category in _menu) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              category.categoryDisplay,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          for (final item in category.items)
-            _MenuRow(
-              item: item,
-              quantity: _quantities[item.id] ?? 0,
-              onChanged: (quantity) => _setQuantity(item, quantity),
-            ),
-        ],
-      ],
-    );
-  }
-}
-
-/// One dish with a stepper. Tapping + is the whole interaction.
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({
-    required this.item,
-    required this.quantity,
-    required this.onChanged,
-  });
-
-  final MenuItem item;
-  final int quantity;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (item.imageUrl case final url?) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                url,
-                width: 64,
-                height: 64,
-                fit: BoxFit.cover,
-                errorBuilder: (context, _, _) => const SizedBox(
-                  width: 64,
-                  height: 64,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: theme.textTheme.bodyLarge),
-                if (item.description.isNotEmpty)
-                  Text(
-                    item.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  '${item.price} GNF',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _Stepper(quantity: quantity, onChanged: onChanged, name: item.name),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stepper extends StatelessWidget {
-  const _Stepper({
-    required this.quantity,
-    required this.onChanged,
-    required this.name,
-  });
-
-  final int quantity;
-  final ValueChanged<int> onChanged;
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    if (quantity == 0) {
-      return OutlinedButton(
-        onPressed: () => onChanged(1),
-        child: Text('Add', semanticsLabel: 'Add $name'),
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.remove_circle_outline),
-          tooltip: 'One fewer $name',
-          onPressed: () => onChanged(quantity - 1),
-        ),
-        Text('$quantity', style: Theme.of(context).textTheme.titleMedium),
-        IconButton(
-          icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'One more $name',
-          onPressed: () => onChanged(quantity + 1),
+        // The same component the venue page uses, with steppers switched on.
+        // A second menu layout would have drifted from the first inside a
+        // slice.
+        MenuSection(
+          menu: _menu,
+          quantityFor: (item) => _quantities[item.id] ?? 0,
+          onQuantityChanged: _setQuantity,
         ),
       ],
     );
@@ -291,16 +213,82 @@ class _Stepper extends StatelessWidget {
 }
 
 /// The running basket, pinned at the bottom so it is never hunted for.
-class _CartBar extends StatelessWidget {
-  const _CartBar({
+class CartBar extends StatelessWidget {
+  const CartBar({
+    super.key,
     required this.itemCount,
     required this.total,
+    required this.onReview,
     required this.onCheckout,
   });
 
   final int itemCount;
   final double total;
+  final VoidCallback onReview;
   final VoidCallback onCheckout;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      elevation: 3,
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        child: InkWell(
+          // The whole bar opens the basket; the button skips straight to
+          // paying. Tapping a total to see what makes it up is the thing
+          // people try first.
+          onTap: onReview,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 12, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$itemCount ${itemCount == 1 ? "item" : "items"} · tap '
+                        'to review',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        '${NumberFormat('#,##0.00').format(total)} GNF',
+                        style: sylibookingPriceStyle(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: onCheckout,
+                  icon: const Icon(Icons.shopping_bag_outlined),
+                  label: const Text('Checkout'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What is in the basket, and a last chance to change it.
+class _CartSheet extends StatelessWidget {
+  const _CartSheet({
+    required this.basket,
+    required this.total,
+    required this.onChanged,
+  });
+
+  final List<({MenuItem item, int quantity})> basket;
+  final double total;
+  final void Function(MenuItem item, int quantity) onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -308,31 +296,53 @@ class _CartBar extends StatelessWidget {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+            Text('Your basket', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
                 children: [
-                  Text(
-                    '$itemCount ${itemCount == 1 ? "item" : "items"}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  Text(
-                    '${NumberFormat('#,##0.00').format(total)} GNF',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  for (final line in basket)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(line.item.name)),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            tooltip: 'One fewer ${line.item.name}',
+                            onPressed: () =>
+                                onChanged(line.item, line.quantity - 1),
+                          ),
+                          Text('${line.quantity}'),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            tooltip: 'One more ${line.item.name}',
+                            onPressed: () =>
+                                onChanged(line.item, line.quantity + 1),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
-            FilledButton.icon(
-              onPressed: onCheckout,
-              icon: const Icon(Icons.shopping_bag_outlined),
-              label: const Text('Checkout'),
+            const Divider(),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Total', style: theme.textTheme.titleMedium),
+                ),
+                Text(
+                  '${NumberFormat('#,##0.00').format(total)} GNF',
+                  style: sylibookingPriceStyle(context),
+                ),
+              ],
             ),
           ],
         ),

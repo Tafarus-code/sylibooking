@@ -8,6 +8,7 @@ import 'package:merchant_app/src/app.dart';
 import 'package:merchant_app/src/auth_controller.dart';
 import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
+import 'package:merchant_app/src/screens/orders_screen.dart';
 import 'package:merchant_app/src/widgets/reservation_card.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -297,7 +298,8 @@ void main() {
 
       await tester.pumpWidget(MerchantApp(auth: auth));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Orders').last);
+      // Orders is a tab on the venue desk, not its own navigation destination.
+      await tester.tap(find.text('Commandes'));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -517,6 +519,195 @@ void main() {
         (r) => r.url.path == '/api/merchant/orders/',
       );
       expect(request.url.queryParameters['establishment'], '7');
+    });
+
+    testWidgets('each ticket carries a badge for where it has got to',
+        (tester) async {
+      await openQueue(tester, [
+        orderJson(id: 1),
+        orderJson(id: 2, status: 'preparing', customer: 'Ibrahima'),
+        orderJson(id: 3, status: 'ready', customer: 'Aïssatou'),
+      ]);
+
+      // Badge language, not just a heading: the state travels with the ticket.
+      expect(
+        find.descendant(
+          of: find.byType(OrderStatusBadge),
+          matching: find.text('Placed'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(OrderStatusBadge), findsNWidgets(3));
+    });
+
+    testWidgets('each state gets its own colour', (tester) async {
+      await openQueue(tester, [
+        orderJson(id: 1),
+        orderJson(id: 2, status: 'preparing', customer: 'Ibrahima'),
+        orderJson(id: 3, status: 'ready', customer: 'Aïssatou'),
+      ]);
+
+      final colours = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(OrderStatusBadge),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((c) => (c.decoration as BoxDecoration?)?.color)
+          .toSet();
+
+      expect(colours, hasLength(3));
+    });
+  });
+
+  group('the venue desk switcher', () {
+    Future<FakeBackend> signIn(
+      WidgetTester tester, {
+      String preset = 'ember',
+      List<Map<String, dynamic>>? orders,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [
+          {...venueJson(), 'theme_preset': preset},
+        ],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [paidBooking()],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': orders ?? []});
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('both queues live on one screen', (tester) async {
+      await signIn(tester);
+
+      expect(find.text('Réservations'), findsOneWidget);
+      expect(find.text('Commandes'), findsOneWidget);
+    });
+
+    testWidgets('orders are not a separate navigation destination',
+        (tester) async {
+      await signIn(tester);
+
+      // Same job as reservations: someone arriving at a time, and something
+      // owed to them when they do.
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.text('Orders'), findsNothing);
+    });
+
+    testWidgets('switching to orders and back keeps the date range',
+        (tester) async {
+      final backend = await signIn(tester);
+
+      await tester.tap(find.text('Next 7 days'));
+      await tester.pumpAndSettle();
+      final callsBefore =
+          backend.requests.where((r) => r.url.path == '/api/reservations/');
+      final rangeRequest = callsBefore.last.url.queryParameters;
+
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Réservations'));
+      await tester.pumpAndSettle();
+
+      // The week range survived the round trip, and nothing refetched.
+      expect(find.text('Next 7 days'), findsOneWidget);
+      expect(
+        backend.requests
+            .where((r) => r.url.path == '/api/reservations/')
+            .last
+            .url
+            .queryParameters,
+        rangeRequest,
+      );
+    });
+
+    testWidgets('switching tabs does not refetch either queue',
+        (tester) async {
+      final backend = await signIn(tester);
+      int calls(String path) =>
+          backend.requests.where((r) => r.url.path == path).length;
+
+      final reservations = calls('/api/reservations/');
+      final orders = calls('/api/merchant/orders/');
+
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Réservations'));
+      await tester.pumpAndSettle();
+
+      expect(calls('/api/reservations/'), reservations);
+      expect(calls('/api/merchant/orders/'), orders);
+    });
+
+    testWidgets('the orders queue keeps its own state across a switch',
+        (tester) async {
+      await signIn(tester, orders: [
+        {
+          'id': 1,
+          'reference': 'order-ref-1',
+          'establishment': 7,
+          'establishment_name': 'Le Petit Baobab',
+          'reservation': null,
+          'customer_name': 'Mariama Diallo',
+          'customer_phone': '+224 620 00 00 00',
+          'pickup_time': DateTime.now()
+              .add(const Duration(hours: 2))
+              .toUtc()
+              .toIso8601String(),
+          'status': 'placed',
+          'status_display': 'Placed',
+          'created_at': '2026-08-01T18:00:00Z',
+          'items': const [],
+          'total': '150000.00',
+          'payment_provider': null,
+          'payment_provider_display': 'Cash on arrival',
+          'payment_status': null,
+          'is_paid': false,
+          'can_advance': true,
+          'next_status': 'preparing',
+        },
+      ]);
+
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mariama Diallo'), findsOneWidget);
+
+      await tester.tap(find.text('Réservations'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mariama Diallo'), findsOneWidget);
+    });
+
+    testWidgets('the desk carries the venue own branding', (tester) async {
+      await signIn(tester, preset: 'bissap');
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+
+      // A venue's own screens look like the venue, the way a customer sees it.
+      final scheme = Theme.of(
+        tester.element(find.text('Nothing in the queue')),
+      ).colorScheme;
+      expect(scheme.primary, themePresetFor('bissap').accent);
+    });
+
+    testWidgets('but the chrome around it does not', (tester) async {
+      await signIn(tester, preset: 'bissap');
+
+      // The navigation is the app, not the venue.
+      final scheme =
+          Theme.of(tester.element(find.text('Payments'))).colorScheme;
+      expect(scheme.primary, SylibookingTokens.ember);
     });
   });
 

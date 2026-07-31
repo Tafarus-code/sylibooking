@@ -4,6 +4,7 @@
 /// back, they send plain maps, so there is no `toJson` to drift out of sync.
 library;
 
+import 'establishment_theme.dart';
 import 'geo.dart';
 
 enum EstablishmentType {
@@ -223,6 +224,7 @@ class MerchantVenue {
     required this.roleDisplay,
     this.type = '',
     this.tagline = '',
+    this.themePreset = defaultThemePresetKey,
   });
 
   final int id;
@@ -230,6 +232,10 @@ class MerchantVenue {
   final String city;
   final String type;
   final String tagline;
+
+  /// The venue's chosen branding, so its own screens in the merchant app can
+  /// be themed the way a customer sees them.
+  final String themePreset;
 
   /// What this user may do here. The server enforces the same rules; this is
   /// only so the app does not offer a control that would be refused.
@@ -242,6 +248,8 @@ class MerchantVenue {
         city: json['city'] as String? ?? '',
         type: json['type'] as String? ?? '',
         tagline: json['tagline'] as String? ?? '',
+        themePreset:
+            json['theme_preset'] as String? ?? defaultThemePresetKey,
         role: MerchantRole.parse(json['role'] as String?),
         roleDisplay: json['role_display'] as String? ?? '',
       );

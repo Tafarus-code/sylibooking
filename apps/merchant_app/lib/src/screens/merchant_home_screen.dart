@@ -4,9 +4,8 @@ import 'package:shared_client/shared_client.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
 import 'manage_screen.dart';
-import 'orders_screen.dart';
 import 'payments_dashboard_screen.dart';
-import 'reservations_screen.dart';
+import 'venue_desk_screen.dart';
 
 /// The signed-in shell: tonight's bookings, and the money behind them.
 class MerchantHomeScreen extends StatefulWidget {
@@ -38,11 +37,6 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
           selectedIcon: Icons.event_note,
         ),
         AdaptiveDestination(
-          label: 'Orders',
-          icon: Icons.receipt_long_outlined,
-          selectedIcon: Icons.receipt_long,
-        ),
-        AdaptiveDestination(
           label: 'Payments',
           icon: Icons.payments_outlined,
           selectedIcon: Icons.payments,
@@ -58,8 +52,7 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
       body: IndexedStack(
         index: _index,
         children: [
-          ReservationsScreen(auth: widget.auth),
-          OrdersScreen(auth: widget.auth),
+          VenueDeskScreen(auth: widget.auth),
           PaymentsDashboardScreen(auth: widget.auth),
           ManageScreen(auth: widget.auth, imageSource: widget.imageSource),
         ],

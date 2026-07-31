@@ -416,15 +416,38 @@ class PaymentGateTests(OrderTestCase):
 
 class KitchenQueueTests(OrderTestCase):
     def test_the_queue_lists_todays_orders(self):
-        self.place_order()
-        self.authenticate(self.owner)
+        placed = self.place_order()
 
+        # Pinned to midday rather than left at "two hours from now". The
+        # endpoint filters on the local date, and a test run after 22:00 was
+        # putting the pickup into tomorrow and finding an empty queue — the
+        # assertion was right and the fixture was quietly time-dependent.
+        midday = timezone.localtime(timezone.now()).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+        Order.objects.filter(pk=placed.data['id']).update(pickup_time=midday)
+
+        self.authenticate(self.owner)
         response = self.client.get(
             reverse('merchant-orders'), {'establishment': self.restaurant.pk}
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
+
+    def test_the_queue_is_todays_only(self):
+        placed = self.place_order()
+        Order.objects.filter(pk=placed.data['id']).update(
+            pickup_time=timezone.now() + timedelta(days=2)
+        )
+        self.authenticate(self.owner)
+
+        response = self.client.get(
+            reverse('merchant-orders'), {'establishment': self.restaurant.pk}
+        )
+
+        # A kitchen screen showing next Tuesday's tickets is worse than useless.
+        self.assertEqual(len(response.data['results']), 0)
 
     def test_it_can_be_filtered_by_status(self):
         self.place_order()

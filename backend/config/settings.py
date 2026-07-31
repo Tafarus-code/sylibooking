@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'reservations',
     'payments',
     'orders',
+    'accounts',
     'api',
 ]
 
@@ -252,3 +253,26 @@ RESERVATION_DEPOSIT_AMOUNT = Decimal(
 AVAILABILITY_SLOT_MINUTES = 30
 AVAILABILITY_WINDOW_START = '12:00'
 AVAILABILITY_WINDOW_END = '23:00'
+
+
+# --- Notifications --------------------------------------------------------
+# Same shape as PAYMENT_PROVIDERS: swapping the console stub for a real SMS
+# aggregator is a settings change, not a code change.
+NOTIFIERS = {
+    'sms': config(
+        'SMS_NOTIFIER',
+        default='accounts.notifications.ConsoleSmsNotifier',
+    ),
+    'email': config(
+        'EMAIL_NOTIFIER',
+        default='accounts.notifications.EmailNotifier',
+    ),
+}
+
+# Console in development, so a reset code is readable in the terminal without
+# anything actually leaving the machine.
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@sylibooking.gn')

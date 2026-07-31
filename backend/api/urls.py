@@ -33,6 +33,7 @@ from .orders import (
     MerchantOrderStatusView,
     OrderCreateView,
 )
+from .password_reset import ConfirmResetView, RequestResetView
 from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
 
@@ -88,6 +89,16 @@ urlpatterns = [
         name='customer-register',
     ),
     path('customer/me/', CustomerMeView.as_view(), name='customer-me'),
+    path(
+        'customer/password-reset/',
+        RequestResetView.as_view(),
+        name='customer-password-reset',
+    ),
+    path(
+        'customer/password-reset/confirm/',
+        ConfirmResetView.as_view(),
+        name='customer-password-reset-confirm',
+    ),
     path('customer/claim/', ClaimView.as_view(), name='customer-claim'),
     path(
         'customer/history/',

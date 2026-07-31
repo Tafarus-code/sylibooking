@@ -7,6 +7,7 @@ only two — the list survives losing the phone, and favourites become portable.
 So nothing here gates the booking flow. Everything is additive.
 """
 
+from accounts.models import CustomerProfile
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from orders.models import Order
@@ -35,11 +36,18 @@ class CustomerSerializer(serializers.ModelSerializer):
     """
 
     name = serializers.SerializerMethodField()
+    # So the app can warn someone with no contact details that forgetting the
+    # password would lock them out, while there is still time to add one.
+    can_reset_password = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'name']
+        fields = ['id', 'username', 'name', 'can_reset_password']
         read_only_fields = fields
+
+    def get_can_reset_password(self, user):
+        profile = getattr(user, 'customer_profile', None)
+        return bool(user.email or (profile and profile.phone))
 
     def get_name(self, user):
         return user.get_full_name() or user.first_name or user.username
@@ -51,6 +59,11 @@ class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(min_length=8, write_only=True)
     name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+
+    # Optional, but the only way back in if the password is forgotten — which
+    # is why the app asks for one and says exactly what it is for.
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate_username(self, username):
         username = username.strip()
@@ -88,6 +101,10 @@ class RegisterView(APIView):
                     username=data['username'],
                     password=data['password'],
                     first_name=data.get('name', '')[:150],
+                    email=data.get('email', ''),
+                )
+                CustomerProfile.objects.create(
+                    user=user, phone=data.get('phone', '').strip()
                 )
         except IntegrityError:
             # Two signups racing for the same name. The loser is told the same

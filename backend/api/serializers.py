@@ -104,6 +104,10 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
     # exist once, and both apps should agree on the answer.
     is_open_now = serializers.SerializerMethodField()
     closes_at = serializers.SerializerMethodField()
+    # Sent by the detail endpoint too. Without it the browse card cannot tell
+    # "closed right now" from "this venue never told us its hours", and every
+    # row reads "Hours not listed" however complete the record is.
+    today = serializers.SerializerMethodField()
 
     class Meta:
         model = Establishment
@@ -119,6 +123,7 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
             'space_count',
             'is_open_now',
             'closes_at',
+            'today',
             'theme_preset',
         ]
 
@@ -127,6 +132,10 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
 
     def get_closes_at(self, establishment):
         return closing_time_at(establishment)
+
+    def get_today(self, establishment):
+        hours = todays_hours(establishment)
+        return None if hours is None else OpeningHoursSerializer(hours).data
 
 
 class EstablishmentDetailSerializer(serializers.ModelSerializer):

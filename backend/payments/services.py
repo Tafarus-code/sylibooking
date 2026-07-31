@@ -37,29 +37,54 @@ def start_payment(reservation, provider_name, amount=None):
 
     Returns the Payment, or None for cash on arrival.
     """
+    return _start(
+        provider_name,
+        amount=deposit_amount() if amount is None else amount,
+        reservation=reservation,
+    )
+
+
+def start_order_payment(order, provider_name):
+    """Open a payment for a pickup order.
+
+    The amount is the order's own total rather than the global deposit: the
+    customer is buying named dishes at snapshotted prices, so what is owed is
+    already decided and is not ours to choose.
+
+    Cash on pickup writes no Payment row, exactly as cash on arrival does not.
+    """
+    return _start(provider_name, amount=order.total, order=order)
+
+
+def _start(provider_name, *, amount, reservation=None, order=None):
+    """The shared body: create, initiate, then apply whatever came back."""
     if provider_name == Payment.Provider.CASH_ON_ARRIVAL:
         return None
 
+    subject = reservation if reservation is not None else order
+
     payment = Payment.objects.create(
         reservation=reservation,
+        order=order,
         provider=provider_name,
-        amount=deposit_amount() if amount is None else amount,
+        amount=amount,
         status=Payment.Status.PENDING,
     )
 
     try:
         provider = get_payment_provider(provider_name)
         payment.provider_reference = provider.initiate_payment(
-            reservation, payment.amount
+            subject, payment.amount
         )
         payment.save(update_fields=['provider_reference'])
     except PaymentError:
         # We could not place the request, so nothing is owed and nothing was
         # taken. Mark it failed and leave the booking pending.
         logger.exception(
-            'Could not initiate %s payment for reservation %s',
+            'Could not initiate %s payment for %s %s',
             provider_name,
-            reservation.pk,
+            type(subject).__name__.lower(),
+            subject.pk,
         )
         payment.status = Payment.Status.FAILED
         payment.save(update_fields=['status'])
@@ -101,7 +126,9 @@ def refresh_payment(payment):
     payment.status = status
     payment.save(update_fields=['status'])
 
-    if status == Payment.Status.COMPLETED:
+    if status == Payment.Status.COMPLETED and payment.reservation_id:
+        # An order needs no equivalent: paying does not advance it through the
+        # kitchen, it only unblocks the merchant from doing so.
         confirm_reservation_for(payment)
 
     return payment
@@ -132,6 +159,9 @@ def confirm_reservation_for(payment):
         return reservation
 
 
-def latest_payment_for(reservation):
-    """The payment a customer would be asking about — the most recent one."""
-    return reservation.payments.order_by('-created_at').first()
+def latest_payment_for(subject):
+    """The payment a customer would be asking about — the most recent one.
+
+    Takes a reservation or an order; both expose the same `payments` relation.
+    """
+    return subject.payments.order_by('-created_at').first()

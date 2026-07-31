@@ -217,6 +217,309 @@ Map<String, dynamic> venueJson({
     };
 
 void main() {
+  group('the kitchen queue', () {
+    Map<String, dynamic> orderJson({
+      int id = 1,
+      String customer = 'Mariama Diallo',
+      String status = 'placed',
+      String? paymentProvider,
+      bool isPaid = false,
+      bool? canAdvance,
+      int? reservation,
+    }) =>
+        {
+          'id': id,
+          'reference': 'order-ref-$id',
+          'establishment': 7,
+          'establishment_name': 'Le Petit Baobab',
+          'reservation': reservation,
+          'customer_name': customer,
+          'customer_phone': '+224 620 00 00 00',
+          'pickup_time': DateTime.now()
+              .add(const Duration(hours: 2))
+              .toUtc()
+              .toIso8601String(),
+          'status': status,
+          'status_display': status[0].toUpperCase() + status.substring(1),
+          'created_at': '2026-08-01T18:00:00Z',
+          'items': [
+            {
+              'id': id,
+              'menu_item': 1,
+              'menu_item_name': 'Poulet braisé',
+              'quantity': 2,
+              'unit_price_at_order': '75000.00',
+              'line_total': '150000.00',
+            },
+          ],
+          'total': '150000.00',
+          'payment_provider': paymentProvider,
+          'payment_provider_display': switch (paymentProvider) {
+            'orange_money' => 'Orange Money',
+            'mtn_money' => 'MTN Mobile Money',
+            _ => 'Cash on arrival',
+          },
+          'payment_status': paymentProvider == null
+              ? null
+              : (isPaid ? 'completed' : 'pending'),
+          'is_paid': isPaid,
+          // Mirrors the server: cash advances freely, unpaid mobile money
+          // does not.
+          'can_advance': canAdvance ??
+              (paymentProvider == null ||
+                  paymentProvider == 'cash_on_arrival' ||
+                  isPaid),
+          'next_status': switch (status) {
+            'placed' => 'preparing',
+            'preparing' => 'ready',
+            'ready' => 'completed',
+            _ => null,
+          },
+        };
+
+    /// Signs in and opens the Orders tab.
+    Future<FakeBackend> openQueue(
+      WidgetTester tester,
+      List<Map<String, dynamic>> orders, {
+      String role = 'owner',
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': orders});
+
+      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Orders').last);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('the queue is reachable from the shell', (tester) async {
+      await openQueue(tester, [orderJson()]);
+
+      expect(find.text('Mariama Diallo'), findsOneWidget);
+    });
+
+    testWidgets('a ticket shows what to cook and when it is wanted',
+        (tester) async {
+      await openQueue(tester, [orderJson()]);
+
+      expect(find.text('Poulet braisé'), findsOneWidget);
+      expect(find.text('2×'), findsOneWidget);
+      expect(find.text('150000.00 GNF'), findsOneWidget);
+    });
+
+    testWidgets('tickets are grouped by stage, not mixed by time',
+        (tester) async {
+      await openQueue(tester, [
+        orderJson(id: 1, customer: 'Mariama Diallo'),
+        orderJson(id: 2, customer: 'Ibrahima Sory', status: 'preparing'),
+        orderJson(id: 3, customer: 'Aïssatou Bah', status: 'ready'),
+      ]);
+
+      expect(find.text('Ready to collect · 1'), findsOneWidget);
+      expect(find.text('Being prepared · 1'), findsOneWidget);
+      expect(find.text('New orders · 1'), findsOneWidget);
+    });
+
+    testWidgets('finished tickets drop off the queue', (tester) async {
+      await openQueue(tester, [
+        orderJson(id: 1, status: 'completed', customer: 'Gone'),
+        orderJson(id: 2, status: 'cancelled', customer: 'Also gone'),
+      ]);
+
+      expect(find.text('Nothing in the queue'), findsOneWidget);
+    });
+
+    testWidgets('an empty queue says so', (tester) async {
+      await openQueue(tester, const []);
+
+      expect(find.text('Nothing in the queue'), findsOneWidget);
+    });
+
+    testWidgets('the button names the next step', (tester) async {
+      await openQueue(tester, [
+        orderJson(id: 1),
+        orderJson(id: 2, status: 'preparing', customer: 'Ibrahima'),
+        orderJson(id: 3, status: 'ready', customer: 'Aïssatou'),
+      ]);
+
+      expect(find.text('Start preparing'), findsOneWidget);
+      expect(find.text('Mark ready'), findsOneWidget);
+      expect(find.text('Collected'), findsOneWidget);
+    });
+
+    testWidgets('advancing a cash order updates the ticket in place',
+        (tester) async {
+      final backend = await openQueue(tester, [orderJson()]);
+      backend.on(
+        'POST',
+        '/api/merchant/orders/1/status/',
+        orderJson(status: 'preparing'),
+      );
+
+      await tester.tap(find.text('Start preparing'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mark ready'), findsOneWidget);
+      expect(find.text('Being prepared · 1'), findsOneWidget);
+    });
+
+    testWidgets('the requested status is what gets sent', (tester) async {
+      final backend = await openQueue(tester, [orderJson()]);
+      backend.on(
+        'POST',
+        '/api/merchant/orders/1/status/',
+        orderJson(status: 'preparing'),
+      );
+
+      await tester.tap(find.text('Start preparing'));
+      await tester.pumpAndSettle();
+
+      final post = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/merchant/orders/1/status/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['status'], 'preparing');
+    });
+
+    testWidgets('an unpaid mobile money ticket cannot be started',
+        (tester) async {
+      await openQueue(tester, [
+        orderJson(paymentProvider: 'orange_money'),
+      ]);
+
+      final button = tester.widget<FilledButton>(
+        find.ancestor(
+          of: find.text('Start preparing'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('and it says why, rather than just greying out',
+        (tester) async {
+      await openQueue(tester, [
+        orderJson(paymentProvider: 'orange_money'),
+      ]);
+
+      expect(find.textContaining('cannot start'), findsOneWidget);
+      expect(find.text('Unpaid'), findsOneWidget);
+    });
+
+    testWidgets('a paid mobile money ticket works normally', (tester) async {
+      await openQueue(tester, [
+        orderJson(paymentProvider: 'orange_money', isPaid: true),
+      ]);
+
+      final button = tester.widget<FilledButton>(
+        find.ancestor(
+          of: find.text('Start preparing'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      expect(button.onPressed, isNotNull);
+      expect(find.text('Paid (Orange Money)'), findsOneWidget);
+    });
+
+    testWidgets('a cash ticket is badged as cash, not as unpaid',
+        (tester) async {
+      await openQueue(tester, [orderJson()]);
+
+      expect(find.text('Cash on pickup'), findsOneWidget);
+      expect(find.text('Unpaid'), findsNothing);
+    });
+
+    testWidgets('an unpaid ticket can still be cancelled', (tester) async {
+      await openQueue(tester, [
+        orderJson(paymentProvider: 'orange_money'),
+      ]);
+
+      final button = tester.widget<TextButton>(
+        find.ancestor(
+          of: find.text('Cancel'),
+          matching: find.byType(TextButton),
+        ),
+      );
+      expect(button.onPressed, isNotNull);
+    });
+
+    testWidgets('cancelling asks first', (tester) async {
+      await openQueue(tester, [orderJson()]);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancel this order?'), findsOneWidget);
+
+      await tester.tap(find.text('Keep it'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mariama Diallo'), findsOneWidget);
+    });
+
+    testWidgets('a server refusal is surfaced, not swallowed', (tester) async {
+      final backend = await openQueue(tester, [orderJson()]);
+      backend.on(
+        'POST',
+        '/api/merchant/orders/1/status/',
+        {'detail': 'Orange Money payment is pending. Start this order once '
+            'the payment completes, or cancel it.'},
+        status: 409,
+      );
+
+      await tester.tap(find.text('Start preparing'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('payment is pending'), findsOneWidget);
+    });
+
+    testWidgets('an order for a table is marked as one', (tester) async {
+      await openQueue(tester, [orderJson(reservation: 5)]);
+
+      expect(find.text('At their table'), findsOneWidget);
+    });
+
+    testWidgets('a plain pickup is not', (tester) async {
+      await openQueue(tester, [orderJson()]);
+
+      expect(find.text('At their table'), findsNothing);
+    });
+
+    testWidgets('staff can work the queue', (tester) async {
+      // Running the floor is operations, whatever the role.
+      final backend = await openQueue(tester, [orderJson()], role: 'staff');
+      backend.on(
+        'POST',
+        '/api/merchant/orders/1/status/',
+        orderJson(status: 'preparing'),
+      );
+
+      await tester.tap(find.text('Start preparing'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mark ready'), findsOneWidget);
+    });
+
+    testWidgets('the queue is requested for the selected venue only',
+        (tester) async {
+      final backend = await openQueue(tester, [orderJson()]);
+
+      final request = backend.requests.lastWhere(
+        (r) => r.url.path == '/api/merchant/orders/',
+      );
+      expect(request.url.queryParameters['establishment'], '7');
+    });
+  });
+
   group('phone, tablet and desktop', () {
     /// Signs in at [size] and walks every tab.
     ///

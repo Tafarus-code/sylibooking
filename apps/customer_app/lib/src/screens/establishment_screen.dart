@@ -10,6 +10,8 @@ import '../widgets/photos_section.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/reviews_section.dart';
 import 'booking_form_screen.dart';
+import 'order_ahead_screen.dart';
+import 'photo_viewer_screen.dart';
 
 /// Pick a day, a party size, and a time.
 class EstablishmentScreen extends StatefulWidget {
@@ -143,6 +145,28 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
     }
   }
 
+  /// Ordering ahead for collection, which only restaurants offer.
+  void _openOrderAhead(Establishment establishment) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderAheadScreen(
+          api: widget.api,
+          store: widget.store,
+          establishment: establishment,
+        ),
+      ),
+    );
+  }
+
+  /// Opens the album full screen at the picture that was tapped.
+  void _openPhoto(int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PhotoViewerScreen(photos: _photos, initialIndex: index),
+      ),
+    );
+  }
+
   Future<void> _openBooking(TimeOption option) async {
     final booked = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -254,10 +278,26 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
             ),
             if (_photos.isNotEmpty || _loadingExtras) ...[
               const SizedBox(height: 16),
-              PhotosSection(photos: _photos, loading: _loadingExtras),
+              PhotosSection(
+                photos: _photos,
+                loading: _loadingExtras,
+                onTapPhoto: _openPhoto,
+              ),
             ],
             if (establishment.hasMenu) ...[
               const Divider(height: 32),
+              // Restaurants only, and only when there is a menu to order
+              // from. A lounge showing this would be an invitation the server
+              // is going to refuse.
+              if (establishment.type == EstablishmentType.restaurant)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: FilledButton.icon(
+                    onPressed: () => _openOrderAhead(establishment),
+                    icon: const Icon(Icons.shopping_bag_outlined),
+                    label: const Text('Order ahead'),
+                  ),
+                ),
               MenuSection(menu: establishment.menu),
             ],
             const Divider(height: 32),
@@ -396,20 +436,20 @@ class _PartySizePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+    // Wrap, not a scroller: twelve small chips fit two rows on the narrowest
+    // phone, so hiding half of them behind a sideways swipe bought nothing and
+    // cost the customer the ability to see the choice at all.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
           for (var size = 1; size <= max; size++)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ChoiceChip(
-                label: Text('$size'),
-                selected: value == size,
-                onSelected: (_) => onChanged(size),
-              ),
+            ChoiceChip(
+              label: Text('$size'),
+              selected: value == size,
+              onSelected: (_) => onChanged(size),
             ),
         ],
       ),
@@ -433,37 +473,44 @@ class _DayPicker extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    return SizedBox(
-      height: 64,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
+    // A dropdown, not a row of chips. Two weeks of dates never fitted across a
+    // phone, and the ones past the edge were reachable only by a sideways
+    // swipe — a gesture that is invisible, and impossible with a mouse.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: DropdownButtonFormField<DateTime>(
+        initialValue: selected,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          prefixIcon: Icon(Icons.calendar_today_outlined),
+          isDense: true,
+        ),
+        items: [
           for (var offset = 0; offset < days; offset++)
-            Builder(
-              builder: (context) {
-                final day = today.add(Duration(days: offset));
-                final isSelected = day == selected;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ChoiceChip(
-                    selected: isSelected,
-                    onSelected: (_) => onChanged(day),
-                    label: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          offset == 0 ? 'Today' : DateFormat.E().format(day),
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                        Text(DateFormat.MMMd().format(day)),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+            _dayItem(today.add(Duration(days: offset)), offset),
         ],
+        onChanged: (day) {
+          if (day != null) onChanged(day);
+        },
+      ),
+    );
+  }
+
+  DropdownMenuItem<DateTime> _dayItem(DateTime day, int offset) {
+    // "Today" and "Tomorrow" carry more than a weekday name does, and those
+    // are the two days most bookings are for.
+    final label = switch (offset) {
+      0 => 'Today',
+      1 => 'Tomorrow',
+      _ => DateFormat.EEEE().format(day),
+    };
+
+    return DropdownMenuItem(
+      value: day,
+      child: Text(
+        '$label · ${DateFormat.MMMd().format(day)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

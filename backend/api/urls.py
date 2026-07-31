@@ -19,6 +19,12 @@ from .merchant import (
     MerchantStaffView,
     ThemePresetsView,
 )
+from .orders import (
+    CustomerOrderView,
+    MerchantOrderListView,
+    MerchantOrderStatusView,
+    OrderCreateView,
+)
 from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
 
@@ -46,6 +52,24 @@ urlpatterns = [
         'reservations/ref/<uuid:reference>/payment/',
         PaymentStatusView.as_view(),
         name='reservation-payment-status',
+    ),
+    # Ordering ahead. Customer routes are keyed by reference like bookings;
+    # merchant routes carry the venue and check membership against it.
+    path('orders/', OrderCreateView.as_view(), name='order-create'),
+    path(
+        'orders/ref/<uuid:reference>/',
+        CustomerOrderView.as_view(),
+        name='order-by-reference',
+    ),
+    path(
+        'merchant/orders/',
+        MerchantOrderListView.as_view(),
+        name='merchant-orders',
+    ),
+    path(
+        'merchant/orders/<int:pk>/status/',
+        MerchantOrderStatusView.as_view(),
+        name='merchant-order-status',
     ),
     path(
         'dashboard/payments/',

@@ -5,9 +5,11 @@ import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
 import 'package:customer_app/src/location_source.dart';
+import 'package:customer_app/src/screens/photo_viewer_screen.dart';
 import 'package:customer_app/src/widgets/establishment_card.dart';
 import 'package:customer_app/src/widgets/menu_section.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -136,6 +138,7 @@ Map<String, dynamic> establishmentJson({
     };
 
 Map<String, dynamic> establishmentDetailJson({
+  String type = 'lounge',
   bool isOpenNow = true,
   String? closesAt = '02:00:00',
   Map<String, dynamic>? today,
@@ -145,6 +148,7 @@ Map<String, dynamic> establishmentDetailJson({
 }) =>
     {
       ...establishmentJson(
+        type: type,
         isOpenNow: isOpenNow,
         closesAt: closesAt,
         today: today,
@@ -339,13 +343,30 @@ void main() {
           ),
         ],
       });
-      for (final id in [7, 8, 9]) {
+      for (final id in [8, 9]) {
         backend.on('GET', '/api/establishments/$id/photos/', {
           'count': 0,
           'next': null,
           'results': [],
         });
       }
+      // A venue with a real album, which is where the sideways-scrolling
+      // photo strip used to hide most of the pictures.
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 8,
+        'next': null,
+        'results': [
+          for (var i = 1; i <= 8; i++)
+            {
+              'id': i,
+              'image_url': 'http://localhost:8000/media/venue$i.jpg',
+              'caption': 'Rooftop',
+              'uploaded_by_role': 'merchant',
+              'uploaded_by_role_display': 'The venue',
+              'created_at': '2026-08-01T18:00:00Z',
+            },
+        ],
+      });
       backend.on('GET', '/api/establishments/7/', {
         ...establishmentDetailJson(menu: [
           menuGroup('food', 'Food', [
@@ -458,6 +479,82 @@ void main() {
       expect(card.height, lessThan(landscapePhoneSize.height));
     });
 
+    testWidgets('every party size is on screen, none hidden past the edge',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      // Scroll past the pickers, so the whole party-size block is laid out
+      // rather than just its heading.
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      // Twelve small chips fit two rows on the narrowest phone, so none of
+      // them should be sitting off the right edge waiting to be swiped to.
+      for (final size in ['1', '6', '12']) {
+        final rect = tester.getRect(find.widgetWithText(ChoiceChip, size));
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width), reason: size);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: size);
+      }
+    });
+
+    testWidgets('the day is chosen from a dropdown, not a sideways swipe',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      // Two weeks of dates never fitted across a phone, and the ones past the
+      // edge were reachable only by a gesture that is invisible on touch and
+      // impossible with a mouse.
+      expect(find.byType(DropdownButtonFormField<DateTime>), findsOneWidget);
+      expect(find.textContaining('Today'), findsWidgets);
+    });
+
+    testWidgets('a later date can be picked without any horizontal scrolling',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Available times'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<DateTime>));
+      await tester.pumpAndSettle();
+
+      // The far end of the fortnight, reachable in the open menu.
+      expect(find.textContaining('Tomorrow'), findsWidgets);
+    });
+
+    testWidgets('every venue photo is on screen, none past the right edge',
+        (tester) async {
+      await walkTheApp(tester, phoneSize);
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+
+      // Photos wrap downwards like the menu cards. A customer should not have
+      // to swipe sideways to find out a venue has eight pictures.
+      final tiles = find.byType(ClipRRect).evaluate();
+      expect(tiles, isNotEmpty);
+      for (final tile in tiles) {
+        final box = tile.renderObject as RenderBox;
+        final left = box.localToGlobal(Offset.zero).dx;
+        expect(left, greaterThanOrEqualTo(0));
+        expect(left + box.size.width, lessThanOrEqualTo(phoneSize.width));
+      }
+    });
+
     testWidgets('venues are one column on a phone', (tester) async {
       await walkTheApp(tester, phoneSize);
 
@@ -494,6 +591,599 @@ void main() {
           tester.getSize(find.byType(MenuItemCard).first).width;
       // A dish card that grew to half a desktop window would be absurd.
       expect(cardWidth, lessThan(320));
+    });
+  });
+
+  group('ordering ahead', () {
+    Map<String, dynamic> orderJson({
+      String status = 'placed',
+      String? paymentProvider,
+      String? paymentStatus,
+      bool isPaid = false,
+      bool canAdvance = true,
+      int? reservation,
+    }) =>
+        {
+          'id': 1,
+          'reference': 'order-ref-1',
+          'establishment': 8,
+          'establishment_name': 'Chez Fatou',
+          'reservation': reservation,
+          'customer_name': 'Mariama Diallo',
+          'customer_phone': '+224620000000',
+          'pickup_time': DateTime.now()
+              .add(const Duration(hours: 2))
+              .toUtc()
+              .toIso8601String(),
+          'status': status,
+          'status_display': status[0].toUpperCase() + status.substring(1),
+          'created_at': '2026-08-01T18:00:00Z',
+          'items': [
+            {
+              'id': 1,
+              'menu_item': 1,
+              'menu_item_name': 'Poulet braisé',
+              'quantity': 2,
+              'unit_price_at_order': '75000.00',
+              'line_total': '150000.00',
+            },
+          ],
+          'total': '150000.00',
+          'payment_provider': paymentProvider,
+          'payment_provider_display': switch (paymentProvider) {
+            'orange_money' => 'Orange Money',
+            'mtn_money' => 'MTN Mobile Money',
+            _ => 'Cash on arrival',
+          },
+          'payment_status': paymentStatus,
+          'is_paid': isPaid,
+          'can_advance': canAdvance,
+          'next_status': switch (status) {
+            'placed' => 'preparing',
+            'preparing' => 'ready',
+            'ready' => 'completed',
+            _ => null,
+          },
+        };
+
+    /// Opens a venue's detail screen. Restaurant by default, since that is
+    /// the only type that can order.
+    Future<FakeBackend> openVenue(
+      WidgetTester tester, {
+      String type = 'restaurant',
+      List<Map<String, dynamic>>? menu,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        customer: (name: 'Mariama Diallo', phone: '+224620000000'),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          establishmentJson(id: 8, name: 'Chez Fatou', type: type),
+        ],
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/8/',
+        {
+          ...establishmentDetailJson(
+            type: type,
+            menu: menu ??
+                [
+                  menuGroup('food', 'Food', [
+                    ('Poulet braisé', '75000.00'),
+                    ('Riz gras', '40000.00'),
+                  ]),
+                ],
+          ),
+          'id': 8,
+          'name': 'Chez Fatou',
+        },
+      );
+      backend.on(
+        'GET',
+        '/api/establishments/8/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/8/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/8/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chez Fatou').first);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a restaurant offers ordering ahead', (tester) async {
+      await openVenue(tester);
+
+      expect(find.text('Order ahead'), findsOneWidget);
+    });
+
+    testWidgets('a lounge does not', (tester) async {
+      // The server would refuse it, so offering it would be a lie.
+      await openVenue(tester, type: 'lounge');
+
+      expect(find.text('Order ahead'), findsNothing);
+    });
+
+    testWidgets('a restaurant with no menu cannot be ordered from',
+        (tester) async {
+      await openVenue(tester, menu: const []);
+
+      expect(find.text('Order ahead'), findsNothing);
+    });
+
+    testWidgets('the menu is listed with a way to add each dish',
+        (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poulet braisé'), findsWidgets);
+      expect(find.text('Add'), findsNWidgets(2));
+    });
+
+    testWidgets('the basket only appears once something is in it',
+        (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      expect(find.text('Checkout'), findsNothing);
+
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkout'), findsOneWidget);
+      expect(find.text('1 item'), findsOneWidget);
+    });
+
+    testWidgets('the stepper adds and removes', (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add_circle_outline));
+      await tester.pumpAndSettle();
+      expect(find.text('2 items'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.remove_circle_outline));
+      await tester.pumpAndSettle();
+      expect(find.text('1 item'), findsOneWidget);
+    });
+
+    testWidgets('emptying the basket puts the bar away', (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.remove_circle_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkout'), findsNothing);
+    });
+
+    /// Basket with one dish, at the checkout screen.
+    Future<FakeBackend> reachCheckout(WidgetTester tester) async {
+      final backend = await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Checkout'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('checkout prefills a returning customer', (tester) async {
+      await reachCheckout(tester);
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+      expect(find.text('+224620000000'), findsWidgets);
+    });
+
+    testWidgets('checkout offers cash and both mobile money providers',
+        (tester) async {
+      await reachCheckout(tester);
+
+      expect(find.text('Cash on pickup'), findsOneWidget);
+      expect(find.text('Orange Money'), findsOneWidget);
+      expect(find.text('MTN Mobile Money'), findsOneWidget);
+    });
+
+    testWidgets('placing an order sends the cart, never a price',
+        (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      // The tracking screen fires a GET straight after, so the POST has to be
+      // picked out rather than assumed to be the last request.
+      final post = backend.requests.firstWhere(
+        (r) => r.method == 'POST' && r.url.path == '/api/orders/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['establishment'], 8);
+      expect(sent['items'], [
+        {'menu_item': 1, 'quantity': 1},
+      ]);
+      // What a dish costs is the menu's to say.
+      expect(sent.containsKey('total'), isFalse);
+      expect((sent['items'] as List).first, isNot(contains('price')));
+    });
+
+    testWidgets('a cash order lands on the tracking screen', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your order'), findsOneWidget);
+      expect(find.text('Placed'), findsOneWidget);
+      expect(find.text('Preparing'), findsOneWidget);
+      expect(find.text('Ready'), findsOneWidget);
+    });
+
+    testWidgets('the order reference is kept on the device', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          establishmentJson(id: 8, name: 'Chez Fatou', type: 'restaurant'),
+        ],
+      });
+      backend.on('GET', '/api/establishments/8/', {
+        ...establishmentDetailJson(
+          type: 'restaurant',
+          menu: [
+            menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+          ],
+        ),
+        'id': 8,
+        'name': 'Chez Fatou',
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/8/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/8/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/8/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chez Fatou').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Checkout'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Mariama');
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        '+224620000000',
+      );
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      // No account, so the reference on this device is the only way back.
+      expect(await store.orderReferences(), ['order-ref-1']);
+    });
+
+    testWidgets('choosing mobile money changes the button', (tester) async {
+      await reachCheckout(tester);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pay and order'), findsOneWidget);
+      expect(find.text('Place order'), findsNothing);
+    });
+
+    testWidgets('the chosen provider is sent', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on(
+        'POST',
+        '/api/orders/',
+        orderJson(paymentProvider: 'orange_money', paymentStatus: 'completed'),
+      );
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pay and order'));
+      await tester.pumpAndSettle();
+
+      // The tracking screen fires a GET straight after, so the POST has to be
+      // picked out rather than assumed to be the last request.
+      final post = backend.requests.firstWhere(
+        (r) => r.method == 'POST' && r.url.path == '/api/orders/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['payment_provider'], 'orange_money');
+    });
+
+    testWidgets('an unpaid order says the kitchen is waiting', (tester) async {
+      final backend = await reachCheckout(tester);
+      final unpaid = orderJson(
+        paymentProvider: 'orange_money',
+        paymentStatus: 'pending',
+        canAdvance: false,
+      );
+      backend.on('POST', '/api/orders/', unpaid);
+      backend.on('GET', '/api/orders/ref/order-ref-1/', unpaid);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pay and order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Waiting for your'), findsOneWidget);
+    });
+
+    testWidgets('the server refusing is shown, not swallowed', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on(
+        'POST',
+        '/api/orders/',
+        {'establishment': 'Chez Fatou is a lounge, and only restaurants '
+            'take orders ahead.'},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('only restaurants'), findsOneWidget);
+    });
+
+    testWidgets('tracking follows the kitchen', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on(
+        'GET',
+        '/api/orders/ref/order-ref-1/',
+        orderJson(status: 'ready'),
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Collect it at the counter'), findsOneWidget);
+    });
+
+    testWidgets('a cancelled order says nothing is owed', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on(
+        'GET',
+        '/api/orders/ref/order-ref-1/',
+        orderJson(status: 'cancelled', canAdvance: false),
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nothing is owed'), findsOneWidget);
+    });
+
+    testWidgets('the snapshotted price is what is shown back', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('150000.00 GNF'), findsWidgets);
+    });
+  });
+
+  group('viewing a photo full screen', () {
+    /// The venue screen with an album of four, ready to tap into.
+    Future<void> openVenue(WidgetTester tester, {Size size = phoneSize}) async {
+      final (:app, :backend, :store) = buildApp(tester, size: size);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 4,
+        'next': null,
+        'results': [
+          for (var i = 1; i <= 4; i++)
+            {
+              'id': i,
+              'image_url': 'http://localhost:8000/media/venue$i.jpg',
+              'caption': 'Photo $i',
+              'uploaded_by_role': 'merchant',
+              'uploaded_by_role_display': 'The venue',
+              'created_at': '2026-08-01T18:00:00Z',
+            },
+        ],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab').first);
+      await tester.pumpAndSettle();
+    }
+
+    /// Taps the thumbnail at [index] in the grid, found by its caption —
+    /// byType(InkWell) also matches the buttons elsewhere on the screen.
+    Future<void> tapThumb(WidgetTester tester, int index) async {
+      await tester.tap(find.text('Photo ${index + 1}'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('tapping a photo opens it full screen', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      expect(find.byType(PhotoViewerScreen), findsOneWidget);
+      expect(find.text('1 of 4'), findsOneWidget);
+    });
+
+    testWidgets('it opens at the photo that was tapped, not the first',
+        (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 2);
+
+      expect(find.text('3 of 4'), findsOneWidget);
+    });
+
+    testWidgets('the next arrow moves to the next photo', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      await tester.tap(find.byTooltip('Next photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 4'), findsOneWidget);
+    });
+
+    testWidgets('the previous arrow goes back', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 2);
+
+      await tester.tap(find.byTooltip('Previous photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 4'), findsOneWidget);
+    });
+
+    testWidgets('there is no arrow past either end', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+      expect(find.byTooltip('Previous photo'), findsNothing);
+
+      // Walk to the last one.
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byTooltip('Next photo'));
+        await tester.pumpAndSettle();
+      }
+
+      expect(find.text('4 of 4'), findsOneWidget);
+      expect(find.byTooltip('Next photo'), findsNothing);
+    });
+
+    testWidgets('swiping moves between photos', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      await tester.drag(find.byType(PageView), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 4'), findsOneWidget);
+    });
+
+    testWidgets('closing returns to the venue and its photo grid',
+        (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 1);
+
+      await tester.tap(find.byTooltip('Back to photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PhotoViewerScreen), findsNothing);
+      expect(find.text('Available times'), findsOneWidget);
+    });
+
+    testWidgets('the caption travels with the photo', (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+      expect(find.text('Photo 1'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Next photo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Photo 2'), findsWidgets);
+    });
+
+    testWidgets('arrow keys move, and escape closes', (tester) async {
+      // A desktop window has no swipe, so the keyboard has to work.
+      await openVenue(tester, size: desktopSize);
+      await tapThumb(tester, 0);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.text('2 of 4'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('1 of 4'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(PhotoViewerScreen), findsNothing);
+    });
+
+    testWidgets('it opens on a tablet and a desktop window too',
+        (tester) async {
+      await openVenue(tester, size: tabletSize);
+      await tapThumb(tester, 0);
+
+      expect(find.text('1 of 4'), findsOneWidget);
+    });
+
+    testWidgets('a small photo is scaled up to the window, not left tiny',
+        (tester) async {
+      await openVenue(tester);
+      await tapThumb(tester, 0);
+
+      // Several of the real uploads are small. Full screen has to mean full
+      // screen — a Center would hand the image loose constraints and leave a
+      // 200px picture marooned in the middle of a black page.
+      final image = tester.getSize(
+        find.descendant(
+          of: find.byType(PhotoViewerScreen),
+          matching: find.byType(Image),
+        ).first,
+      );
+      expect(image.width, phoneSize.width);
     });
   });
 

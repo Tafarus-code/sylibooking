@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'order_models.dart';
 
 /// A non-2xx response from the API.
 ///
@@ -326,6 +327,60 @@ class SylibookingApi {
   Future<Reservation> cancelReservation(int id) async {
     final json = await _post('/reservations/$id/cancel/');
     return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Ordering ahead -------------------------------------------------------
+
+  /// Place a pickup order. No account: the reference that comes back is the
+  /// only handle on it, exactly as with a booking.
+  Future<Order> createOrder({
+    required int establishmentId,
+    required String customerName,
+    required String customerPhone,
+    required DateTime pickupTime,
+    required List<CartLine> items,
+    PaymentProvider paymentProvider = PaymentProvider.cashOnArrival,
+    String? reservationReference,
+  }) async {
+    final json = await _post('/orders/', {
+      'establishment': establishmentId,
+      'customer_name': customerName,
+      'customer_phone': customerPhone,
+      'pickup_time': pickupTime.toUtc().toIso8601String(),
+      'items': [for (final line in items) line.toJson()],
+      'payment_provider': paymentProvider.wireValue,
+      'reservation_reference': ?reservationReference,
+    });
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Follow an order. The server polls the payment provider on the way, so
+  /// refreshing this screen is what settles a payment that went through.
+  Future<Order> orderByReference(String reference) async {
+    final json = await _get('/orders/ref/$reference/');
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// The kitchen queue for one venue, for the day being worked.
+  Future<List<Order>> merchantOrders({
+    required int establishmentId,
+    DateTime? date,
+  }) async {
+    final json = await _get('/merchant/orders/', {
+      'establishment': '$establishmentId',
+      if (date != null) 'date': formatDate(date),
+    });
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => Order.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Order> setOrderStatus(int orderId, OrderStatus status) async {
+    final json = await _post('/merchant/orders/$orderId/status/', {
+      'status': status.wireValue,
+    });
+    return Order.fromJson(json as Map<String, dynamic>);
   }
 
   // --- Reviews and photos -------------------------------------------------

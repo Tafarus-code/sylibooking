@@ -10,5 +10,7 @@ export 'src/app_theme.dart';
 export 'src/booking_options.dart';
 export 'src/establishment_theme.dart';
 export 'src/geo.dart';
+export 'src/horizontal_strip.dart';
 export 'src/layout.dart';
 export 'src/models.dart';
+export 'src/order_models.dart';

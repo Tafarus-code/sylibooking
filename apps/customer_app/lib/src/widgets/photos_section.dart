@@ -15,7 +15,10 @@ class PhotosSection extends StatelessWidget {
 
   final List<Photo> photos;
   final bool loading;
-  final void Function(Photo photo)? onTapPhoto;
+
+  /// Takes the position, not the photo: opening one picture full screen means
+  /// opening the album at that point, so the rest is a swipe away.
+  final void Function(int index)? onTapPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -27,18 +30,39 @@ class PhotosSection extends StatelessWidget {
     }
     if (photos.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: 140,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: photos.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final photo = photos[index];
-          return _PhotoThumb(
-            photo: photo,
-            onTap: onTapPhoto == null ? null : () => onTapPhoto!(photo),
+    // A grid, not a carousel. Sideways scrolling hid most of a venue's
+    // pictures behind a gesture nobody makes, and the page already scrolls
+    // downwards — so the photos go the same way as the menu cards.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 8.0;
+          // 160 keeps a phone on two columns; wider windows fit more.
+          final columns = columnsForWidth(
+            constraints.maxWidth,
+            targetCardWidth: 160,
+            max: 5,
+          );
+          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final (index, photo) in photos.indexed)
+                SizedBox(
+                  width: width,
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: _PhotoThumb(
+                      photo: photo,
+                      onTap:
+                          onTapPhoto == null ? null : () => onTapPhoto!(index),
+                    ),
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -61,8 +85,7 @@ class _PhotoThumb extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: 180,
+        child: SizedBox.expand(
           child: Stack(
             fit: StackFit.expand,
             children: [

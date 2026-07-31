@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'customer_models.dart';
 import 'models.dart';
 import 'order_models.dart';
 
@@ -327,6 +328,102 @@ class SylibookingApi {
   Future<Reservation> cancelReservation(int id) async {
     final json = await _post('/reservations/$id/cancel/');
     return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Customer accounts (optional) ----------------------------------------
+
+  /// Make an account. Signup signs you in, so a token comes back with it.
+  Future<CustomerSession> registerCustomer({
+    required String username,
+    required String password,
+    String name = '',
+  }) async {
+    final json = await _post('/customer/register/', {
+      'username': username,
+      'password': password,
+      'name': name,
+    });
+    final session = CustomerSession.fromJson(json as Map<String, dynamic>);
+    token = session.token;
+    return session;
+  }
+
+  /// Sign in an existing customer. Shares the merchant login endpoint —
+  /// one user table, and a customer is simply a user with no venues.
+  Future<CustomerSession> signInCustomer({
+    required String username,
+    required String password,
+  }) async {
+    final json = await _post('/auth/login/', {
+      'username': username,
+      'password': password,
+    });
+    final map = json as Map<String, dynamic>;
+    final session = CustomerSession(
+      token: map['token'] as String,
+      customer: CustomerAccount.fromJson(
+        map['user'] as Map<String, dynamic>,
+      ),
+    );
+    token = session.token;
+    return session;
+  }
+
+  Future<CustomerAccount> customerMe() async {
+    final json = await _get('/customer/me/');
+    return CustomerAccount.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Hand this phone's bookings and orders to the account just signed into.
+  Future<({int reservations, int orders})> claim({
+    List<String> reservationReferences = const [],
+    List<String> orderReferences = const [],
+  }) async {
+    final json = await _post('/customer/claim/', {
+      'reservation_references': reservationReferences,
+      'order_references': orderReferences,
+    });
+    final map = json as Map<String, dynamic>;
+    return (
+      reservations: map['reservations'] as int? ?? 0,
+      orders: map['orders'] as int? ?? 0,
+    );
+  }
+
+  /// Everything this account has booked or ordered, from the server rather
+  /// than from this phone — which is the whole point of having one.
+  Future<({List<Reservation> reservations, List<Order> orders})>
+      customerHistory() async {
+    final json = await _get('/customer/history/') as Map<String, dynamic>;
+    return (
+      reservations: (json['reservations'] as List<dynamic>? ?? [])
+          .map((e) => Reservation.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      orders: (json['orders'] as List<dynamic>? ?? [])
+          .map((e) => Order.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Future<List<Establishment>> favourites() async {
+    final json = await _get('/customer/favourites/') as Map<String, dynamic>;
+    return (json['results'] as List<dynamic>? ?? [])
+        .map((e) => Establishment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Save one venue, or merge a phone's whole list up at sign-in.
+  Future<List<Establishment>> addFavourites(List<int> establishmentIds) async {
+    final json = await _post('/customer/favourites/', {
+      'establishments': establishmentIds,
+    }) as Map<String, dynamic>;
+    return (json['results'] as List<dynamic>? ?? [])
+        .map((e) => Establishment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> removeFavourite(int establishmentId) async {
+    await _delete('/customer/favourites/$establishmentId/');
   }
 
   // --- Ordering ahead -------------------------------------------------------

@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../customer_auth.dart';
 import '../directions.dart';
+import '../favourites_controller.dart';
 import '../image_source.dart';
 import '../location_source.dart';
 import 'browse_screen.dart';
-import 'my_bookings_screen.dart';
+import 'favourites_screen.dart';
+import 'my_activity_screen.dart';
+import 'profile_screen.dart';
 
 /// The four-tab shell: browse, bookings, favourites, profile.
 ///
@@ -17,6 +21,8 @@ class CustomerHomeScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.store,
+    required this.auth,
+    required this.favourites,
     required this.imageSource,
     required this.locationSource,
     required this.directionsLauncher,
@@ -24,6 +30,8 @@ class CustomerHomeScreen extends StatefulWidget {
 
   final SylibookingApi api;
   final BookingStore store;
+  final CustomerAuth auth;
+  final FavouritesController favourites;
   final ImageSource imageSource;
   final LocationSource locationSource;
   final DirectionsLauncher directionsLauncher;
@@ -34,6 +42,13 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.auth.restore();
+    widget.favourites.load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,75 +85,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           BrowseScreen(
             api: widget.api,
             store: widget.store,
+            favourites: widget.favourites,
             imageSource: widget.imageSource,
             locationSource: widget.locationSource,
             directionsLauncher: widget.directionsLauncher,
           ),
-          MyBookingsScreen(
+          MyActivityScreen(
             api: widget.api,
             store: widget.store,
+            auth: widget.auth,
             imageSource: widget.imageSource,
           ),
-          const _NotYetScreen(
-            title: 'Favourites',
-            icon: Icons.favorite_border,
-            detail:
-                'Saving a place for later needs somewhere to save it to, which '
-                'means customer accounts. Not built yet.',
+          ListenableBuilder(
+            listenable: widget.auth,
+            builder: (context, _) => FavouritesScreen(
+              api: widget.api,
+              store: widget.store,
+              favourites: widget.favourites,
+              directionsLauncher: widget.directionsLauncher,
+              signedIn: widget.auth.isSignedIn,
+            ),
           ),
-          const _NotYetScreen(
-            title: 'Profile',
-            icon: Icons.person_outline,
-            detail:
-                'Bookings are kept on this phone and identified by their '
-                'reference, so there is no account to show yet.',
-          ),
+          ProfileScreen(auth: widget.auth),
         ],
-      ),
-    );
-  }
-}
-
-/// A tab the mockup calls for and the product does not have yet.
-///
-/// Says so plainly rather than showing an empty list that looks broken.
-class _NotYetScreen extends StatelessWidget {
-  const _NotYetScreen({
-    required this.title,
-    required this.icon,
-    required this.detail,
-  });
-
-  final String title;
-  final IconData icon;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 56, color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(height: 16),
-              Text('$title is coming', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(
-                detail,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

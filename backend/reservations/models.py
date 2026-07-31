@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -35,6 +36,18 @@ class Reservation(models.Model):
         on_delete=models.PROTECT,
         related_name='reservations',
         help_text='The table or room being held.',
+    )
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reservations',
+        help_text=(
+            'The account this booking belongs to, once there is one. Null for '
+            'the account-less path, which stays the default — the reference is '
+            'what proves ownership either way.'
+        ),
     )
     customer_name = models.CharField(
         max_length=200,

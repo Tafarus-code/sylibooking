@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
+import '../favourites_controller.dart';
 import '../directions.dart';
 import '../image_source.dart';
 import '../location_source.dart';
@@ -17,6 +18,7 @@ class BrowseScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.store,
+    required this.favourites,
     required this.imageSource,
     required this.locationSource,
     required this.directionsLauncher,
@@ -24,6 +26,7 @@ class BrowseScreen extends StatefulWidget {
 
   final SylibookingApi api;
   final BookingStore store;
+  final FavouritesController favourites;
   final ImageSource imageSource;
   final LocationSource locationSource;
   final DirectionsLauncher directionsLauncher;
@@ -368,18 +371,26 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   Widget _card(Establishment establishment) {
     _ensureCover(establishment);
-    return EstablishmentCard(
-      establishment: establishment,
-      coverUrl: _covers[establishment.id],
-      distanceKm: _distanceTo(establishment),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => EstablishmentScreen(
-            api: widget.api,
-            store: widget.store,
-            establishment: establishment,
-            here: _here,
-            directionsLauncher: widget.directionsLauncher,
+    // Listens per card: the heart has to fill the instant it is tapped, and
+    // rebuilding the whole list for that would lose the scroll position on a
+    // long one.
+    return ListenableBuilder(
+      listenable: widget.favourites,
+      builder: (context, _) => EstablishmentCard(
+        establishment: establishment,
+        coverUrl: _covers[establishment.id],
+        distanceKm: _distanceTo(establishment),
+        isFavourite: widget.favourites.contains(establishment.id),
+        onToggleFavourite: () => widget.favourites.toggle(establishment.id),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EstablishmentScreen(
+              api: widget.api,
+              store: widget.store,
+              establishment: establishment,
+              here: _here,
+              directionsLauncher: widget.directionsLauncher,
+            ),
           ),
         ),
       ),

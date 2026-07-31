@@ -516,3 +516,7 @@ class Space(models.Model):
 
     def __str__(self):
         return f'{self.name} — {self.establishment.name}'
+
+# Imported last so the model is registered with the app, while its own
+# module stays free of the rest of establishments' imports.
+from .favourites import Favourite  # noqa: E402, F401

@@ -223,10 +223,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('My bookings')),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
-    );
+    // A body, not a screen: the activity screen above owns the bar and the
+    // Bookings/Orders switcher, so both halves share one heading.
+    return RefreshIndicator(onRefresh: _load, child: _body());
   }
 
   Widget _body() {

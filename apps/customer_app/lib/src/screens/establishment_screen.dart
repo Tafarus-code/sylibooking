@@ -10,6 +10,7 @@ import '../widgets/photos_section.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/reviews_section.dart';
 import 'booking_form_screen.dart';
+import 'order_ahead_screen.dart';
 import 'photo_viewer_screen.dart';
 
 /// Pick a day, a party size, and a time.
@@ -144,6 +145,19 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
     }
   }
 
+  /// Ordering ahead for collection, which only restaurants offer.
+  void _openOrderAhead(Establishment establishment) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderAheadScreen(
+          api: widget.api,
+          store: widget.store,
+          establishment: establishment,
+        ),
+      ),
+    );
+  }
+
   /// Opens the album full screen at the picture that was tapped.
   void _openPhoto(int index) {
     Navigator.of(context).push(
@@ -272,6 +286,18 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
             ],
             if (establishment.hasMenu) ...[
               const Divider(height: 32),
+              // Restaurants only, and only when there is a menu to order
+              // from. A lounge showing this would be an invitation the server
+              // is going to refuse.
+              if (establishment.type == EstablishmentType.restaurant)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: FilledButton.icon(
+                    onPressed: () => _openOrderAhead(establishment),
+                    icon: const Icon(Icons.shopping_bag_outlined),
+                    label: const Text('Order ahead'),
+                  ),
+                ),
               MenuSection(menu: establishment.menu),
             ],
             const Divider(height: 32),

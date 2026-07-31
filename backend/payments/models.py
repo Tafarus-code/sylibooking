@@ -25,11 +25,24 @@ class Payment(models.Model):
         {Provider.ORANGE_MONEY, Provider.MTN_MONEY}
     )
 
+    # A payment settles exactly one thing: a table booking or a pickup order.
+    # Both are nullable so either can be the one that is set, and the check
+    # constraint below is what stops that becoming "neither" or "both".
     reservation = models.ForeignKey(
         'reservations.Reservation',
         on_delete=models.CASCADE,
         related_name='payments',
-        help_text='The booking this payment is for.',
+        null=True,
+        blank=True,
+        help_text='The booking this payment is for, if it is for a booking.',
+    )
+    order = models.ForeignKey(
+        'orders.Order',
+        on_delete=models.CASCADE,
+        related_name='payments',
+        null=True,
+        blank=True,
+        help_text='The pickup order this payment is for, if it is for one.',
     )
     provider = models.CharField(
         max_length=20,
@@ -71,12 +84,28 @@ class Payment(models.Model):
         indexes = [
             models.Index(fields=['provider_reference']),
         ]
+        constraints = [
+            # In the database, not only in a serializer: a payment attached to
+            # nothing has no one to credit, and one attached to both would be
+            # counted twice in the takings.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(reservation__isnull=False, order__isnull=True)
+                    | models.Q(reservation__isnull=True, order__isnull=False)
+                ),
+                name='payment_settles_exactly_one_thing',
+            ),
+        ]
 
     def __str__(self):
+        subject = (
+            f'reservation {self.reservation_id}'
+            if self.reservation_id
+            else f'order {self.order_id}'
+        )
         return (
             f'{self.get_provider_display()} {self.amount} '
-            f'({self.get_status_display()}) for reservation '
-            f'{self.reservation_id}'
+            f'({self.get_status_display()}) for {subject}'
         )
 
     @property

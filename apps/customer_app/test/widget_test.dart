@@ -138,6 +138,7 @@ Map<String, dynamic> establishmentJson({
     };
 
 Map<String, dynamic> establishmentDetailJson({
+  String type = 'lounge',
   bool isOpenNow = true,
   String? closesAt = '02:00:00',
   Map<String, dynamic>? today,
@@ -147,6 +148,7 @@ Map<String, dynamic> establishmentDetailJson({
 }) =>
     {
       ...establishmentJson(
+        type: type,
         isOpenNow: isOpenNow,
         closesAt: closesAt,
         today: today,
@@ -589,6 +591,422 @@ void main() {
           tester.getSize(find.byType(MenuItemCard).first).width;
       // A dish card that grew to half a desktop window would be absurd.
       expect(cardWidth, lessThan(320));
+    });
+  });
+
+  group('ordering ahead', () {
+    Map<String, dynamic> orderJson({
+      String status = 'placed',
+      String? paymentProvider,
+      String? paymentStatus,
+      bool isPaid = false,
+      bool canAdvance = true,
+      int? reservation,
+    }) =>
+        {
+          'id': 1,
+          'reference': 'order-ref-1',
+          'establishment': 8,
+          'establishment_name': 'Chez Fatou',
+          'reservation': reservation,
+          'customer_name': 'Mariama Diallo',
+          'customer_phone': '+224620000000',
+          'pickup_time': DateTime.now()
+              .add(const Duration(hours: 2))
+              .toUtc()
+              .toIso8601String(),
+          'status': status,
+          'status_display': status[0].toUpperCase() + status.substring(1),
+          'created_at': '2026-08-01T18:00:00Z',
+          'items': [
+            {
+              'id': 1,
+              'menu_item': 1,
+              'menu_item_name': 'Poulet braisé',
+              'quantity': 2,
+              'unit_price_at_order': '75000.00',
+              'line_total': '150000.00',
+            },
+          ],
+          'total': '150000.00',
+          'payment_provider': paymentProvider,
+          'payment_provider_display': switch (paymentProvider) {
+            'orange_money' => 'Orange Money',
+            'mtn_money' => 'MTN Mobile Money',
+            _ => 'Cash on arrival',
+          },
+          'payment_status': paymentStatus,
+          'is_paid': isPaid,
+          'can_advance': canAdvance,
+          'next_status': switch (status) {
+            'placed' => 'preparing',
+            'preparing' => 'ready',
+            'ready' => 'completed',
+            _ => null,
+          },
+        };
+
+    /// Opens a venue's detail screen. Restaurant by default, since that is
+    /// the only type that can order.
+    Future<FakeBackend> openVenue(
+      WidgetTester tester, {
+      String type = 'restaurant',
+      List<Map<String, dynamic>>? menu,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        customer: (name: 'Mariama Diallo', phone: '+224620000000'),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          establishmentJson(id: 8, name: 'Chez Fatou', type: type),
+        ],
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/8/',
+        {
+          ...establishmentDetailJson(
+            type: type,
+            menu: menu ??
+                [
+                  menuGroup('food', 'Food', [
+                    ('Poulet braisé', '75000.00'),
+                    ('Riz gras', '40000.00'),
+                  ]),
+                ],
+          ),
+          'id': 8,
+          'name': 'Chez Fatou',
+        },
+      );
+      backend.on(
+        'GET',
+        '/api/establishments/8/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/8/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/8/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chez Fatou').first);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a restaurant offers ordering ahead', (tester) async {
+      await openVenue(tester);
+
+      expect(find.text('Order ahead'), findsOneWidget);
+    });
+
+    testWidgets('a lounge does not', (tester) async {
+      // The server would refuse it, so offering it would be a lie.
+      await openVenue(tester, type: 'lounge');
+
+      expect(find.text('Order ahead'), findsNothing);
+    });
+
+    testWidgets('a restaurant with no menu cannot be ordered from',
+        (tester) async {
+      await openVenue(tester, menu: const []);
+
+      expect(find.text('Order ahead'), findsNothing);
+    });
+
+    testWidgets('the menu is listed with a way to add each dish',
+        (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poulet braisé'), findsWidgets);
+      expect(find.text('Add'), findsNWidgets(2));
+    });
+
+    testWidgets('the basket only appears once something is in it',
+        (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      expect(find.text('Checkout'), findsNothing);
+
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkout'), findsOneWidget);
+      expect(find.text('1 item'), findsOneWidget);
+    });
+
+    testWidgets('the stepper adds and removes', (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add_circle_outline));
+      await tester.pumpAndSettle();
+      expect(find.text('2 items'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.remove_circle_outline));
+      await tester.pumpAndSettle();
+      expect(find.text('1 item'), findsOneWidget);
+    });
+
+    testWidgets('emptying the basket puts the bar away', (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.remove_circle_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkout'), findsNothing);
+    });
+
+    /// Basket with one dish, at the checkout screen.
+    Future<FakeBackend> reachCheckout(WidgetTester tester) async {
+      final backend = await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Checkout'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('checkout prefills a returning customer', (tester) async {
+      await reachCheckout(tester);
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+      expect(find.text('+224620000000'), findsWidgets);
+    });
+
+    testWidgets('checkout offers cash and both mobile money providers',
+        (tester) async {
+      await reachCheckout(tester);
+
+      expect(find.text('Cash on pickup'), findsOneWidget);
+      expect(find.text('Orange Money'), findsOneWidget);
+      expect(find.text('MTN Mobile Money'), findsOneWidget);
+    });
+
+    testWidgets('placing an order sends the cart, never a price',
+        (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      // The tracking screen fires a GET straight after, so the POST has to be
+      // picked out rather than assumed to be the last request.
+      final post = backend.requests.firstWhere(
+        (r) => r.method == 'POST' && r.url.path == '/api/orders/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['establishment'], 8);
+      expect(sent['items'], [
+        {'menu_item': 1, 'quantity': 1},
+      ]);
+      // What a dish costs is the menu's to say.
+      expect(sent.containsKey('total'), isFalse);
+      expect((sent['items'] as List).first, isNot(contains('price')));
+    });
+
+    testWidgets('a cash order lands on the tracking screen', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your order'), findsOneWidget);
+      expect(find.text('Placed'), findsOneWidget);
+      expect(find.text('Preparing'), findsOneWidget);
+      expect(find.text('Ready'), findsOneWidget);
+    });
+
+    testWidgets('the order reference is kept on the device', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          establishmentJson(id: 8, name: 'Chez Fatou', type: 'restaurant'),
+        ],
+      });
+      backend.on('GET', '/api/establishments/8/', {
+        ...establishmentDetailJson(
+          type: 'restaurant',
+          menu: [
+            menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+          ],
+        ),
+        'id': 8,
+        'name': 'Chez Fatou',
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/8/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/8/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/8/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chez Fatou').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Checkout'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Mariama');
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        '+224620000000',
+      );
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      // No account, so the reference on this device is the only way back.
+      expect(await store.orderReferences(), ['order-ref-1']);
+    });
+
+    testWidgets('choosing mobile money changes the button', (tester) async {
+      await reachCheckout(tester);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pay and order'), findsOneWidget);
+      expect(find.text('Place order'), findsNothing);
+    });
+
+    testWidgets('the chosen provider is sent', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on(
+        'POST',
+        '/api/orders/',
+        orderJson(paymentProvider: 'orange_money', paymentStatus: 'completed'),
+      );
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pay and order'));
+      await tester.pumpAndSettle();
+
+      // The tracking screen fires a GET straight after, so the POST has to be
+      // picked out rather than assumed to be the last request.
+      final post = backend.requests.firstWhere(
+        (r) => r.method == 'POST' && r.url.path == '/api/orders/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['payment_provider'], 'orange_money');
+    });
+
+    testWidgets('an unpaid order says the kitchen is waiting', (tester) async {
+      final backend = await reachCheckout(tester);
+      final unpaid = orderJson(
+        paymentProvider: 'orange_money',
+        paymentStatus: 'pending',
+        canAdvance: false,
+      );
+      backend.on('POST', '/api/orders/', unpaid);
+      backend.on('GET', '/api/orders/ref/order-ref-1/', unpaid);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pay and order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Waiting for your'), findsOneWidget);
+    });
+
+    testWidgets('the server refusing is shown, not swallowed', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on(
+        'POST',
+        '/api/orders/',
+        {'establishment': 'Chez Fatou is a lounge, and only restaurants '
+            'take orders ahead.'},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('only restaurants'), findsOneWidget);
+    });
+
+    testWidgets('tracking follows the kitchen', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on(
+        'GET',
+        '/api/orders/ref/order-ref-1/',
+        orderJson(status: 'ready'),
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Collect it at the counter'), findsOneWidget);
+    });
+
+    testWidgets('a cancelled order says nothing is owed', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on(
+        'GET',
+        '/api/orders/ref/order-ref-1/',
+        orderJson(status: 'cancelled', canAdvance: false),
+      );
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nothing is owed'), findsOneWidget);
+    });
+
+    testWidgets('the snapshotted price is what is shown back', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      await tester.tap(find.text('Place order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('150000.00 GNF'), findsWidgets);
     });
   });
 

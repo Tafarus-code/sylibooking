@@ -13,3 +13,4 @@ export 'src/geo.dart';
 export 'src/horizontal_strip.dart';
 export 'src/layout.dart';
 export 'src/models.dart';
+export 'src/order_models.dart';

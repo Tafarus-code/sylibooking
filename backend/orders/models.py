@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 from establishments.models import Establishment, MenuItem
@@ -62,6 +63,14 @@ class Order(models.Model):
             'cancelled booking must not silently delete food the kitchen may '
             'already have started.'
         ),
+    )
+    customer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders',
+        help_text='The account this order belongs to, once there is one.',
     )
     customer_name = models.CharField(max_length=200)
     customer_phone = models.CharField(

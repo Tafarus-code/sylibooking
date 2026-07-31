@@ -2,6 +2,14 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .auth import LoginView, LogoutView, MeView
+from .customer_accounts import (
+    ClaimView,
+    CustomerHistoryView,
+    CustomerMeView,
+    FavouriteDetailView,
+    FavouritesView,
+    RegisterView,
+)
 from .customer_views import (
     CancelReservationByReferenceView,
     PaymentStatusView,
@@ -70,6 +78,31 @@ urlpatterns = [
         'merchant/orders/<int:pk>/status/',
         MerchantOrderStatusView.as_view(),
         name='merchant-order-status',
+    ),
+    # Optional customer accounts. Nothing in the booking or ordering flow
+    # depends on these — an account only makes the history portable and the
+    # favourites shared between devices.
+    path(
+        'customer/register/',
+        RegisterView.as_view(),
+        name='customer-register',
+    ),
+    path('customer/me/', CustomerMeView.as_view(), name='customer-me'),
+    path('customer/claim/', ClaimView.as_view(), name='customer-claim'),
+    path(
+        'customer/history/',
+        CustomerHistoryView.as_view(),
+        name='customer-history',
+    ),
+    path(
+        'customer/favourites/',
+        FavouritesView.as_view(),
+        name='customer-favourites',
+    ),
+    path(
+        'customer/favourites/<int:pk>/',
+        FavouriteDetailView.as_view(),
+        name='customer-favourite-detail',
     ),
     path(
         'dashboard/payments/',

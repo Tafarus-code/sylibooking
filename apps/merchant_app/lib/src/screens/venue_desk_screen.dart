@@ -83,7 +83,12 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
             child: SegmentedButton<DeskTab>(
               segments: [
                 for (final tab in DeskTab.values)
-                  ButtonSegment(value: tab, label: Text(tab.label)),
+                  ButtonSegment(
+                    value: tab,
+                    // A segment is a fixed-height pill: a label that wraps
+                    // gets its second line clipped rather than growing.
+                    label: Text(tab.label, maxLines: 1, softWrap: false),
+                  ),
               ],
               selected: {_tab},
               onSelectionChanged: (selection) =>

@@ -16,10 +16,17 @@ class EstablishmentCard extends StatelessWidget {
     required this.onTap,
     this.coverUrl,
     this.distanceKm,
+    this.isFavourite = false,
+    this.onToggleFavourite,
   });
 
   final Establishment establishment;
   final VoidCallback onTap;
+
+  /// Saved on this device. Null callback means the heart is not offered at
+  /// all, which is how the card renders anywhere favouriting makes no sense.
+  final bool isFavourite;
+  final VoidCallback? onToggleFavourite;
 
   /// First photo, when the venue has one.
   final String? coverUrl;
@@ -45,6 +52,12 @@ class EstablishmentCard extends StatelessWidget {
             bottom: 10,
             right: 10,
             child: _Badge(label: formatDistance(km), icon: Icons.near_me),
+          ),
+        if (onToggleFavourite case final toggle?)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: _HeartButton(saved: isFavourite, onPressed: toggle),
           ),
       ],
     );
@@ -172,6 +185,28 @@ class _StatusBadge extends StatelessWidget {
           : theme.colorScheme.error,
     );
   }
+}
+
+/// Save this venue for later, from the list.
+///
+/// Fixed white on a dark scrim, like the badges: it sits on an arbitrary
+/// photograph and has to stay visible whatever is behind it.
+class _HeartButton extends StatelessWidget {
+  const _HeartButton({required this.saved, required this.onPressed});
+
+  final bool saved;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        icon: Icon(saved ? Icons.favorite : Icons.favorite_border),
+        color: Colors.white,
+        // Both states named: "Saved" alone would leave a screen reader unable
+        // to tell what the tap will do.
+        tooltip: saved ? 'Remove from favourites' : 'Save to favourites',
+        style: IconButton.styleFrom(backgroundColor: const Color(0x6610231B)),
+        onPressed: onPressed,
+      );
 }
 
 /// Legible over any photo: dark scrim, light text, fixed regardless of theme.

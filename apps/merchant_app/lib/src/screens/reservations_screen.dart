@@ -184,7 +184,12 @@ class _ReservationsViewState extends State<ReservationsView> {
           child: SegmentedButton<DateRange>(
             segments: [
               for (final range in DateRange.values)
-                ButtonSegment(value: range, label: Text(range.label)),
+                ButtonSegment(
+                  value: range,
+                  // No wrapping: a segment is a fixed-height pill, so a label
+                  // that runs to two lines has its second one clipped off.
+                  label: Text(range.label, maxLines: 1, softWrap: false),
+                ),
             ],
             selected: {_range},
             onSelectionChanged: (selection) {

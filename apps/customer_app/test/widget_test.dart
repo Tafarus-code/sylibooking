@@ -280,6 +280,9 @@ const landscapePhoneSize = Size(900, 360);
   LocationSource? locationSource,
   DirectionsLauncher? directionsLauncher,
   Size size = phoneSize,
+
+  /// A token already on the device, i.e. a customer who signed in last time.
+  String? storedToken,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -300,6 +303,7 @@ const landscapePhoneSize = Size(900, 360);
         httpClient: backend.client,
       ),
       store: store,
+      tokenStore: InMemoryCustomerTokenStore(storedToken),
       imageSource: imageSource,
       // Default: no location at all, which is the state most tests want and
       // the one the app must never depend on.
@@ -592,6 +596,334 @@ void main() {
           tester.getSize(find.byType(MenuItemCard).first).width;
       // A dish card that grew to half a desktop window would be absurd.
       expect(cardWidth, lessThan(320));
+    });
+  });
+
+  group('favourites', () {
+    Future<({FakeBackend backend, InMemoryBookingStore store})> browse(
+      WidgetTester tester,
+    ) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 2,
+        'next': null,
+        'results': [
+          establishmentJson(),
+          establishmentJson(id: 8, name: 'Chez Fatou', type: 'restaurant'),
+        ],
+      });
+      for (final id in [7, 8]) {
+        backend.on('GET', '/api/establishments/$id/photos/', {
+          'count': 0,
+          'next': null,
+          'results': [],
+        });
+        backend.on('GET', '/api/establishments/$id/', {
+          ...establishmentDetailJson(),
+          'id': id,
+          'name': id == 7 ? 'Le Petit Baobab' : 'Chez Fatou',
+        });
+      }
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return (backend: backend, store: store);
+    }
+
+    testWidgets('every venue on browse offers a heart', (tester) async {
+      await browse(tester);
+
+      expect(find.byTooltip('Save to favourites'), findsNWidgets(2));
+    });
+
+    testWidgets('tapping the heart saves it without asking to sign up',
+        (tester) async {
+      final (:backend, :store) = await browse(tester);
+
+      await tester.tap(find.byTooltip('Save to favourites').first);
+      await tester.pumpAndSettle();
+
+      // No account, no prompt: the list lives on the phone.
+      expect(await store.favouriteIds(), {7});
+      expect(find.text('Make an account'), findsNothing);
+    });
+
+    testWidgets('the heart fills once saved', (tester) async {
+      await browse(tester);
+
+      await tester.tap(find.byTooltip('Save to favourites').first);
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Remove from favourites'), findsOneWidget);
+    });
+
+    testWidgets('tapping again unsaves', (tester) async {
+      final (:backend, :store) = await browse(tester);
+
+      await tester.tap(find.byTooltip('Save to favourites').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Remove from favourites'));
+      await tester.pumpAndSettle();
+
+      expect(await store.favouriteIds(), isEmpty);
+    });
+
+    testWidgets('a saved venue shows up in the favourites tab',
+        (tester) async {
+      await browse(tester);
+      await tester.tap(find.byTooltip('Save to favourites').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nothing saved yet'), findsNothing);
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+    });
+
+    testWidgets('signed out, the tab says the list is only on this phone',
+        (tester) async {
+      await browse(tester);
+      await tester.tap(find.byTooltip('Save to favourites').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Saved on this phone'), findsOneWidget);
+    });
+
+    testWidgets('a device that already had favourites shows them at start',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      await store.setFavourite(7, saved: true);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Favourites'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+    });
+  });
+
+  group('the optional account', () {
+    Future<FakeBackend> openProfile(
+      WidgetTester tester, {
+      String? storedToken,
+      List<String>? bookingReferences,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        storedToken: storedToken,
+        bookingReferences: bookingReferences,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/customer/me/', {
+        'id': 1,
+        'username': 'mariama',
+        'name': 'Mariama Diallo',
+      });
+      backend.on('GET', '/api/customer/favourites/', {'results': []});
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('booking still works with no account at all', (tester) async {
+      // The guarantee under all of this.
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+      expect(find.text('Make an account'), findsNothing);
+    });
+
+    testWidgets('creating an account asks for a name, handle and password',
+        (tester) async {
+      await openProfile(tester);
+
+      expect(find.widgetWithText(TextFormField, 'Your name'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Username'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
+    });
+
+    testWidgets('a short password is refused before the server sees it',
+        (tester) async {
+      await openProfile(tester);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'),
+        'mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'short',
+      );
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('At least 8 characters.'), findsOneWidget);
+    });
+
+    testWidgets('signing up signs you in', (tester) async {
+      final backend = await openProfile(tester);
+      backend.on('POST', '/api/customer/register/', {
+        'token': 'customer-token',
+        'user': {'id': 1, 'username': 'mariama', 'name': 'Mariama Diallo'},
+      }, status: 201);
+      backend.on('POST', '/api/customer/claim/', {
+        'reservations': 0,
+        'orders': 0,
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Mariama Diallo',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'),
+        'mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
+    testWidgets('signing up hands this phone bookings to the account',
+        (tester) async {
+      final backend = await openProfile(
+        tester,
+        bookingReferences: ['ref-1', 'ref-2'],
+      );
+      backend.on('POST', '/api/customer/register/', {
+        'token': 'customer-token',
+        'user': {'id': 1, 'username': 'mariama', 'name': 'Mariama'},
+      }, status: 201);
+      backend.on('POST', '/api/customer/claim/', {
+        'reservations': 2,
+        'orders': 0,
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'),
+        'mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+
+      final claim = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/customer/claim/',
+      );
+      final sent = jsonDecode(claim.body) as Map<String, dynamic>;
+      expect(sent['reservation_references'], ['ref-1', 'ref-2']);
+    });
+
+    testWidgets('a server refusal is shown, not swallowed', (tester) async {
+      final backend = await openProfile(tester);
+      backend.on('POST', '/api/customer/register/', {
+        'username': ['That name is taken. Try another, or sign in instead.'],
+      }, status: 400);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'),
+        'mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('taken'), findsOneWidget);
+    });
+
+    testWidgets('an existing customer can switch to signing in',
+        (tester) async {
+      await openProfile(tester);
+
+      await tester.tap(find.text('I already have an account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Welcome back'), findsOneWidget);
+      // No name field when signing in: they already told us once.
+      expect(find.widgetWithText(TextFormField, 'Your name'), findsNothing);
+    });
+
+    testWidgets('a stored token signs the customer straight back in',
+        (tester) async {
+      await openProfile(tester, storedToken: 'customer-token');
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
+    testWidgets('signing out returns to the offer, keeping the phone list',
+        (tester) async {
+      final backend = await openProfile(tester, storedToken: 'customer-token');
+      backend.on('POST', '/api/auth/logout/', null, status: 204);
+
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Make an account'), findsOneWidget);
     });
   });
 
@@ -1436,21 +1768,25 @@ void main() {
       expect(scheme.primary, SylibookingTokens.ember);
     });
 
-    testWidgets('favourites says it is not built rather than looking broken',
+    testWidgets('favourites starts empty and says how to fill it',
         (tester) async {
       await openApp(tester);
       await tester.tap(find.text('Favourites'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Favourites is coming'), findsOneWidget);
+      expect(find.text('Nothing saved yet'), findsOneWidget);
+      expect(find.textContaining('Tap the heart'), findsOneWidget);
     });
 
-    testWidgets('profile explains why there is no account', (tester) async {
+    testWidgets('profile offers an account without demanding one',
+        (tester) async {
       await openApp(tester);
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('reference'), findsOneWidget);
+      expect(find.text('Make an account'), findsOneWidget);
+      // The offer has to be honest about being optional.
+      expect(find.textContaining('You do not need one'), findsOneWidget);
     });
 
     testWidgets('coming back to browse does not refetch the list',

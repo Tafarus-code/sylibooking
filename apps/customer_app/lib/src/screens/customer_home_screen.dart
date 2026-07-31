@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import '../customer_auth.dart';
 import '../directions.dart';
 import '../favourites_controller.dart';
+import '../locale_controller.dart';
 import '../image_source.dart';
 import '../location_source.dart';
 import 'browse_screen.dart';
@@ -23,6 +25,7 @@ class CustomerHomeScreen extends StatefulWidget {
     required this.store,
     required this.auth,
     required this.favourites,
+    required this.localeController,
     required this.imageSource,
     required this.locationSource,
     required this.directionsLauncher,
@@ -32,6 +35,7 @@ class CustomerHomeScreen extends StatefulWidget {
   final BookingStore store;
   final CustomerAuth auth;
   final FavouritesController favourites;
+  final LocaleController localeController;
   final ImageSource imageSource;
   final LocationSource locationSource;
   final DirectionsLauncher directionsLauncher;
@@ -52,27 +56,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return AdaptiveScaffold(
       selectedIndex: _index,
       onDestinationSelected: (index) => setState(() => _index = index),
-      destinations: const [
+      destinations: [
         AdaptiveDestination(
-          label: 'Browse',
+          label: l.navBrowse,
           icon: Icons.search,
           selectedIcon: Icons.search,
         ),
         AdaptiveDestination(
-          label: 'Bookings',
+          label: l.navBookings,
           icon: Icons.receipt_long_outlined,
           selectedIcon: Icons.receipt_long,
         ),
         AdaptiveDestination(
-          label: 'Favourites',
+          label: l.navFavourites,
           icon: Icons.favorite_border,
           selectedIcon: Icons.favorite,
         ),
         AdaptiveDestination(
-          label: 'Profile',
+          label: l.navProfile,
           icon: Icons.person_outline,
           selectedIcon: Icons.person,
         ),
@@ -106,7 +112,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               signedIn: widget.auth.isSignedIn,
             ),
           ),
-          ProfileScreen(auth: widget.auth),
+          ProfileScreen(
+            auth: widget.auth,
+            localeController: widget.localeController,
+          ),
         ],
       ),
     );

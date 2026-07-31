@@ -9,16 +9,19 @@ import '../auth_controller.dart';
 /// Grouped rather than sorted, because a kitchen works by stage — everything
 /// waiting to be started, everything on, everything on the pass — and a single
 /// list ordered by time mixes all three together.
-class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key, required this.auth});
+class OrdersView extends StatefulWidget {
+  const OrdersView({super.key, required this.auth, this.reloadToken = 0});
 
   final AuthController auth;
 
+  /// Bumped by the desk's refresh button.
+  final int reloadToken;
+
   @override
-  State<OrdersScreen> createState() => _OrdersScreenState();
+  State<OrdersView> createState() => _OrdersViewState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersViewState extends State<OrdersView> {
   List<Order> _orders = const [];
   bool _loading = true;
   String? _error;
@@ -35,6 +38,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(OrdersView old) {
+    super.didUpdateWidget(old);
+    if (widget.reloadToken != old.reloadToken) _load();
   }
 
   int? get _venueId => widget.auth.selectedVenueId;
@@ -133,19 +142,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Orders'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh the queue',
-            onPressed: _load,
-          ),
-        ],
-      ),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
-    );
+    return RefreshIndicator(onRefresh: _load, child: _body());
   }
 
   Widget _body() {
@@ -295,6 +292,8 @@ class OrderTicket extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            OrderStatusBadge(status: order.status),
             const SizedBox(height: 10),
             for (final line in order.items)
               Padding(
@@ -363,6 +362,88 @@ class OrderTicket extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Where a ticket has got to, in the same badge language as the payment
+/// badges: a small filled pill, an icon so colour is never doing the work
+/// alone, and a distinct colour per state.
+class OrderStatusBadge extends StatelessWidget {
+  const OrderStatusBadge({super.key, required this.status});
+
+  final OrderStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    // Drawn from the scheme rather than from fixed colours, so a venue's
+    // preset recolours these with the rest of its screens — but from roles
+    // that stay distinct: secondaryContainer and primaryContainer resolve to
+    // the same colour under a seeded scheme, which would leave two stages
+    // looking identical.
+    //
+    // Neutral for waiting, warm for cooking, the accent for done.
+    final (label, icon, background, foreground) = switch (status) {
+      OrderStatus.placed => (
+          'Placed',
+          Icons.fiber_new,
+          scheme.surfaceContainerHighest,
+          scheme.onSurfaceVariant,
+        ),
+      OrderStatus.preparing => (
+          'Preparing',
+          Icons.local_fire_department,
+          scheme.tertiaryContainer,
+          scheme.onTertiaryContainer,
+        ),
+      OrderStatus.ready => (
+          'Ready',
+          Icons.check_circle,
+          scheme.primaryContainer,
+          scheme.onPrimaryContainer,
+        ),
+      OrderStatus.completed => (
+          'Collected',
+          Icons.done_all,
+          scheme.secondaryContainer,
+          scheme.onSecondaryContainer,
+        ),
+      OrderStatus.cancelled => (
+          'Cancelled',
+          Icons.cancel,
+          scheme.errorContainer,
+          scheme.onErrorContainer,
+        ),
+      OrderStatus.unknown => (
+          'Unknown',
+          Icons.help_outline,
+          scheme.surfaceContainerHighest,
+          scheme.onSurfaceVariant,
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: foreground),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
       ),
     );
   }

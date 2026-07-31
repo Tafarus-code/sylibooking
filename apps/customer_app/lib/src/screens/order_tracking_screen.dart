@@ -96,7 +96,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              _Timeline(status: order.status),
+              OrderProgress(status: order.status),
               if (order.isAwaitingPayment) ...[
                 const SizedBox(height: 16),
                 _Notice(
@@ -134,9 +134,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   ),
                   Text(
                     '${order.total} GNF',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: sylibookingPriceStyle(context),
                   ),
                 ],
               ),
@@ -155,17 +153,31 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 }
 
-/// Placed → Preparing → Ready, with where it has got to marked.
-class _Timeline extends StatelessWidget {
-  const _Timeline({required this.status});
+/// Placed → Preparing → Ready, across the screen rather than down it.
+///
+/// Horizontal because there are exactly three steps and they are a journey:
+/// the shape itself says "you are here, two to go", which a vertical list of
+/// ticks does not.
+class OrderProgress extends StatelessWidget {
+  const OrderProgress({super.key, required this.status});
 
   final OrderStatus status;
 
-  static const _steps = [
-    (OrderStatus.placed, 'Placed', 'The restaurant has your order'),
-    (OrderStatus.preparing, 'Preparing', 'It is being cooked'),
-    (OrderStatus.ready, 'Ready', 'Collect it at the counter'),
+  static const steps = [
+    (OrderStatus.placed, 'Placed'),
+    (OrderStatus.preparing, 'Preparing'),
+    (OrderStatus.ready, 'Ready'),
   ];
+
+  /// What the customer should be doing about the stage they are at.
+  static String captionFor(OrderStatus status) => switch (status) {
+        OrderStatus.placed => 'The restaurant has your order',
+        OrderStatus.preparing => 'It is being cooked',
+        OrderStatus.ready => 'Collect it at the counter',
+        OrderStatus.completed => 'Collected. Enjoy it.',
+        OrderStatus.cancelled => 'This order was cancelled',
+        OrderStatus.unknown => '',
+      };
 
   int get _reached => switch (status) {
         OrderStatus.placed => 0,
@@ -179,57 +191,64 @@ class _Timeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    Color colourFor(int index) => index <= _reached
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outlineVariant;
+
     return Column(
       children: [
-        for (final (index, step) in _steps.indexed)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                children: [
-                  Icon(
-                    index <= _reached
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    color: index <= _reached
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline,
-                  ),
-                  if (index < _steps.length - 1)
-                    Container(
-                      width: 2,
-                      height: 28,
-                      color: index < _reached
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outlineVariant,
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      step.$2,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: index <= _reached
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    Text(
-                      step.$3,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+        Row(
+          children: [
+            for (final (index, _) in steps.indexed) ...[
+              if (index > 0)
+                Expanded(
+                  // The connector fills between the dots, so the row stretches
+                  // to the screen instead of clustering in the middle.
+                  child: Container(height: 3, color: colourFor(index)),
                 ),
+              Icon(
+                index <= _reached
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                size: 26,
+                color: index <= _reached
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline,
               ),
             ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (final (index, step) in steps.indexed)
+              Expanded(
+                child: Text(
+                  step.$2,
+                  textAlign: switch (index) {
+                    0 => TextAlign.start,
+                    2 => TextAlign.end,
+                    _ => TextAlign.center,
+                  },
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight:
+                        index == _reached ? FontWeight.w700 : FontWeight.w400,
+                    color: index <= _reached
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          captionFor(status),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
       ],
     );
   }

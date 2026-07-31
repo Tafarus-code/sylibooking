@@ -53,6 +53,10 @@ class MembershipEstablishmentSerializer(serializers.ModelSerializer):
             'city',
             'address',
             'tagline',
+            # The merchant app themes a venue's own screens with its chosen
+            # preset, so it has to know the preset from the venue list rather
+            # than fetching each profile to find out.
+            'theme_preset',
             'role',
             'role_display',
             'can_edit_profile',

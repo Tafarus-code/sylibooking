@@ -7,9 +7,21 @@ import 'package:shared_client/shared_client.dart';
 /// nothing at all when there is no menu — many pilot merchants will not have
 /// filled one in, and an empty heading reads as a broken screen.
 class MenuSection extends StatelessWidget {
-  const MenuSection({super.key, required this.menu});
+  const MenuSection({
+    super.key,
+    required this.menu,
+    this.quantityFor,
+    this.onQuantityChanged,
+  });
 
   final List<MenuCategory> menu;
+
+  /// How many of this dish are in the basket. Null on the browsing screen,
+  /// where the menu is a list of what exists rather than a shop.
+  final int Function(MenuItem item)? quantityFor;
+  final void Function(MenuItem item, int quantity)? onQuantityChanged;
+
+  bool get _ordering => quantityFor != null && onQuantityChanged != null;
 
   /// Gap between cards, and between the two columns.
   static const _gap = 12.0;
@@ -67,7 +79,13 @@ class MenuSection extends StatelessWidget {
                     for (final item in category.items)
                       SizedBox(
                         width: cardWidth,
-                        child: MenuItemCard(item: item),
+                        child: MenuItemCard(
+                          item: item,
+                          quantity: _ordering ? quantityFor!(item) : null,
+                          onQuantityChanged: _ordering
+                              ? (quantity) => onQuantityChanged!(item, quantity)
+                              : null,
+                        ),
                       ),
                   ],
                 );
@@ -82,10 +100,23 @@ class MenuSection extends StatelessWidget {
 }
 
 /// One dish: picture on top, name and price beneath.
+///
+/// The same card serves browsing and ordering — passing a quantity turns it
+/// into something you can put in a basket, and nothing else changes. Two
+/// layouts for the same dish would drift apart within a slice.
 class MenuItemCard extends StatelessWidget {
-  const MenuItemCard({super.key, required this.item});
+  const MenuItemCard({
+    super.key,
+    required this.item,
+    this.quantity,
+    this.onQuantityChanged,
+  });
 
   final MenuItem item;
+
+  /// Null when the card is only being read, not ordered from.
+  final int? quantity;
+  final void Function(int quantity)? onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -112,8 +143,7 @@ class MenuItemCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${item.price} GNF',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: sylibookingPriceStyle(context, fontSize: 14).copyWith(
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -128,11 +158,64 @@ class MenuItemCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (onQuantityChanged case final onChanged?) ...[
+                  const SizedBox(height: 8),
+                  _QuantityStepper(
+                    name: item.name,
+                    quantity: quantity ?? 0,
+                    onChanged: onChanged,
+                  ),
+                ],
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Add, then plus and minus. The whole interaction for building a basket.
+class _QuantityStepper extends StatelessWidget {
+  const _QuantityStepper({
+    required this.name,
+    required this.quantity,
+    required this.onChanged,
+  });
+
+  final String name;
+  final int quantity;
+  final void Function(int quantity) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (quantity == 0) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () => onChanged(1),
+          child: Text('Add', semanticsLabel: 'Add $name'),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.remove_circle_outline),
+          tooltip: 'One fewer $name',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => onChanged(quantity - 1),
+        ),
+        Text('$quantity', style: Theme.of(context).textTheme.titleMedium),
+        IconButton(
+          icon: const Icon(Icons.add_circle_outline),
+          tooltip: 'One more $name',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => onChanged(quantity + 1),
+        ),
+      ],
     );
   }
 }

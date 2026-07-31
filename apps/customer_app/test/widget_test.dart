@@ -11,6 +11,7 @@ import 'package:customer_app/src/widgets/menu_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_client/shared_client.dart';
@@ -746,7 +747,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Checkout'), findsOneWidget);
-      expect(find.text('1 item'), findsOneWidget);
+      expect(find.textContaining('1 item'), findsOneWidget);
     });
 
     testWidgets('the stepper adds and removes', (tester) async {
@@ -758,11 +759,11 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.add_circle_outline));
       await tester.pumpAndSettle();
-      expect(find.text('2 items'), findsOneWidget);
+      expect(find.textContaining('2 items'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.remove_circle_outline));
       await tester.pumpAndSettle();
-      expect(find.text('1 item'), findsOneWidget);
+      expect(find.textContaining('1 item'), findsOneWidget);
     });
 
     testWidgets('emptying the basket puts the bar away', (tester) async {
@@ -777,6 +778,21 @@ void main() {
 
       expect(find.text('Checkout'), findsNothing);
     });
+
+    /// Scrolls the checkout list to [label] and taps it.
+    ///
+    /// The collection slots sit above the payment options, so on a 360dp
+    /// phone the lower half of the form has not been built yet — a customer
+    /// scrolls to it, and so does this.
+    Future<void> tapOnCheckout(WidgetTester tester, String label) async {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
 
     /// Basket with one dish, at the checkout screen.
     Future<FakeBackend> reachCheckout(WidgetTester tester) async {
@@ -811,8 +827,7 @@ void main() {
       final backend = await reachCheckout(tester);
       backend.on('POST', '/api/orders/', orderJson());
 
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       // The tracking screen fires a GET straight after, so the POST has to be
       // picked out rather than assumed to be the last request.
@@ -834,8 +849,7 @@ void main() {
       backend.on('POST', '/api/orders/', orderJson());
       backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
 
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       expect(find.text('Your order'), findsOneWidget);
       expect(find.text('Placed'), findsOneWidget);
@@ -895,8 +909,7 @@ void main() {
         find.byType(TextFormField).last,
         '+224620000000',
       );
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       // No account, so the reference on this device is the only way back.
       expect(await store.orderReferences(), ['order-ref-1']);
@@ -905,8 +918,7 @@ void main() {
     testWidgets('choosing mobile money changes the button', (tester) async {
       await reachCheckout(tester);
 
-      await tester.tap(find.text('Orange Money'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Orange Money');
 
       expect(find.text('Pay and order'), findsOneWidget);
       expect(find.text('Place order'), findsNothing);
@@ -920,10 +932,8 @@ void main() {
         orderJson(paymentProvider: 'orange_money', paymentStatus: 'completed'),
       );
 
-      await tester.tap(find.text('Orange Money'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Pay and order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Orange Money');
+      await tapOnCheckout(tester, 'Pay and order');
 
       // The tracking screen fires a GET straight after, so the POST has to be
       // picked out rather than assumed to be the last request.
@@ -944,10 +954,8 @@ void main() {
       backend.on('POST', '/api/orders/', unpaid);
       backend.on('GET', '/api/orders/ref/order-ref-1/', unpaid);
 
-      await tester.tap(find.text('Orange Money'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Pay and order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Orange Money');
+      await tapOnCheckout(tester, 'Pay and order');
 
       expect(find.textContaining('Waiting for your'), findsOneWidget);
     });
@@ -962,8 +970,7 @@ void main() {
         status: 400,
       );
 
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       expect(find.textContaining('only restaurants'), findsOneWidget);
     });
@@ -977,8 +984,7 @@ void main() {
         orderJson(status: 'ready'),
       );
 
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       expect(find.text('Collect it at the counter'), findsOneWidget);
     });
@@ -992,10 +998,126 @@ void main() {
         orderJson(status: 'cancelled', canAdvance: false),
       );
 
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       expect(find.textContaining('Nothing is owed'), findsOneWidget);
+    });
+
+    testWidgets('the order screen carries the restaurant own branding',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [
+          {
+            ...establishmentJson(id: 8, name: 'Chez Fatou', type: 'restaurant'),
+            'theme_preset': 'bissap',
+          },
+        ],
+      });
+      backend.on('GET', '/api/establishments/8/', {
+        ...establishmentDetailJson(
+          type: 'restaurant',
+          menu: [
+            menuGroup('food', 'Food', [('Poulet braisé', '75000.00')]),
+          ],
+        ),
+        'id': 8,
+        'name': 'Chez Fatou',
+        'theme_preset': 'bissap',
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/8/availability/',
+        availabilityJson(),
+      );
+      backend.on('GET', '/api/establishments/8/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/establishments/8/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chez Fatou').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+
+      // Ordering is part of the restaurant's page, not app chrome: the
+      // customer has not left the restaurant, they have started buying from
+      // it.
+      final scheme =
+          Theme.of(tester.element(find.text('Order ahead'))).colorScheme;
+      expect(scheme.primary, themePresetFor('bissap').accent);
+    });
+
+    testWidgets('the menu reuses the venue page component', (tester) async {
+      await openVenue(tester);
+      await tester.tap(find.text('Order ahead'));
+      await tester.pumpAndSettle();
+
+      // Same cards as the browsing menu, with steppers switched on. A second
+      // layout for the same dish would have drifted within a slice.
+      expect(find.byType(MenuSection), findsOneWidget);
+      expect(find.byType(MenuItemCard), findsNWidgets(2));
+    });
+
+    testWidgets('collection is chosen from slots, not a clock',
+        (tester) async {
+      await reachCheckout(tester);
+
+      // A customer collecting food is choosing between "in half an hour" and
+      // "in an hour", not picking a date.
+      expect(find.byType(ChoiceChip), findsWidgets);
+      expect(find.byType(TimePickerDialog), findsNothing);
+    });
+
+    testWidgets('picking a later slot sends that time', (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
+
+      final chips = find.byType(ChoiceChip);
+      final chosen = tester.widget<ChoiceChip>(chips.at(3));
+      final label = (chosen.label as Text).data!;
+
+      await tester.tap(chips.at(3));
+      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
+
+      final post = backend.requests.firstWhere(
+        (r) => r.method == 'POST' && r.url.path == '/api/orders/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      final when = DateTime.parse(sent['pickup_time'] as String).toLocal();
+      expect(DateFormat('HH:mm').format(when), label);
+    });
+
+    testWidgets('progress is shown across the screen, not down it',
+        (tester) async {
+      final backend = await reachCheckout(tester);
+      backend.on('POST', '/api/orders/', orderJson());
+      backend.on(
+        'GET',
+        '/api/orders/ref/order-ref-1/',
+        orderJson(status: 'preparing'),
+      );
+
+      await tapOnCheckout(tester, 'Place order');
+
+      // Three steps laid left to right: the shape says "you are here, one to
+      // go" in a way a vertical list of ticks does not.
+      final placed = tester.getRect(find.text('Placed'));
+      final ready = tester.getRect(find.text('Ready'));
+      expect(ready.left, greaterThan(placed.right));
+      expect((ready.center.dy - placed.center.dy).abs(), lessThan(2));
     });
 
     testWidgets('the snapshotted price is what is shown back', (tester) async {
@@ -1003,8 +1125,7 @@ void main() {
       backend.on('POST', '/api/orders/', orderJson());
       backend.on('GET', '/api/orders/ref/order-ref-1/', orderJson());
 
-      await tester.tap(find.text('Place order'));
-      await tester.pumpAndSettle();
+      await tapOnCheckout(tester, 'Place order');
 
       expect(find.text('150000.00 GNF'), findsWidgets);
     });
@@ -2993,6 +3114,8 @@ void main() {
       await reachForm(tester);
       expect(find.text('Reserve'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('Orange Money'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
 
@@ -3027,6 +3150,8 @@ void main() {
         reservationJson(status: 'confirmed', payment: paymentJson()),
       );
 
+      await tester.ensureVisible(find.text('Orange Money'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
@@ -3047,6 +3172,8 @@ void main() {
         reservationJson(status: 'confirmed', payment: paymentJson()),
       );
 
+      await tester.ensureVisible(find.text('Orange Money'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
@@ -3078,6 +3205,8 @@ void main() {
         reservationJson(payment: paymentJson(status: 'failed')),
       );
 
+      await tester.ensureVisible(find.text('Orange Money'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
@@ -3104,6 +3233,8 @@ void main() {
         'payment': paymentJson(status: 'pending'),
       });
 
+      await tester.ensureVisible(find.text('Orange Money'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
@@ -3132,6 +3263,8 @@ void main() {
         'payment': paymentJson(),
       });
 
+      await tester.ensureVisible(find.text('Orange Money'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);

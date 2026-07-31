@@ -40,14 +40,7 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    final soon = DateTime.now().add(const Duration(minutes: 30));
-    _pickupTime = DateTime(
-      soon.year,
-      soon.month,
-      soon.day,
-      soon.hour,
-      soon.minute >= 30 ? 30 : 0,
-    ).add(const Duration(minutes: 30));
+    _pickupTime = _slots.first;
     _prefill();
   }
 
@@ -67,26 +60,25 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
     super.dispose();
   }
 
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_pickupTime),
-      helpText: 'Collection time',
+  /// Collection slots, every fifteen minutes for the next three hours.
+  ///
+  /// A list of slots rather than a clock or a calendar: a customer collecting
+  /// food is choosing between "in half an hour" and "in an hour", not picking
+  /// a date. Spinning a time wheel to express that is three gestures too many.
+  List<DateTime> get _slots {
+    final earliest = DateTime.now().add(const Duration(minutes: 20));
+    // Round up to the next quarter, so the list reads 18:15, 18:30, not 18:07.
+    final start = DateTime(
+      earliest.year,
+      earliest.month,
+      earliest.day,
+      earliest.hour,
+      (earliest.minute / 15).ceil() * 15,
     );
-    if (time == null) return;
-
-    var chosen = DateTime(
-      _pickupTime.year,
-      _pickupTime.month,
-      _pickupTime.day,
-      time.hour,
-      time.minute,
-    );
-    // A time already gone today means tomorrow: nobody collects in the past.
-    if (chosen.isBefore(DateTime.now())) {
-      chosen = chosen.add(const Duration(days: 1));
-    }
-    setState(() => _pickupTime = chosen);
+    return [
+      for (var step = 0; step < 12; step++)
+        start.add(Duration(minutes: 15 * step)),
+    ];
   }
 
   Future<void> _submit() async {
@@ -209,10 +201,19 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
             const SizedBox(height: 20),
             Text('Collection time', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _pickTime,
-              icon: const Icon(Icons.schedule),
-              label: Text(DateFormat('EEEE HH:mm').format(_pickupTime)),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final slot in _slots)
+                  ChoiceChip(
+                    label: Text(DateFormat('HH:mm').format(slot)),
+                    selected: slot == _pickupTime,
+                    onSelected: _submitting
+                        ? null
+                        : (_) => setState(() => _pickupTime = slot),
+                  ),
+              ],
             ),
             const SizedBox(height: 20),
             Text('Payment', style: theme.textTheme.titleSmall),

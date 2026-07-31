@@ -41,6 +41,24 @@ TextTheme sylibookingTextTheme(TextTheme base) {
   );
 }
 
+/// Money, set in the mono face.
+///
+/// Prices are read as figures rather than as words: a column of them should
+/// line up, and 150000.00 next to 15000.00 should differ visibly in width
+/// rather than only in a digit. The mono face is the third font the design
+/// tokens name, and this is what it is for.
+TextStyle sylibookingPriceStyle(BuildContext context, {double? fontSize}) {
+  final theme = Theme.of(context);
+  return GoogleFonts.getFont(
+    SylibookingTokens.monoFont,
+    textStyle: theme.textTheme.titleMedium,
+    fontSize: fontSize,
+    fontWeight: FontWeight.w600,
+    // Deliberately not coloured here: on a cart bar it wants onSurface, on a
+    // menu row the accent. The caller decides; the face is what is shared.
+  );
+}
+
 /// The colour half of the app theme, pure so it can be asserted without a
 /// font stack — the same split as `colorSchemeForPreset`.
 ColorScheme sylibookingColorScheme() => const ColorScheme.light(

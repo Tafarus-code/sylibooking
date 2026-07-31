@@ -9,9 +9,11 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db.models import ProtectedError
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
+from orders.models import Order
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
@@ -22,7 +24,6 @@ from establishments.models import (
     MerchantMembership,
     Space,
 )
-from orders.models import Order
 from payments.models import Payment
 from payments.tests import STUCK
 from reservations.models import Reservation
@@ -305,9 +306,13 @@ class PriceSnapshotTests(OrderTestCase):
     def test_deleting_the_dish_is_refused_rather_than_erasing_the_record(self):
         self.place_order()
 
-        # PROTECT: what somebody bought is not the menu's to delete.
-        with self.assertRaises(Exception):
+        # PROTECT: what somebody bought is not the menu's to delete. Naming the
+        # exception matters — a blind assertRaises would also pass if the
+        # delete failed for some unrelated reason.
+        with self.assertRaises(ProtectedError):
             self.poulet.delete()
+
+        self.assertTrue(MenuItem.objects.filter(pk=self.poulet.pk).exists())
 
 
 class PaymentGateTests(OrderTestCase):

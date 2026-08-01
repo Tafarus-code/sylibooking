@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -38,7 +40,7 @@ class ReviewsSection extends StatelessWidget {
           child: Row(
             children: [
               Text(
-                'Reviews',
+                L.of(context).reviews,
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
@@ -47,7 +49,7 @@ class ReviewsSection extends StatelessWidget {
               if (reviews.length > previewCount && onSeeAll != null)
                 TextButton(
                   onPressed: onSeeAll,
-                  child: Text('See all ${establishment.reviewCount}'),
+                  child: Text(L.of(context).seeAllReviews(establishment.reviewCount)),
                 ),
             ],
           ),
@@ -73,7 +75,7 @@ class ReviewsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'No reviews yet — be the first after your visit.',
+              L.of(context).noReviewsAfterVisit,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

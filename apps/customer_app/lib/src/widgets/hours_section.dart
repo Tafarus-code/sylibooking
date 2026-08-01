@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/app_localizations.dart';
 import 'package:shared_client/shared_client.dart';
 
 /// Today's hours up front, the rest of the week behind a tap.
@@ -56,7 +58,9 @@ class _HoursSectionState extends State<HoursSection> {
             if (establishment.hasHours)
               TextButton(
                 onPressed: () => setState(() => _expanded = !_expanded),
-                child: Text(_expanded ? 'Hide week' : 'All week'),
+                child: Text(
+                _expanded ? L.of(context).hideWeek : L.of(context).allWeek,
+              ),
               ),
           ],
         ),

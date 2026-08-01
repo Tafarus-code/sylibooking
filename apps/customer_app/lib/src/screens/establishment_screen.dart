@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import '../directions.dart';
 import '../widgets/hours_section.dart';
@@ -137,11 +138,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
     if (!opened && mounted) {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('No maps app found on this phone.'),
-          ),
-        );
+        ..showSnackBar(SnackBar(content: Text(L.of(context).noMapsApp)));
     }
   }
 
@@ -202,6 +199,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
   }
 
   Widget _scaffold(BuildContext context, Establishment establishment) {
+    final l = L.of(context);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -259,7 +257,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                     OutlinedButton.icon(
                       onPressed: _openDirections,
                       icon: const Icon(Icons.directions, size: 18),
-                      label: const Text('Get directions'),
+                      label: Text(l.getDirections),
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -295,7 +293,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                   child: FilledButton.icon(
                     onPressed: () => _openOrderAhead(establishment),
                     icon: const Icon(Icons.shopping_bag_outlined),
-                    label: const Text('Order ahead'),
+                    label: Text(l.orderAhead),
                   ),
                 ),
               MenuSection(menu: establishment.menu),
@@ -307,7 +305,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
               loading: _loadingExtras,
             ),
             const Divider(height: 32),
-            _SectionLabel('Party size'),
+            _SectionLabel(l.partySize),
             _PartySizePicker(
               value: _partySize,
               max: _maxPartySize,
@@ -317,7 +315,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
               },
             ),
             const SizedBox(height: 16),
-            _SectionLabel('Day'),
+            _SectionLabel(l.day),
             _DayPicker(
               selected: _day,
               days: _daysAhead,
@@ -327,7 +325,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
               },
             ),
             const SizedBox(height: 16),
-            _SectionLabel('Available times'),
+            _SectionLabel(l.availableTimes),
             _times(),
           ],
         ),
@@ -336,6 +334,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
   }
 
   Widget _times() {
+    final l = L.of(context);
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
@@ -350,7 +349,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
           children: [
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _load, child: const Text('Try again')),
+            FilledButton(onPressed: _load, child: Text(l.tryAgain)),
           ],
         ),
       );
@@ -368,13 +367,13 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Nothing free for $_partySize on this day',
+              l.nothingFreeForParty(_partySize),
               style: Theme.of(context).textTheme.titleSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Try another day, or a smaller party.',
+              l.tryAnotherDay,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -396,8 +395,8 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                   ? const Icon(Icons.priority_high, size: 16)
                   : null,
               tooltip: option.isLastSpace
-                  ? 'Last space free at this time'
-                  : '${option.freeSpaceCount} spaces free',
+                  ? l.lastSpaceFree
+                  : l.spacesFree(option.freeSpaceCount),
               onPressed: () => _openBooking(option),
             ),
         ],
@@ -470,6 +469,7 @@ class _DayPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -487,7 +487,7 @@ class _DayPicker extends StatelessWidget {
         ),
         items: [
           for (var offset = 0; offset < days; offset++)
-            _dayItem(today.add(Duration(days: offset)), offset),
+            _dayItem(l, today.add(Duration(days: offset)), offset),
         ],
         onChanged: (day) {
           if (day != null) onChanged(day);
@@ -496,13 +496,15 @@ class _DayPicker extends StatelessWidget {
     );
   }
 
-  DropdownMenuItem<DateTime> _dayItem(DateTime day, int offset) {
+  DropdownMenuItem<DateTime> _dayItem(L l, DateTime day, int offset) {
     // "Today" and "Tomorrow" carry more than a weekday name does, and those
     // are the two days most bookings are for.
     final label = switch (offset) {
-      0 => 'Today',
-      1 => 'Tomorrow',
-      _ => DateFormat.EEEE().format(day),
+      0 => l.today,
+      1 => l.tomorrow,
+      // Named in the app's language, not the phone's: a French UI showing
+      // "Wednesday" is the half-translated look this whole change is against.
+      _ => DateFormat.EEEE(l.localeName).format(day),
     };
 
     return DropdownMenuItem(

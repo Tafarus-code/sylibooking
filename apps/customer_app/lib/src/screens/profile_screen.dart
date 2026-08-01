@@ -233,9 +233,9 @@ class _SignedOutState extends State<_SignedOut> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _phoneController,
-              decoration: const InputDecoration(
-                labelText: 'Phone number',
-                helperText: 'So you can get back in if you forget the password',
+              decoration: InputDecoration(
+                labelText: l.phoneNumber,
+                helperText: l.phoneHelper,
               ),
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
@@ -250,9 +250,7 @@ class _SignedOutState extends State<_SignedOut> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email (optional)',
-              ),
+              decoration: InputDecoration(labelText: l.emailOptional),
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               textInputAction: TextInputAction.next,
@@ -317,6 +315,14 @@ class _SignedOutState extends State<_SignedOut> {
               onPressed: auth.busy ? null : _forgotten,
               child: Text(l.iForgotMyPassword),
             ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          // Offered signed out as well as signed in. Someone who cannot read
+          // the app is exactly the person who has not made an account yet,
+          // and making them sign up first to change the language would be
+          // the wrong way round.
+          LanguageToggle(controller: widget.localeController),
         ],
       ),
     );

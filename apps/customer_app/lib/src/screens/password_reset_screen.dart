@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// Forgot the password: ask for a code, then use it.
 ///
 /// One screen in two states rather than two screens, so the identifier the
@@ -44,7 +46,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   Future<void> _request() async {
     if (_identifier.text.trim().isEmpty) {
-      setState(() => _error = 'Enter your username, phone or email.');
+      setState(() => _error = L.of(context).identifierRequired);
       return;
     }
 
@@ -117,26 +119,25 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Forgotten password')),
+      appBar: AppBar(title: Text(l.forgottenPassword)),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: contentInsets(context, vertical: 24, minHorizontal: 24),
           children: [
             Text(
-              _codeSent ? 'Enter the code' : 'Get a code',
+              _codeSent ? l.enterTheCode : l.getACode,
               style: theme.textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
               _codeSent
-                  ? 'We sent a six digit code to ${_sentTo ?? "you"}. It is '
-                      'good for 15 minutes.'
-                  : 'Tell us your username, phone number or email and we will '
-                      'send a code to whichever we have on file.',
+                  ? l.codeSentTo(_sentTo ?? '—')
+                  : l.getACodeDetail,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -146,9 +147,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
               controller: _identifier,
               enabled: !_codeSent,
               autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Username, phone or email',
-              ),
+              decoration: InputDecoration(labelText: l.identifierLabel),
             ),
             if (_codeSent) ...[
               const SizedBox(height: 16),
@@ -159,19 +158,17 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(6),
                 ],
-                decoration: const InputDecoration(labelText: 'Six digit code'),
-                validator: (value) => (value ?? '').trim().length < 6
-                    ? 'The code is six digits.'
-                    : null,
+                decoration: InputDecoration(labelText: l.sixDigitCode),
+                validator: (value) =>
+                    (value ?? '').trim().length < 6 ? l.codeIsSixDigits : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _password,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'New password'),
-                validator: (value) => (value ?? '').length < 8
-                    ? 'At least 8 characters.'
-                    : null,
+                decoration: InputDecoration(labelText: l.newPassword),
+                validator: (value) =>
+                    (value ?? '').length < 8 ? l.atLeast8Characters : null,
               ),
             ],
             if (_error case final error?) ...[
@@ -183,21 +180,21 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
               onPressed: _busy ? null : (_codeSent ? _confirm : _request),
               child: Text(
                 _busy
-                    ? 'Just a moment…'
+                    ? l.justAMoment
                     : _codeSent
-                        ? 'Change my password'
-                        : 'Send me a code',
+                        ? l.changeMyPassword
+                        : l.sendMeACode,
               ),
             ),
             if (_codeSent) ...[
               const SizedBox(height: 8),
               TextButton(
                 onPressed: _busy ? null : _request,
-                child: const Text('Send another code'),
+                child: Text(l.sendAnotherCode),
               ),
               const SizedBox(height: 4),
               Text(
-                'Asking for a new code cancels the last one.',
+                l.newCodeCancelsLast,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,

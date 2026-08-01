@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 import '../widgets/rating_stars.dart';
 
 /// Leave a review for a visit that happened.
@@ -37,7 +39,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
 
   Future<void> _submit() async {
     if (_rating == 0) {
-      setState(() => _error = 'Choose a rating from 1 to 5.');
+      setState(() => _error = L.of(context).chooseARating);
       return;
     }
 
@@ -72,11 +74,12 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final reservation = widget.reservation;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Write a review')),
+      appBar: AppBar(title: Text(l.writeAReview)),
       body: ListView(
         padding: contentInsets(context, vertical: 16, minHorizontal: 16),
         children: [
@@ -93,7 +96,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'How was it?',
+            l.howWasIt,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),
@@ -113,8 +116,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             maxLines: 4,
             maxLength: 2000,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Anything to add? (optional)',
+            decoration: InputDecoration(
+              labelText: l.anythingToAdd,
               alignLabelWithHint: true,
               border: OutlineInputBorder(),
             ),
@@ -160,11 +163,11 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Post review'),
+                : Text(l.postReview),
           ),
           const SizedBox(height: 8),
           Text(
-            'Only your first name is shown.',
+            l.onlyFirstNameShown,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,

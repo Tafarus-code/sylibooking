@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import '../widgets/menu_section.dart';
 import 'order_checkout_screen.dart';
@@ -161,7 +162,7 @@ class _OrderAheadScreenState extends State<OrderAheadScreen> {
 
   Widget _scaffold(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Order ahead')),
+      appBar: AppBar(title: Text(L.of(context).orderAhead)),
       body: _body(),
       bottomNavigationBar: _itemCount == 0
           ? null
@@ -175,23 +176,24 @@ class _OrderAheadScreenState extends State<OrderAheadScreen> {
   }
 
   Widget _body() {
+    final l = L.of(context);
+
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
       return _Message(
         icon: Icons.cloud_off,
-        title: 'Could not load the menu',
+        title: l.couldNotLoadMenu,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
     if (_menu.isEmpty) {
-      return const _Message(
+      return _Message(
         icon: Icons.restaurant_menu,
-        title: 'Nothing to order yet',
-        detail: 'This restaurant has not put its menu online. You can still '
-            'book a table and order at it.',
+        title: l.nothingToOrderYet,
+        detail: l.nothingToOrderDetail,
       );
     }
 
@@ -229,6 +231,7 @@ class CartBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
 
     return Material(
@@ -250,14 +253,15 @@ class CartBar extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '$itemCount ${itemCount == 1 ? "item" : "items"} · tap '
-                        'to review',
+                        l.tapToReview(l.itemCount(itemCount)),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       Text(
-                        '${NumberFormat('#,##0.00').format(total)} GNF',
+                        l.priceWithCurrency(
+                          NumberFormat('#,##0.00', l.localeName).format(total),
+                        ),
                         style: sylibookingPriceStyle(context),
                       ),
                     ],
@@ -267,7 +271,7 @@ class CartBar extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onCheckout,
                   icon: const Icon(Icons.shopping_bag_outlined),
-                  label: const Text('Checkout'),
+                  label: Text(l.checkout),
                 ),
               ],
             ),
@@ -292,6 +296,7 @@ class _CartSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
 
     return SafeArea(
@@ -301,7 +306,7 @@ class _CartSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Your basket', style: theme.textTheme.titleLarge),
+            Text(l.yourBasket, style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
             Flexible(
               child: ListView(
@@ -315,14 +320,14 @@ class _CartSheet extends StatelessWidget {
                           Expanded(child: Text(line.item.name)),
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline),
-                            tooltip: 'One fewer ${line.item.name}',
+                            tooltip: l.oneFewer(line.item.name),
                             onPressed: () =>
                                 onChanged(line.item, line.quantity - 1),
                           ),
                           Text('${line.quantity}'),
                           IconButton(
                             icon: const Icon(Icons.add_circle_outline),
-                            tooltip: 'One more ${line.item.name}',
+                            tooltip: l.oneMore(line.item.name),
                             onPressed: () =>
                                 onChanged(line.item, line.quantity + 1),
                           ),
@@ -336,7 +341,7 @@ class _CartSheet extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text('Total', style: theme.textTheme.titleMedium),
+                  child: Text(l.total, style: theme.textTheme.titleMedium),
                 ),
                 Text(
                   '${NumberFormat('#,##0.00').format(total)} GNF',

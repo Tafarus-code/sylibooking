@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// One venue on the browse list.
 ///
 /// Cover photo carrying two badges — status top-left, distance bottom-right —
@@ -162,15 +164,16 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     // Nothing recorded is not the same as shut; saying "Closed" would be a
     // guess, and pilot merchants will not all have filled their hours in.
     final unknown = establishment.today == null && !establishment.hasHours;
 
     if (unknown) {
-      return const _Badge(
-        label: 'Hours not listed',
-        dotColour: Color(0xFF9AA0A6),
+      return _Badge(
+        label: l.statusHoursNotListed,
+        dotColour: const Color(0xFF9AA0A6),
       );
     }
 
@@ -179,7 +182,9 @@ class _StatusBadge extends StatelessWidget {
       // "Open until 02:00" rather than the mockup's bare "Open": for a lounge
       // at 23:00 the closing time is the thing the customer is actually asking,
       // and it fits the badge on a 360dp phone.
-      label: open ? establishment.openSummary : 'Closed',
+      label: open
+          ? l.statusOpenUntil(establishment.closesAtDisplay)
+          : l.statusClosed,
       dotColour: open
           ? const Color(0xFF3FBF7F)
           : theme.colorScheme.error,
@@ -203,7 +208,9 @@ class _HeartButton extends StatelessWidget {
         color: Colors.white,
         // Both states named: "Saved" alone would leave a screen reader unable
         // to tell what the tap will do.
-        tooltip: saved ? 'Remove from favourites' : 'Save to favourites',
+        tooltip: saved
+            ? L.of(context).removeFromFavourites
+            : L.of(context).saveToFavourites,
         style: IconButton.styleFrom(backgroundColor: const Color(0x6610231B)),
         onPressed: onPressed,
       );

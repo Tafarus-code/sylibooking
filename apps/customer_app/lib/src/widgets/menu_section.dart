@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/app_localizations.dart';
 import 'package:shared_client/shared_client.dart';
 
 /// The menu, grouped by category, as a card per dish.
@@ -38,7 +40,7 @@ class MenuSection extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
-            'Menu',
+            L.of(context).menu,
             style: theme.textTheme.titleSmall?.copyWith(
               color: theme.colorScheme.primary,
             ),
@@ -142,7 +144,7 @@ class MenuItemCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${item.price} GNF',
+                  L.of(context).priceWithCurrency(item.price),
                   style: sylibookingPriceStyle(context, fontSize: 14).copyWith(
                     color: theme.colorScheme.primary,
                   ),
@@ -194,7 +196,10 @@ class _QuantityStepper extends StatelessWidget {
         width: double.infinity,
         child: OutlinedButton(
           onPressed: () => onChanged(1),
-          child: Text('Add', semanticsLabel: 'Add $name'),
+          child: Text(
+            L.of(context).add,
+            semanticsLabel: L.of(context).addNamed(name),
+          ),
         ),
       );
     }
@@ -204,14 +209,14 @@ class _QuantityStepper extends StatelessWidget {
       children: [
         IconButton(
           icon: const Icon(Icons.remove_circle_outline),
-          tooltip: 'One fewer $name',
+          tooltip: L.of(context).oneFewer(name),
           visualDensity: VisualDensity.compact,
           onPressed: () => onChanged(quantity - 1),
         ),
         Text('$quantity', style: Theme.of(context).textTheme.titleMedium),
         IconButton(
           icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'One more $name',
+          tooltip: L.of(context).oneMore(name),
           visualDensity: VisualDensity.compact,
           onPressed: () => onChanged(quantity + 1),
         ),

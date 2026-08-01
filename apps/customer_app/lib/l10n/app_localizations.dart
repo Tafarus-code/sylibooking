@@ -325,11 +325,41 @@ abstract class L {
   /// **'All week'**
   String get allWeek;
 
+  /// No description provided for @hideWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide week'**
+  String get hideWeek;
+
   /// No description provided for @closedToday.
   ///
   /// In en, this message translates to:
   /// **'Closed today'**
   String get closedToday;
+
+  /// No description provided for @seeAllReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'See all {count}'**
+  String seeAllReviews(int count);
+
+  /// No description provided for @noReviewsAfterVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'No reviews yet — be the first after your visit.'**
+  String get noReviewsAfterVisit;
+
+  /// No description provided for @lastSpaceFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Last space free at this time'**
+  String get lastSpaceFree;
+
+  /// No description provided for @spacesFree.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 space free} other{{count} spaces free}}'**
+  String spacesFree(int count);
 
   /// No description provided for @menu.
   ///
@@ -1134,6 +1164,246 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Asking for a new code cancels the last one.'**
   String get newCodeCancelsLast;
+
+  /// No description provided for @cancelBookingWhen.
+  ///
+  /// In en, this message translates to:
+  /// **'{when}.\n\nThe table goes back to other customers, so you may not get it again.'**
+  String cancelBookingWhen(String when);
+
+  /// No description provided for @bookingCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking cancelled.'**
+  String get bookingCancelled;
+
+  /// No description provided for @reviewIsLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks — your review is live.'**
+  String get reviewIsLive;
+
+  /// No description provided for @addACaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a caption'**
+  String get addACaption;
+
+  /// No description provided for @optional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get optional;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get share;
+
+  /// No description provided for @photoShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks — your photo is shared.'**
+  String get photoShared;
+
+  /// No description provided for @noBookingsOnThisPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Reservations you make on this phone show up here.'**
+  String get noBookingsOnThisPhone;
+
+  /// No description provided for @paymentFailedShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} · payment failed'**
+  String paymentFailedShort(String provider);
+
+  /// No description provided for @paymentPendingShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} · payment pending'**
+  String paymentPendingShort(String provider);
+
+  /// No description provided for @addAPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo'**
+  String get addAPhoto;
+
+  /// No description provided for @nameRequiredBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'The venue needs a name for the booking'**
+  String get nameRequiredBooking;
+
+  /// No description provided for @phoneRequiredBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'The venue will call to confirm'**
+  String get phoneRequiredBooking;
+
+  /// No description provided for @phoneTooShortBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'That number looks too short'**
+  String get phoneTooShortBooking;
+
+  /// No description provided for @howWouldYouLikeToPay.
+  ///
+  /// In en, this message translates to:
+  /// **'How would you like to pay?'**
+  String get howWouldYouLikeToPay;
+
+  /// No description provided for @payOnArrival.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay on arrival'**
+  String get payOnArrival;
+
+  /// No description provided for @payOnArrivalDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is charged now. The venue confirms your table.'**
+  String get payOnArrivalDetail;
+
+  /// No description provided for @payDepositDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay a deposit now — your table is confirmed straight away.'**
+  String get payDepositDetail;
+
+  /// No description provided for @payAndReserve.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay and reserve'**
+  String get payAndReserve;
+
+  /// No description provided for @reserve.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserve'**
+  String get reserve;
+
+  /// No description provided for @requestSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Request sent'**
+  String get requestSent;
+
+  /// No description provided for @willConfirmShortly.
+  ///
+  /// In en, this message translates to:
+  /// **'{venue} will confirm shortly. They may call {phone}.'**
+  String willConfirmShortly(String venue, String phone);
+
+  /// No description provided for @tableConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Table confirmed'**
+  String get tableConfirmed;
+
+  /// No description provided for @paidAndConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid and confirmed at {venue}. Show this reference when you arrive.'**
+  String paidAndConfirmed(String venue);
+
+  /// No description provided for @paymentDidNotGoThrough.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment did not go through'**
+  String get paymentDidNotGoThrough;
+
+  /// No description provided for @stillHeldAsRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Your table is still held as a request. {venue} will confirm it, or you can pay on arrival.'**
+  String stillHeldAsRequest(String venue);
+
+  /// No description provided for @stillWaitingOnPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Still waiting on payment'**
+  String get stillWaitingOnPayment;
+
+  /// No description provided for @waitingForPaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for payment'**
+  String get waitingForPaymentTitle;
+
+  /// No description provided for @notComeThroughYet.
+  ///
+  /// In en, this message translates to:
+  /// **'It has not come through yet. Check My bookings in a moment — the table is held either way.'**
+  String get notComeThroughYet;
+
+  /// No description provided for @approveOnYourPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve the payment on your phone. This updates by itself.'**
+  String get approveOnYourPhone;
+
+  /// No description provided for @booked.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked'**
+  String get booked;
+
+  /// No description provided for @bookingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking'**
+  String get bookingLabel;
+
+  /// No description provided for @reference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get reference;
+
+  /// No description provided for @paidWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid with'**
+  String get paidWith;
+
+  /// No description provided for @chooseARating.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a rating from 1 to 5.'**
+  String get chooseARating;
+
+  /// No description provided for @howWasIt.
+  ///
+  /// In en, this message translates to:
+  /// **'How was it?'**
+  String get howWasIt;
+
+  /// No description provided for @anythingToAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything to add? (optional)'**
+  String get anythingToAdd;
+
+  /// No description provided for @postReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Post review'**
+  String get postReview;
+
+  /// No description provided for @onlyFirstNameShown.
+  ///
+  /// In en, this message translates to:
+  /// **'Only your first name is shown.'**
+  String get onlyFirstNameShown;
 
   /// No description provided for @language.
   ///

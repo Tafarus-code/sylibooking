@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import '../favourites_controller.dart';
 import '../directions.dart';
@@ -102,23 +103,20 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   /// Explains why before prompting, so a refusal is an informed one.
   Future<void> _askForLocation() async {
+    final l = L.of(context);
     final agreed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Show distances?'),
-        content: const Text(
-          'Sylibooking can show how far each place is and sort by what is '
-          'nearest. Your location stays on your phone — it is never sent to '
-          'us or to the venues.',
-        ),
+        title: Text(l.showDistancesTitle),
+        content: Text(l.showDistancesBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not now'),
+            child: Text(l.notNow),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Allow'),
+            child: Text(l.allow),
           ),
         ],
       ),
@@ -131,12 +129,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     // Nothing arrived. Say why, once, and carry on — browsing never depended
     // on this.
     final message = switch (_locationStatus) {
-      LocationStatus.denied =>
-        'No problem — browsing works without it. You can allow location later '
-            'in your phone settings.',
-      LocationStatus.servicesOff =>
-        'Location is switched off on this phone. Turn it on to see distances.',
-      _ => 'Could not get a location just now. Distances are unavailable.',
+      LocationStatus.denied => l.locationDenied,
+      LocationStatus.servicesOff => l.locationServicesOff,
+      _ => l.locationUnavailable,
     };
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -239,6 +234,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     // Chrome: this screen stays on the app theme no matter which venues, and
     // therefore which presets, appear in the list below.
     return Scaffold(
@@ -261,11 +258,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
             ),
             BrowseFilters(
               options: [
-                (null, 'All'),
-                (EstablishmentType.restaurant, 'Restaurants'),
-                (EstablishmentType.lounge, 'Lounges'),
-                (_openNowFilter, 'Open now'),
-                (_nearestFilter, _canSortByDistance ? 'Nearest' : 'Show distances'),
+                (null, l.filterAll),
+                (EstablishmentType.restaurant, l.filterRestaurants),
+                (EstablishmentType.lounge, l.filterLounges),
+                (_openNowFilter, l.filterOpenNow),
+                (
+                  _nearestFilter,
+                  _canSortByDistance ? l.filterNearest : l.filterShowDistances,
+                ),
               ],
               isSelected: (value) => switch (value) {
                 _openNowFilter => _openOnly,
@@ -301,14 +301,16 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _body() {
+    final l = L.of(context);
+
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
       return _EmptyState(
         icon: Icons.cloud_off,
-        title: 'Could not load places',
+        title: l.couldNotLoadPlaces,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
@@ -319,11 +321,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
       // fetch returned venues. Name that case rather than showing blank space.
       return _EmptyState(
         icon: Icons.search_off,
-        title: 'Nothing found',
+        title: l.nothingFound,
         detail: _openOnly && _establishments.isNotEmpty
-            ? 'Nothing is open right now. Turn off "Open now" to see places '
-                  'you can book for later.'
-            : 'Try a different name, or clear the filters.',
+            ? l.nothingOpenRightNow
+            : l.nothingFoundDetail,
       );
     }
 

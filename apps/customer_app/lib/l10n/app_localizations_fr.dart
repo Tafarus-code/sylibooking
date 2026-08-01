@@ -135,7 +135,33 @@ class LFr extends L {
   String get allWeek => 'Toute la semaine';
 
   @override
+  String get hideWeek => 'Masquer la semaine';
+
+  @override
   String get closedToday => 'Fermé aujourd\'hui';
+
+  @override
+  String seeAllReviews(int count) {
+    return 'Voir les $count';
+  }
+
+  @override
+  String get noReviewsAfterVisit =>
+      'Aucun avis pour l\'instant — soyez le premier après votre visite.';
+
+  @override
+  String get lastSpaceFree => 'Dernière place à cette heure';
+
+  @override
+  String spacesFree(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count places libres',
+      one: '1 place libre',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get menu => 'Menu';
@@ -603,6 +629,145 @@ class LFr extends L {
   @override
   String get newCodeCancelsLast =>
       'Demander un nouveau code annule le précédent.';
+
+  @override
+  String cancelBookingWhen(String when) {
+    return '$when.\n\nLa table repart aux autres clients, vous risquez de ne pas la retrouver.';
+  }
+
+  @override
+  String get bookingCancelled => 'Réservation annulée.';
+
+  @override
+  String get reviewIsLive => 'Merci — votre avis est en ligne.';
+
+  @override
+  String get addACaption => 'Ajouter une légende';
+
+  @override
+  String get optional => 'Facultatif';
+
+  @override
+  String get cancel => 'Annuler';
+
+  @override
+  String get share => 'Partager';
+
+  @override
+  String get photoShared => 'Merci — votre photo est partagée.';
+
+  @override
+  String get noBookingsOnThisPhone =>
+      'Les réservations faites sur ce téléphone apparaissent ici.';
+
+  @override
+  String paymentFailedShort(String provider) {
+    return '$provider · paiement échoué';
+  }
+
+  @override
+  String paymentPendingShort(String provider) {
+    return '$provider · paiement en attente';
+  }
+
+  @override
+  String get addAPhoto => 'Ajouter une photo';
+
+  @override
+  String get nameRequiredBooking =>
+      'L\'établissement a besoin d\'un nom pour la réservation';
+
+  @override
+  String get phoneRequiredBooking =>
+      'L\'établissement appellera pour confirmer';
+
+  @override
+  String get phoneTooShortBooking => 'Ce numéro semble trop court';
+
+  @override
+  String get howWouldYouLikeToPay => 'Comment souhaitez-vous payer ?';
+
+  @override
+  String get payOnArrival => 'Payer sur place';
+
+  @override
+  String get payOnArrivalDetail =>
+      'Rien n\'est débité maintenant. L\'établissement confirme votre table.';
+
+  @override
+  String get payDepositDetail =>
+      'Payez un acompte maintenant — votre table est confirmée immédiatement.';
+
+  @override
+  String get payAndReserve => 'Payer et réserver';
+
+  @override
+  String get reserve => 'Réserver';
+
+  @override
+  String get requestSent => 'Demande envoyée';
+
+  @override
+  String willConfirmShortly(String venue, String phone) {
+    return '$venue confirmera sous peu. On pourra vous appeler au $phone.';
+  }
+
+  @override
+  String get tableConfirmed => 'Table confirmée';
+
+  @override
+  String paidAndConfirmed(String venue) {
+    return 'Payé et confirmé chez $venue. Présentez cette référence à votre arrivée.';
+  }
+
+  @override
+  String get paymentDidNotGoThrough => 'Le paiement n\'a pas abouti';
+
+  @override
+  String stillHeldAsRequest(String venue) {
+    return 'Votre table reste retenue en demande. $venue la confirmera, ou vous pourrez payer sur place.';
+  }
+
+  @override
+  String get stillWaitingOnPayment => 'Toujours en attente du paiement';
+
+  @override
+  String get waitingForPaymentTitle => 'En attente du paiement';
+
+  @override
+  String get notComeThroughYet =>
+      'Il n\'est pas encore arrivé. Regardez Mes réservations dans un moment — la table est retenue dans tous les cas.';
+
+  @override
+  String get approveOnYourPhone =>
+      'Validez le paiement sur votre téléphone. La page se met à jour toute seule.';
+
+  @override
+  String get booked => 'Réservé';
+
+  @override
+  String get bookingLabel => 'Réservation';
+
+  @override
+  String get reference => 'Référence';
+
+  @override
+  String get paidWith => 'Payé avec';
+
+  @override
+  String get chooseARating => 'Choisissez une note de 1 à 5.';
+
+  @override
+  String get howWasIt => 'Comment était-ce ?';
+
+  @override
+  String get anythingToAdd => 'Un commentaire ? (facultatif)';
+
+  @override
+  String get postReview => 'Publier l\'avis';
+
+  @override
+  String get onlyFirstNameShown => 'Seul votre prénom est affiché.';
 
   @override
   String get language => 'Langue';

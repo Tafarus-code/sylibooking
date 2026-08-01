@@ -135,7 +135,33 @@ class LEn extends L {
   String get allWeek => 'All week';
 
   @override
+  String get hideWeek => 'Hide week';
+
+  @override
   String get closedToday => 'Closed today';
+
+  @override
+  String seeAllReviews(int count) {
+    return 'See all $count';
+  }
+
+  @override
+  String get noReviewsAfterVisit =>
+      'No reviews yet — be the first after your visit.';
+
+  @override
+  String get lastSpaceFree => 'Last space free at this time';
+
+  @override
+  String spacesFree(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count spaces free',
+      one: '1 space free',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get menu => 'Menu';
@@ -600,6 +626,143 @@ class LEn extends L {
   @override
   String get newCodeCancelsLast =>
       'Asking for a new code cancels the last one.';
+
+  @override
+  String cancelBookingWhen(String when) {
+    return '$when.\n\nThe table goes back to other customers, so you may not get it again.';
+  }
+
+  @override
+  String get bookingCancelled => 'Booking cancelled.';
+
+  @override
+  String get reviewIsLive => 'Thanks — your review is live.';
+
+  @override
+  String get addACaption => 'Add a caption';
+
+  @override
+  String get optional => 'Optional';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get share => 'Share';
+
+  @override
+  String get photoShared => 'Thanks — your photo is shared.';
+
+  @override
+  String get noBookingsOnThisPhone =>
+      'Reservations you make on this phone show up here.';
+
+  @override
+  String paymentFailedShort(String provider) {
+    return '$provider · payment failed';
+  }
+
+  @override
+  String paymentPendingShort(String provider) {
+    return '$provider · payment pending';
+  }
+
+  @override
+  String get addAPhoto => 'Add a photo';
+
+  @override
+  String get nameRequiredBooking => 'The venue needs a name for the booking';
+
+  @override
+  String get phoneRequiredBooking => 'The venue will call to confirm';
+
+  @override
+  String get phoneTooShortBooking => 'That number looks too short';
+
+  @override
+  String get howWouldYouLikeToPay => 'How would you like to pay?';
+
+  @override
+  String get payOnArrival => 'Pay on arrival';
+
+  @override
+  String get payOnArrivalDetail =>
+      'Nothing is charged now. The venue confirms your table.';
+
+  @override
+  String get payDepositDetail =>
+      'Pay a deposit now — your table is confirmed straight away.';
+
+  @override
+  String get payAndReserve => 'Pay and reserve';
+
+  @override
+  String get reserve => 'Reserve';
+
+  @override
+  String get requestSent => 'Request sent';
+
+  @override
+  String willConfirmShortly(String venue, String phone) {
+    return '$venue will confirm shortly. They may call $phone.';
+  }
+
+  @override
+  String get tableConfirmed => 'Table confirmed';
+
+  @override
+  String paidAndConfirmed(String venue) {
+    return 'Paid and confirmed at $venue. Show this reference when you arrive.';
+  }
+
+  @override
+  String get paymentDidNotGoThrough => 'Payment did not go through';
+
+  @override
+  String stillHeldAsRequest(String venue) {
+    return 'Your table is still held as a request. $venue will confirm it, or you can pay on arrival.';
+  }
+
+  @override
+  String get stillWaitingOnPayment => 'Still waiting on payment';
+
+  @override
+  String get waitingForPaymentTitle => 'Waiting for payment';
+
+  @override
+  String get notComeThroughYet =>
+      'It has not come through yet. Check My bookings in a moment — the table is held either way.';
+
+  @override
+  String get approveOnYourPhone =>
+      'Approve the payment on your phone. This updates by itself.';
+
+  @override
+  String get booked => 'Booked';
+
+  @override
+  String get bookingLabel => 'Booking';
+
+  @override
+  String get reference => 'Reference';
+
+  @override
+  String get paidWith => 'Paid with';
+
+  @override
+  String get chooseARating => 'Choose a rating from 1 to 5.';
+
+  @override
+  String get howWasIt => 'How was it?';
+
+  @override
+  String get anythingToAdd => 'Anything to add? (optional)';
+
+  @override
+  String get postReview => 'Post review';
+
+  @override
+  String get onlyFirstNameShown => 'Only your first name is shown.';
 
   @override
   String get language => 'Language';

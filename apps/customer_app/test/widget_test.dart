@@ -4,6 +4,7 @@ import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
+import 'package:customer_app/src/locale_controller.dart';
 import 'package:customer_app/src/location_source.dart';
 import 'package:customer_app/src/screens/photo_viewer_screen.dart';
 import 'package:customer_app/src/widgets/establishment_card.dart';
@@ -283,6 +284,9 @@ const landscapePhoneSize = Size(900, 360);
 
   /// A token already on the device, i.e. a customer who signed in last time.
   String? storedToken,
+
+  /// A language already chosen on this phone.
+  LocaleStore? localeStore,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -304,6 +308,7 @@ const landscapePhoneSize = Size(900, 360);
       ),
       store: store,
       tokenStore: InMemoryCustomerTokenStore(storedToken),
+      localeStore: localeStore ?? InMemoryLocaleStore(),
       imageSource: imageSource,
       // Default: no location at all, which is the state most tests want and
       // the one the app must never depend on.
@@ -1040,6 +1045,126 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Make an account'), findsOneWidget);
+    });
+  });
+
+  group('English and French', () {
+    Future<InMemoryLocaleStore> openProfile(
+      WidgetTester tester, {
+      String? language,
+    }) async {
+      final localeStore = InMemoryLocaleStore(language);
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: localeStore,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      // The tab is named in whichever language is already in force.
+      await tester.tap(find.text(language == 'fr' ? 'Profil' : 'Profile'));
+      await tester.pumpAndSettle();
+      return localeStore;
+    }
+
+    /// Scrolls the profile form back to the top.
+    ///
+    /// The list is lazy, so reading the toggle at the bottom disposes the
+    /// heading at the top — which is what most of these assertions are about.
+    Future<void> backToTop(WidgetTester tester) async {
+      await tester.drag(
+        find
+            .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
+            .first,
+        const Offset(0, 600),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the app starts in English by default', (tester) async {
+      await openProfile(tester);
+
+      expect(find.text('Make an account'), findsOneWidget);
+      expect(find.text('Browse'), findsOneWidget);
+    });
+
+    testWidgets('the toggle names each language in its own language',
+        (tester) async {
+      await openProfile(tester);
+
+      // Below the fold on a 360dp phone, as it is for a customer.
+      await tester.scrollUntilVisible(
+        find.text('Français'),
+        150,
+        scrollable: find
+            .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
+            .first,
+      );
+
+      // The person who needs this control is the one who cannot read what is
+      // currently on screen, so "French" would be no help.
+      expect(find.text('Français'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+    });
+
+    testWidgets('switching to French translates the app immediately',
+        (tester) async {
+      await openProfile(tester);
+
+      await tapOnProfileForm(tester, 'Français');
+      await backToTop(tester);
+
+      expect(find.text('Créer un compte'), findsOneWidget);
+      // The navigation is part of it: a half-translated app is the failure
+      // this whole change exists to avoid.
+      expect(find.text('Explorer'), findsOneWidget);
+      expect(find.text('Favoris'), findsOneWidget);
+      expect(find.text('Profil'), findsWidgets);
+    });
+
+    testWidgets('the choice is remembered', (tester) async {
+      final localeStore = await openProfile(tester);
+
+      await tapOnProfileForm(tester, 'Français');
+
+      expect(await localeStore.readLanguageCode(), 'fr');
+    });
+
+    testWidgets('a phone that already chose French starts French',
+        (tester) async {
+      await openProfile(tester, language: 'fr');
+
+      expect(find.text('Créer un compte'), findsOneWidget);
+    });
+
+    testWidgets('switching back to English works too', (tester) async {
+      await openProfile(tester, language: 'fr');
+
+      await tapOnProfileForm(tester, 'English');
+      await backToTop(tester);
+
+      expect(find.text('Make an account'), findsOneWidget);
+    });
+
+    testWidgets('browse is translated, not only the profile tab',
+        (tester) async {
+      await openProfile(tester, language: 'fr');
+      await tester.tap(find.text('Explorer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trouver une table'), findsOneWidget);
+      expect(find.text('Restaurants'), findsOneWidget);
+      expect(find.text('Salons'), findsOneWidget);
     });
   });
 

@@ -660,6 +660,15 @@ class LEn extends L {
   String get roleStaff => 'staff';
 
   @override
+  String get roleOwnerName => 'Owner';
+
+  @override
+  String get roleManagerName => 'Manager';
+
+  @override
+  String get roleStaffName => 'Staff';
+
+  @override
   String personAdded(String name) {
     return '$name added.';
   }

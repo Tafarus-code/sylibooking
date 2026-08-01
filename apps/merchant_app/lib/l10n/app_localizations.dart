@@ -1273,6 +1273,24 @@ abstract class L {
   /// **'staff'**
   String get roleStaff;
 
+  /// No description provided for @roleOwnerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get roleOwnerName;
+
+  /// No description provided for @roleManagerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager'**
+  String get roleManagerName;
+
+  /// No description provided for @roleStaffName.
+  ///
+  /// In en, this message translates to:
+  /// **'Staff'**
+  String get roleStaffName;
+
   /// No description provided for @personAdded.
   ///
   /// In en, this message translates to:

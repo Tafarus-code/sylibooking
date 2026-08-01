@@ -1,9 +1,7 @@
 {
   "@@locale": "en",
-
   "appTitle": "Sylibooking Merchant",
   "merchant": "Merchant",
-
   "signIn": "Sign in",
   "signOut": "Sign out",
   "save": "Save",
@@ -16,11 +14,9 @@
   "tryAgain": "Try again",
   "refresh": "Refresh",
   "required": "Required",
-
   "language": "Language",
   "languageEnglish": "English",
   "languageFrench": "Français",
-
   "username": "Username",
   "password": "Password",
   "enterYourUsername": "Enter your username",
@@ -28,11 +24,9 @@
   "showPassword": "Show",
   "hidePassword": "Hide",
   "wrongUsernameOrPassword": "Wrong username or password.",
-
   "navReservations": "Reservations",
   "navPayments": "Payments",
   "navManage": "Manage",
-
   "tabReservations": "Réservations",
   "@tabReservations": {
     "description": "Left half of the desk switcher. Stays French in both languages: it is the word merchants already use on the floor."
@@ -41,7 +35,6 @@
   "@tabOrders": {
     "description": "Right half of the desk switcher. See tabReservations."
   },
-
   "switchVenue": "Switch venue",
   "noVenue": "No venue",
   "chooseAVenue": "Choose a venue",
@@ -49,7 +42,6 @@
   "everythingAppliesToVenue": "Everything you do next applies to the venue you pick.",
   "noVenueYet": "No venue yet",
   "noVenueYetDetail": "This account is not a member of any establishment. An owner can add you to theirs, or an admin can set one up.",
-
   "rangeToday": "Today",
   "rangeNextSevenDays": "Next 7 days",
   "dayToday": "Today",
@@ -64,9 +56,15 @@
   "cancelReservationDetail": "{name} · {space} at {time}.\n\nThe slot becomes bookable again.",
   "@cancelReservationDetail": {
     "placeholders": {
-      "name": {"type": "String"},
-      "space": {"type": "String"},
-      "time": {"type": "String"}
+      "name": {
+        "type": "String"
+      },
+      "space": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
     }
   },
   "cancelBooking": "Cancel booking",
@@ -75,42 +73,59 @@
   "confirm": "Confirm",
   "guestCount": "{count, plural, =1{1 guest} other{{count} guests}}",
   "@guestCount": {
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "cannotConfirmUntilPaymentClears": "Cannot confirm until the payment clears.",
-
   "statusPending": "Pending",
   "statusConfirmed": "Confirmed",
   "statusCancelled": "Cancelled",
   "statusCompleted": "Completed",
   "statusUnknown": "Unknown",
-
   "paidWith": "Paid ({provider})",
   "@paidWith": {
-    "placeholders": {"provider": {"type": "String"}}
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
   },
   "mobileMoney": "mobile money",
   "paymentFailedWith": "Payment failed ({provider})",
   "@paymentFailedWith": {
-    "placeholders": {"provider": {"type": "String"}}
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
   },
   "awaitingPaymentWith": "Awaiting payment ({provider})",
   "@awaitingPaymentWith": {
-    "placeholders": {"provider": {"type": "String"}}
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
   },
   "paymentFailedShort": "Payment failed",
   "unpaid": "Unpaid",
   "cashOnArrival": "Cash on arrival",
   "cashShort": "Cash",
-
   "stageReadyToCollect": "Ready to collect",
   "stageBeingPrepared": "Being prepared",
   "stageNewOrders": "New orders",
   "stageHeading": "{label} · {count}",
   "@stageHeading": {
     "placeholders": {
-      "label": {"type": "String"},
-      "count": {"type": "int"}
+      "label": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
     }
   },
   "couldNotLoadTheQueue": "Could not load the queue",
@@ -121,7 +136,11 @@
   "cancelThisOrder": "Cancel this order?",
   "cancelOrderDetail": "{name} will not be able to collect it, and nothing will be owed.",
   "@cancelOrderDetail": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "cancelOrder": "Cancel order",
   "startPreparing": "Start preparing",
@@ -137,14 +156,21 @@
   "orderUnknown": "Unknown",
   "waitingOnPayment": "Waiting on the {provider} payment. The kitchen cannot start until it clears.",
   "@waitingOnPayment": {
-    "placeholders": {"provider": {"type": "String"}}
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
   },
   "cashOnPickup": "Cash on pickup",
   "amountGnf": "{amount} GNF",
   "@amountGnf": {
-    "placeholders": {"amount": {"type": "String"}}
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
-
   "reservationTitle": "Reservation",
   "sectionBooking": "Booking",
   "rowWhen": "When",
@@ -161,19 +187,30 @@
   "rowProviderReference": "Provider reference",
   "copyField": "Copy {label}",
   "@copyField": {
-    "placeholders": {"label": {"type": "String"}}
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
   },
   "fieldCopied": "{label} copied",
   "@fieldCopied": {
-    "placeholders": {"label": {"type": "String"}}
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
   },
   "cannotConfirmUntilPaymentClearsLong": "This booking cannot be confirmed until the payment clears. Cancel it if the customer does not pay.",
-
   "youAreRoleHere": "{city} · you are {role} here",
   "@youAreRoleHere": {
     "placeholders": {
-      "city": {"type": "String"},
-      "role": {"type": "String"}
+      "city": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      }
     }
   },
   "menu": "Menu",
@@ -191,7 +228,6 @@
   "whoHasAccess": "Who has access",
   "whoHasAccessSubtitle": "Add people, change roles, remove access",
   "managedByOwnerOrManager": "Opening hours, venue details and access are managed by an owner or manager.",
-
   "monday": "Monday",
   "tuesday": "Tuesday",
   "wednesday": "Wednesday",
@@ -204,22 +240,33 @@
   "hoursSaved": "Hours saved.",
   "dayOpenButNoTimes": "{day} is open but has no times set.",
   "@dayOpenButNoTimes": {
-    "placeholders": {"day": {"type": "String"}}
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
   },
   "closed": "Closed",
   "open": "Open",
   "opens": "Opens",
   "opensAt": "Opens {time}",
   "@opensAt": {
-    "placeholders": {"time": {"type": "String"}}
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "closes": "Closes",
   "closesAt": "Closes {time}",
   "@closesAt": {
-    "placeholders": {"time": {"type": "String"}}
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "runsPastMidnight": "Runs past midnight into the next morning.",
-
   "takeAPhoto": "Take a photo",
   "addPhoto": "Add photo",
   "addACaption": "Add a caption",
@@ -229,11 +276,14 @@
   "noPhotosYet": "No photos yet",
   "noPhotosDetailCanUpload": "Customers browse with their eyes. A few good photos of the room go a long way.",
   "noPhotosDetailViewOnly": "An owner or manager adds photos here.",
-
   "yourVenue": "Your venue",
   "brandingIntro": "Choose how {venue} looks to customers. Each set has been checked for readability.",
   "@brandingIntro": {
-    "placeholders": {"venue": {"type": "String"}}
+    "placeholders": {
+      "venue": {
+        "type": "String"
+      }
+    }
   },
   "preview": "Preview",
   "saveBranding": "Save branding",
@@ -242,7 +292,6 @@
   "previewOpenUntil": "Open until 02:00",
   "previewVenueLine": "Lounge · Conakry · 1.2 km away",
   "previewReserve": "Reserve",
-
   "addItem": "Add item",
   "noMenuYet": "No menu yet",
   "noMenuDetailCanEdit": "Add your first item and customers will see it straight away.",
@@ -251,24 +300,44 @@
   "soldOut": "Sold out",
   "itemBackOn": "{name} is back on.",
   "@itemBackOn": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "itemMarkedSoldOut": "{name} marked sold out.",
   "@itemMarkedSoldOut": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "pictureAddedTo": "Picture added to {name}.",
   "@pictureAddedTo": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "removeItemTitle": "Remove {name}?",
   "@removeItemTitle": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "removeItemDetail": "It disappears from the customer menu. To hide it temporarily, mark it sold out instead.",
   "itemRemoved": "{name} removed.",
   "@itemRemoved": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "addAPicture": "Add a picture",
   "replacePicture": "Replace picture",
@@ -284,7 +353,6 @@
   "giveItAPrice": "Give it a price",
   "numbersOnly": "Numbers only",
   "fieldOneLineDescription": "One-line description (optional)",
-
   "addSomeone": "Add someone",
   "fieldRole": "Role",
   "roleStaffOption": "Staff — floor work",
@@ -293,75 +361,120 @@
   "roleOwner": "owner",
   "roleManager": "manager",
   "roleStaff": "staff",
+  "roleOwnerName": "Owner",
+  "roleManagerName": "Manager",
+  "roleStaffName": "Staff",
   "personAdded": "{name} added.",
   "@personAdded": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "personIsNowRole": "{name} is now {role}.",
   "@personIsNowRole": {
     "placeholders": {
-      "name": {"type": "String"},
-      "role": {"type": "String"}
+      "name": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      }
     }
   },
   "removePersonTitle": "Remove {name}?",
   "@removePersonTitle": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "removePersonDetail": "They lose access to this venue immediately.",
   "personRemoved": "{name} removed.",
   "@personRemoved": {
-    "placeholders": {"name": {"type": "String"}}
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
   "makeOwner": "Make owner",
   "makeManager": "Make manager",
   "makeStaff": "Make staff",
   "removeAccess": "Remove access",
-
   "window7Days": "7 days",
   "window30Days": "30 days",
   "window90Days": "90 days",
   "dateRange": "{from} – {to}",
   "@dateRange": {
     "placeholders": {
-      "from": {"type": "String"},
-      "to": {"type": "String"}
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
     }
   },
   "collected": "Collected",
   "paymentCount": "{count, plural, =1{1 payment} other{{count} payments}}",
   "@paymentCount": {
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "awaiting": "Awaiting",
   "pendingCount": "{count} pending",
   "@pendingCount": {
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "failed": "Failed",
   "failedCount": "{count} failed",
   "@failedCount": {
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "sectionBookings": "Bookings",
   "countTotal": "Total",
   "sectionByPaymentMethod": "By payment method",
   "bookingCount": "{count, plural, =1{1 booking} other{{count} bookings}}",
   "@bookingCount": {
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "atTheTill": "at the till",
   "sectionNeedsChasing": "Needs chasing",
   "nothingOutstanding": "Nothing outstanding. Every booking is settled.",
   "providerPaymentFailed": "{provider} payment failed",
   "@providerPaymentFailed": {
-    "placeholders": {"provider": {"type": "String"}}
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
   },
   "providerNotReceived": "{provider} not received",
   "@providerNotReceived": {
-    "placeholders": {"provider": {"type": "String"}}
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
   },
-
   "fieldTagline": "Tagline (one line)",
   "fieldDescription": "Description",
   "fieldCity": "City",

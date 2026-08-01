@@ -668,6 +668,15 @@ class LFr extends L {
   String get roleStaff => 'personnel';
 
   @override
+  String get roleOwnerName => 'Propriétaire';
+
+  @override
+  String get roleManagerName => 'Gérant';
+
+  @override
+  String get roleStaffName => 'Personnel';
+
+  @override
   String personAdded(String name) {
     return '$name ajouté.';
   }

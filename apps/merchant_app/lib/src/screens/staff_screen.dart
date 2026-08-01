@@ -232,7 +232,7 @@ class _StaffScreenState extends State<StaffScreen> {
                         child: ListTile(
                           title: Text(member.fullName),
                           subtitle: Text(
-                            '${member.username} · ${member.roleDisplay}',
+                            '${member.username} · ${member.role.name(l)}',
                             style: theme.textTheme.bodySmall,
                           ),
                           trailing: PopupMenuButton<String>(

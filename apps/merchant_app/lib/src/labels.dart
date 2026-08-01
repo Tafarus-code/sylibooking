@@ -37,12 +37,27 @@ extension OrderStatusLabel on OrderStatus {
       };
 }
 
+/// Roles are labelled here rather than taken from the server's `role_display`.
+///
+/// The venue list is fetched once at sign-in and held for the session, so a
+/// server-supplied role stays in whatever language that one request was made
+/// in — switching to French left "vous y êtes owner" on the Manage screen
+/// until the next sign-in. The set is closed and known, so there is nothing
+/// to gain by asking.
 extension MerchantRoleLabel on MerchantRole {
   /// Lowercase, because it is read inside a sentence rather than on its own.
   String label(L l) => switch (this) {
         MerchantRole.owner => l.roleOwner,
         MerchantRole.manager => l.roleManager,
         MerchantRole.staff => l.roleStaff,
+        MerchantRole.unknown => l.statusUnknown,
+      };
+
+  /// Standing on its own, next to a venue name or a username.
+  String name(L l) => switch (this) {
+        MerchantRole.owner => l.roleOwnerName,
+        MerchantRole.manager => l.roleManagerName,
+        MerchantRole.staff => l.roleStaffName,
         MerchantRole.unknown => l.statusUnknown,
       };
 }

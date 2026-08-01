@@ -3,6 +3,7 @@ import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../labels.dart';
 
 /// Which venue am I working tonight?
 ///
@@ -72,7 +73,7 @@ class VenuePickerScreen extends StatelessWidget {
                   children: [
                     Text(venue.city),
                     Text(
-                      venue.roleDisplay,
+                      venue.role.name(l),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.w600,

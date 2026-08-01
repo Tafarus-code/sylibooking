@@ -4,6 +4,7 @@ import 'package:shared_client/shared_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
+import '../labels.dart';
 import '../widgets/language_toggle.dart';
 import 'branding_screen.dart';
 import 'hours_screen.dart';
@@ -64,7 +65,7 @@ class ManageScreen extends StatelessWidget {
                   Text(
                     l.youAreRoleHere(
                       venue.city,
-                      venue.roleDisplay.toLowerCase(),
+                      venue.role.label(l),
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,

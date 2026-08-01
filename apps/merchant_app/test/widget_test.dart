@@ -2650,6 +2650,34 @@ void main() {
       );
     });
 
+    testWidgets('the role follows the language, not the sign-in request',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      // What the server sends when the venue list was fetched in English —
+      // which it always is, because the list is loaded once at sign-in and
+      // held for the whole session.
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore('fr')),
+      );
+      await tester.pumpAndSettle();
+
+      // Not "Le Petit Baobab · Owner": the payload says Owner, and nothing
+      // refetches it when the language changes.
+      expect(find.textContaining('Propriétaire'), findsOneWidget);
+      expect(find.textContaining('Owner'), findsNothing);
+    });
+
     testWidgets('the French labels still fit a 360dp phone', (tester) async {
       // French runs longer than English almost everywhere, and the navigation
       // bar is the tightest row in the app.

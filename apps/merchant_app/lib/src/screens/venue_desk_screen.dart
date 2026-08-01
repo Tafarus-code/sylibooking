@@ -3,6 +3,7 @@ import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../labels.dart';
 import 'orders_screen.dart';
 import 'reservations_screen.dart';
 
@@ -55,7 +56,7 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
             Text(
               // The role is shown because it decides what the rest of the app
               // will let this person do.
-              venue == null ? name : '$name · ${venue.roleDisplay}',
+              venue == null ? name : '$name · ${venue.role.name(l)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 
-const _dayNames = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
+/// Monday first, matching the API's day_of_week and the week a venue works.
+List<String> _dayNames(L l) => [
+      l.monday,
+      l.tuesday,
+      l.wednesday,
+      l.thursday,
+      l.friday,
+      l.saturday,
+      l.sunday,
+    ];
 
 /// Editing the week's opening hours.
 ///
@@ -115,12 +117,14 @@ class _HoursScreenState extends State<HoursScreen> {
   }
 
   Future<void> _save() async {
+    final l = L.of(context);
+
     // Mirrors the server: a day that is open needs both times.
     for (var day = 0; day < 7; day++) {
       final draft = _week[day];
       if (!draft.isClosed && (draft.opens == null || draft.closes == null)) {
         setState(() {
-          _error = '${_dayNames[day]} is open but has no times set.';
+          _error = l.dayOpenButNoTimes(_dayNames(l)[day]);
         });
         return;
       }
@@ -147,7 +151,7 @@ class _HoursScreenState extends State<HoursScreen> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Hours saved.')));
+        ..showSnackBar(SnackBar(content: Text(l.hoursSaved)));
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -166,9 +170,10 @@ class _HoursScreenState extends State<HoursScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Opening hours')),
+      appBar: AppBar(title: Text(l.openingHours)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -178,7 +183,7 @@ class _HoursScreenState extends State<HoursScreen> {
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Text(
-                      'Only an owner or manager can change opening hours.',
+                      l.onlyOwnerOrManagerCanChangeHours,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -207,7 +212,7 @@ class _HoursScreenState extends State<HoursScreen> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Save week'),
+                          : Text(l.saveWeek),
                     ),
                   ),
               ],
@@ -217,6 +222,7 @@ class _HoursScreenState extends State<HoursScreen> {
 
   Widget _dayRow(int day) {
     final theme = Theme.of(context);
+    final l = L.of(context);
     final draft = _week[day];
     final overnight = !draft.isClosed &&
         draft.opens != null &&
@@ -232,9 +238,9 @@ class _HoursScreenState extends State<HoursScreen> {
           children: [
             Row(
               children: [
-                Expanded(child: Text(_dayNames[day])),
+                Expanded(child: Text(_dayNames(l)[day])),
                 Text(
-                  draft.isClosed ? 'Closed' : 'Open',
+                  draft.isClosed ? l.closed : l.open,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -256,8 +262,8 @@ class _HoursScreenState extends State<HoursScreen> {
                           _canEdit ? () => _pick(day, opening: true) : null,
                       child: Text(
                         draft.opens == null
-                            ? 'Opens'
-                            : 'Opens ${_format(draft.opens!)}',
+                            ? l.opens
+                            : l.opensAt(_format(draft.opens!)),
                       ),
                     ),
                   ),
@@ -268,8 +274,8 @@ class _HoursScreenState extends State<HoursScreen> {
                           _canEdit ? () => _pick(day, opening: false) : null,
                       child: Text(
                         draft.closes == null
-                            ? 'Closes'
-                            : 'Closes ${_format(draft.closes!)}',
+                            ? l.closes
+                            : l.closesAt(_format(draft.closes!)),
                       ),
                     ),
                   ),
@@ -281,7 +287,7 @@ class _HoursScreenState extends State<HoursScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    'Runs past midnight into the next morning.',
+                    l.runsPastMidnight,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.primary,
                     ),

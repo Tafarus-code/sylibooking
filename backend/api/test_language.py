@@ -195,7 +195,7 @@ class CatalogueTests(LanguageTestCase):
 
         from django.conf import settings
 
-        from api.management.commands.compile_po import parse_po
+        from api.management.commands.compile_po import CONTEXT_SEPARATOR, parse_po
 
         root = Path(settings.LOCALE_PATHS[0]) / 'fr' / 'LC_MESSAGES'
         entries = parse_po((root / 'django.po').read_text(encoding='utf-8'))
@@ -203,11 +203,125 @@ class CatalogueTests(LanguageTestCase):
         from django.utils import translation
 
         with translation.override('fr'):
-            for msgid, msgstr in entries.items():
-                if not msgid or '%' in msgid:
+            for key, msgstr in entries.items():
+                if not key or '%' in key:
                     continue
+                if CONTEXT_SEPARATOR in key:
+                    context, msgid = key.split(CONTEXT_SEPARATOR, 1)
+                    actual = translation.pgettext(context, msgid)
+                else:
+                    msgid, actual = key, translation.gettext(key)
                 self.assertEqual(
-                    translation.gettext(msgid),
+                    actual,
                     msgstr,
-                    f'{msgid!r} is in the .po but not in the compiled .mo',
+                    f'{key!r} is in the .po but not in the compiled .mo',
                 )
+
+class StatusLabelTests(LanguageTestCase):
+    """One English word, three French ones.
+
+    "Completed" is a settled payment, a finished sitting and a collected
+    order. Without a context they would all share the catalogue's first
+    translation, and a kitchen ticket would read "abouti".
+    """
+
+    def test_each_completed_gets_its_own_word(self):
+        from django.utils import translation
+        from orders.models import Order
+
+        from payments.models import Payment
+        from reservations.models import Reservation
+
+        with translation.override('fr'):
+            labels = {
+                str(Payment.Status.COMPLETED.label),
+                str(Reservation.Status.COMPLETED.label),
+                str(Order.Status.COMPLETED.label),
+            }
+
+        self.assertEqual(len(labels), 3, labels)
+
+    def test_the_merchant_labels_are_translated(self):
+        from django.utils import translation
+
+        from establishments.models import MenuItem, MerchantMembership
+
+        with translation.override('fr'):
+            self.assertEqual(
+                str(MerchantMembership.Role.OWNER.label), 'Propriétaire'
+            )
+            self.assertEqual(str(MenuItem.Category.FOOD.label), 'Plats')
+
+    def test_english_is_unchanged_by_the_contexts(self):
+        from django.utils import translation
+        from orders.models import Order
+
+        from reservations.models import Reservation
+
+        # Stated outright rather than relying on whatever language the last
+        # request left active: a lazy label is resolved when it is read.
+        with translation.override('en'):
+            self.assertEqual(
+                str(Reservation.Status.COMPLETED.label), 'Completed'
+            )
+            self.assertEqual(str(Order.Status.PLACED.label), 'Placed')
+
+
+class CompilerTests(APITestCase):
+    """The .po parser, which is ours and therefore ours to get wrong."""
+
+    def parse(self, text):
+        from api.management.commands.compile_po import parse_po
+
+        return parse_po(text)
+
+    def test_a_context_keys_the_entry_the_way_gettext_does(self):
+        from api.management.commands.compile_po import CONTEXT_SEPARATOR
+
+        entries = self.parse(
+            'msgctxt "order status"\n'
+            'msgid "Ready"\n'
+            'msgstr "Prête"\n'
+        )
+
+        self.assertEqual(
+            entries, {f'order status{CONTEXT_SEPARATOR}Ready': 'Prête'}
+        )
+
+    def test_the_same_msgid_under_two_contexts_stays_two_entries(self):
+        entries = self.parse(
+            'msgctxt "payment status"\n'
+            'msgid "Completed"\n'
+            'msgstr "abouti"\n'
+            '\n'
+            'msgctxt "order status"\n'
+            'msgid "Completed"\n'
+            'msgstr "Récupérée"\n'
+        )
+
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(sorted(entries.values()), ['Récupérée', 'abouti'])
+
+    def test_a_context_does_not_leak_onto_the_next_entry(self):
+        """The bug this parser is most likely to have."""
+        entries = self.parse(
+            'msgctxt "order status"\n'
+            'msgid "Ready"\n'
+            'msgstr "Prête"\n'
+            '\n'
+            'msgid "Owner"\n'
+            'msgstr "Propriétaire"\n'
+        )
+
+        self.assertIn('Owner', entries)
+        self.assertEqual(entries['Owner'], 'Propriétaire')
+
+    def test_plurals_are_still_refused_rather_than_guessed(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            self.parse(
+                'msgid "one guest"\n'
+                'msgid_plural "%(count)s guests"\n'
+                'msgstr[0] "un client"\n'
+            )

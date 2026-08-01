@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 
 /// Pick the venue's look from a curated set.
@@ -25,7 +26,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
   String? _error;
 
   int get _venueId => widget.auth.selectedVenueId!;
-  String get _venueName => widget.auth.selectedVenue?.name ?? 'Your venue';
+  String _venueName(L l) => widget.auth.selectedVenue?.name ?? l.yourVenue;
 
   bool get _dirty => _selected != _saved;
 
@@ -60,6 +61,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
   }
 
   Future<void> _save() async {
+    final l = L.of(context);
     setState(() {
       _saving = true;
       _error = null;
@@ -76,7 +78,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
       });
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Branding saved.')));
+        ..showSnackBar(SnackBar(content: Text(l.brandingSaved)));
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -95,9 +97,11 @@ class _BrandingScreenState extends State<BrandingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
+    final venueName = _venueName(l);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Branding')),
+      appBar: AppBar(title: Text(l.branding)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -107,8 +111,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                   child: Text(
-                    'Choose how $_venueName looks to customers. Each set has '
-                    'been checked for readability.',
+                    l.brandingIntro(venueName),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -117,7 +120,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                 for (final preset in themePresets)
                   _PresetCard(
                     preset: preset,
-                    venueName: _venueName,
+                    venueName: venueName,
                     selected: preset.key == _selected,
                     onTap: _saving
                         ? null
@@ -125,7 +128,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                   ),
 
                 const SizedBox(height: 8),
-                _SectionLabel('Preview'),
+                _SectionLabel(l.preview),
                 // The selection applied to a miniature of the customer's
                 // detail screen, before it is saved.
                 Padding(
@@ -133,7 +136,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                   child: EstablishmentThemeScope(
                     presetKey: _selected,
                     child: Builder(
-                      builder: (context) => _Preview(venueName: _venueName),
+                      builder: (context) => _Preview(venueName: venueName),
                     ),
                   ),
                 ),
@@ -159,7 +162,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_dirty ? 'Save branding' : 'Saved'),
+                        : Text(_dirty ? l.saveBranding : l.savedLabel),
                   ),
                 ),
               ],
@@ -268,6 +271,7 @@ class _Preview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -299,10 +303,10 @@ class _Preview extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Open until 02:00', style: theme.textTheme.titleMedium),
+                Text(l.previewOpenUntil, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
-                  'Lounge · Conakry · 1.2 km away',
+                  l.previewVenueLine,
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
@@ -319,7 +323,7 @@ class _Preview extends StatelessWidget {
                 const SizedBox(height: 12),
                 FilledButton(
                   onPressed: null,
-                  child: const Text('Reserve'),
+                  child: Text(l.previewReserve),
                 ),
               ],
             ),

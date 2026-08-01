@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// How a booking is being paid, at a glance.
 ///
 /// Built to be scanned down a full day's list rather than read one row at a
@@ -23,7 +25,7 @@ class PaymentBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final style = _styleFor(reservation, scheme);
+    final style = _styleFor(reservation, scheme, L.of(context));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -64,14 +66,14 @@ typedef _BadgeStyle = ({
   Color? border,
 });
 
-_BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme) {
+_BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme, L l) {
   if (reservation.isPaid) {
     final provider = reservation.paymentProviderDisplay.isEmpty
-        ? 'mobile money'
+        ? l.mobileMoney
         : reservation.paymentProviderDisplay;
     return (
-      label: 'Paid ($provider)',
-      shortLabel: 'Paid ($provider)',
+      label: l.paidWith(provider),
+      shortLabel: l.paidWith(provider),
       icon: Icons.check_circle,
       background: scheme.primaryContainer,
       foreground: scheme.onPrimaryContainer,
@@ -83,9 +85,9 @@ _BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme) {
     final failed = reservation.paymentStatus == PaymentStatus.failed;
     return (
       label: failed
-          ? 'Payment failed (${reservation.paymentProviderDisplay})'
-          : 'Awaiting payment (${reservation.paymentProviderDisplay})',
-      shortLabel: failed ? 'Payment failed' : 'Unpaid',
+          ? l.paymentFailedWith(reservation.paymentProviderDisplay)
+          : l.awaitingPaymentWith(reservation.paymentProviderDisplay),
+      shortLabel: failed ? l.paymentFailedShort : l.unpaid,
       icon: failed ? Icons.error : Icons.hourglass_top,
       background: scheme.errorContainer,
       foreground: scheme.onErrorContainer,
@@ -95,8 +97,8 @@ _BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme) {
 
   // Cash on arrival: nothing is owed yet, so it must not read as a problem.
   return (
-    label: 'Cash on arrival',
-    shortLabel: 'Cash',
+    label: l.cashOnArrival,
+    shortLabel: l.cashShort,
     // local_atm rather than payments_outlined: the latter now marks the
     // Payments tab, and the same glyph meaning two things in one screen is
     // exactly what a scannable badge must not do.

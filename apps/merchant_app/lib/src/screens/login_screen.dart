@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -65,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Merchant',
+                          l.merchant,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -77,14 +79,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           enabled: !busy,
                           autocorrect: false,
                           textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                            prefixIcon: Icon(Icons.person_outline),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l.username,
+                            prefixIcon: const Icon(Icons.person_outline),
+                            border: const OutlineInputBorder(),
                           ),
                           validator: (value) =>
                               (value == null || value.trim().isEmpty)
-                                  ? 'Enter your username'
+                                  ? l.enterYourUsername
                                   : null,
                         ),
                         const SizedBox(height: 16),
@@ -95,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textInputAction: TextInputAction.done,
                           onFieldSubmitted: (_) => busy ? null : _submit(),
                           decoration: InputDecoration(
-                            labelText: 'Password',
+                            labelText: l.password,
                             prefixIcon: const Icon(Icons.lock_outline),
                             border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
@@ -106,14 +108,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               onPressed: () =>
                                   setState(() => _obscure = !_obscure),
-                              tooltip: _obscure ? 'Show' : 'Hide',
+                              tooltip:
+                                  _obscure ? l.showPassword : l.hidePassword,
                             ),
                           ),
                           validator: (value) => (value == null || value.isEmpty)
-                              ? 'Enter your password'
+                              ? l.enterYourPassword
                               : null,
                         ),
-                        if (widget.auth.errorMessage != null) ...[
+                        if (widget.auth.badCredentials ||
+                            widget.auth.errorMessage != null) ...[
                           const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -131,7 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    widget.auth.errorMessage!,
+                                    widget.auth.badCredentials
+                                        ? l.wrongUsernameOrPassword
+                                        : widget.auth.errorMessage!,
                                     style: TextStyle(
                                       color: theme.colorScheme.onErrorContainer,
                                     ),
@@ -155,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Sign in'),
+                              : Text(l.signIn),
                         ),
                       ],
                     ),

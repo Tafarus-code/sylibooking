@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 
 
 class Payment(models.Model):
@@ -17,9 +18,9 @@ class Payment(models.Model):
         CASH_ON_ARRIVAL = 'cash_on_arrival', _('Cash on arrival')
 
     class Status(models.TextChoices):
-        PENDING = 'pending', _('Pending')
-        COMPLETED = 'completed', _('Completed')
-        FAILED = 'failed', _('Failed')
+        PENDING = 'pending', pgettext_lazy('payment status', 'Pending')
+        COMPLETED = 'completed', pgettext_lazy('payment status', 'Completed')
+        FAILED = 'failed', pgettext_lazy('payment status', 'Failed')
 
     #: Providers that are settled through an external API rather than in person.
     MOBILE_MONEY_PROVIDERS = frozenset(

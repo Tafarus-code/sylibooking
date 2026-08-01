@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
 
@@ -77,6 +78,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
   }
 
   Future<void> _upload({required bool fromCamera}) async {
+    final l = L.of(context);
     final picked = await widget.imageSource.pick(fromCamera: fromCamera);
     // Backing out of the picker is not an error.
     if (picked == null) return;
@@ -92,7 +94,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
         filename: picked.filename,
         caption: caption,
       );
-      _notify('Photo added.');
+      _notify(l.photoAdded);
       await _load();
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
@@ -104,27 +106,28 @@ class _PhotosScreenState extends State<PhotosScreen> {
   }
 
   Future<String?> _askForCaption() {
+    final l = L.of(context);
     final caption = TextEditingController();
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add a caption'),
+        title: Text(l.addACaption),
         content: TextField(
           controller: caption,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Optional, e.g. "The terrace at night"',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l.captionHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(l.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, caption.text.trim()),
-            child: const Text('Upload'),
+            child: Text(l.upload),
           ),
         ],
       ),
@@ -134,9 +137,10 @@ class _PhotosScreenState extends State<PhotosScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Photos')),
+      appBar: AppBar(title: Text(l.photos)),
       floatingActionButton: _canUpload
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -146,7 +150,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
                   heroTag: 'camera',
                   onPressed:
                       _uploading ? null : () => _upload(fromCamera: true),
-                  tooltip: 'Take a photo',
+                  tooltip: l.takeAPhoto,
                   child: const Icon(Icons.photo_camera),
                 ),
                 const SizedBox(height: 8),
@@ -155,7 +159,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
                   onPressed:
                       _uploading ? null : () => _upload(fromCamera: false),
                   icon: const Icon(Icons.add_photo_alternate),
-                  label: const Text('Add photo'),
+                  label: Text(l.addPhoto),
                 ),
               ],
             )
@@ -173,7 +177,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _load,
-                          child: const Text('Try again'),
+                          child: Text(l.tryAgain),
                         ),
                       ],
                     )
@@ -189,16 +193,15 @@ class _PhotosScreenState extends State<PhotosScreen> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'No photos yet',
+                              l.noPhotosYet,
                               textAlign: TextAlign.center,
                               style: theme.textTheme.titleMedium,
                             ),
                             const SizedBox(height: 8),
                             Text(
                               _canUpload
-                                  ? 'Customers browse with their eyes. A few '
-                                      'good photos of the room go a long way.'
-                                  : 'An owner or manager adds photos here.',
+                                  ? l.noPhotosDetailCanUpload
+                                  : l.noPhotosDetailViewOnly,
                               textAlign: TextAlign.center,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,

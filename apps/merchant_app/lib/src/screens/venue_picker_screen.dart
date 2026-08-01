@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 
 /// Which venue am I working tonight?
@@ -15,24 +16,25 @@ class VenuePickerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
     final canGoBack = auth.selectedVenue != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose a venue'),
+        title: Text(l.chooseAVenue),
         automaticallyImplyLeading: false,
         actions: [
           if (!canGoBack)
             IconButton(
               icon: const Icon(Icons.logout),
-              tooltip: 'Sign out',
+              tooltip: l.signOut,
               onPressed: auth.signOut,
             ),
         ],
         leading: canGoBack
             ? IconButton(
                 icon: const Icon(Icons.close),
-                tooltip: 'Keep current venue',
+                tooltip: l.keepCurrentVenue,
                 onPressed: () => auth.selectVenue(auth.selectedVenue!),
               )
             : null,
@@ -43,7 +45,7 @@ class VenuePickerScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
-              'Everything you do next applies to the venue you pick.',
+              l.everythingAppliesToVenue,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -99,14 +101,15 @@ class NoVenueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sylibooking Merchant'),
+        title: Text(l.appTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
+            tooltip: l.signOut,
             onPressed: auth.signOut,
           ),
         ],
@@ -123,11 +126,10 @@ class NoVenueScreen extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 16),
-              Text('No venue yet', style: theme.textTheme.titleMedium),
+              Text(l.noVenueYet, style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
-                'This account is not a member of any establishment. An owner '
-                'can add you to theirs, or an admin can set one up.',
+                l.noVenueYetDetail,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,

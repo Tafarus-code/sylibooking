@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 
 /// What the venue took, what is still owed, and who to chase.
@@ -16,14 +17,19 @@ class PaymentsDashboardScreen extends StatefulWidget {
 }
 
 enum DashboardWindow {
-  week('7 days', 6),
-  month('30 days', 29),
-  quarter('90 days', 89);
+  week(6),
+  month(29),
+  quarter(89);
 
-  const DashboardWindow(this.label, this.daysBack);
+  const DashboardWindow(this.daysBack);
 
-  final String label;
   final int daysBack;
+
+  String label(L l) => switch (this) {
+        DashboardWindow.week => l.window7Days,
+        DashboardWindow.month => l.window30Days,
+        DashboardWindow.quarter => l.window90Days,
+      };
 }
 
 class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
@@ -79,14 +85,16 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payments'),
+        title: Text(l.navPayments),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,
-            tooltip: 'Refresh',
+            tooltip: l.refresh,
           ),
         ],
         bottom: PreferredSize(
@@ -96,7 +104,10 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
             child: SegmentedButton<DashboardWindow>(
               segments: [
                 for (final window in DashboardWindow.values)
-                  ButtonSegment(value: window, label: Text(window.label)),
+                  ButtonSegment(
+                    value: window,
+                    label: Text(window.label(l)),
+                  ),
               ],
               selected: {_window},
               onSelectionChanged: (selection) {
@@ -115,6 +126,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     if (_error != null) {
       return ListView(
@@ -125,7 +137,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
           const SizedBox(height: 16),
           Text(_error!, textAlign: TextAlign.center),
           const SizedBox(height: 24),
-          FilledButton(onPressed: _load, child: const Text('Try again')),
+          FilledButton(onPressed: _load, child: Text(l.tryAgain)),
         ],
       );
     }
@@ -138,8 +150,10 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
       padding: contentInsets(context, maxWidth: ContentWidth.list, minHorizontal: 12).copyWith(top: 12, bottom: 32),
       children: [
         Text(
-          '${DateFormat.MMMd().format(dashboard.from)} – '
-          '${DateFormat.MMMd().format(dashboard.to)}',
+          l.dateRange(
+            DateFormat.MMMd(l.localeName).format(dashboard.from),
+            DateFormat.MMMd(l.localeName).format(dashboard.to),
+          ),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -149,10 +163,9 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
         // Collected first and largest: it is the number a merchant opens this
         // screen to see.
         _MoneyCard(
-          label: 'Collected',
+          label: l.collected,
           amount: dashboard.collected,
-          detail: '${dashboard.completedCount} '
-              '${dashboard.completedCount == 1 ? "payment" : "payments"}',
+          detail: l.paymentCount(dashboard.completedCount),
           icon: Icons.check_circle,
           tone: _Tone.good,
         ),
@@ -161,9 +174,9 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
           children: [
             Expanded(
               child: _MoneyCard(
-                label: 'Awaiting',
+                label: l.awaiting,
                 amount: dashboard.awaiting,
-                detail: '${dashboard.pendingCount} pending',
+                detail: l.pendingCount(dashboard.pendingCount),
                 icon: Icons.hourglass_top,
                 tone: dashboard.pendingCount > 0 ? _Tone.warn : _Tone.neutral,
                 compact: true,
@@ -172,9 +185,9 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: _MoneyCard(
-                label: 'Failed',
+                label: l.failed,
                 amount: dashboard.failed,
-                detail: '${dashboard.failedCount} failed',
+                detail: l.failedCount(dashboard.failedCount),
                 icon: Icons.error_outline,
                 tone: dashboard.failedCount > 0 ? _Tone.bad : _Tone.neutral,
                 compact: true,
@@ -184,24 +197,27 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
         ),
 
         const SizedBox(height: 16),
-        _SectionLabel('Bookings'),
+        _SectionLabel(l.sectionBookings),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _CountRow('Total', dashboard.totalReservations),
-                _CountRow('Pending', dashboard.reservationCounts['pending'] ?? 0),
+                _CountRow(l.countTotal, dashboard.totalReservations),
                 _CountRow(
-                  'Confirmed',
+                  l.statusPending,
+                  dashboard.reservationCounts['pending'] ?? 0,
+                ),
+                _CountRow(
+                  l.statusConfirmed,
                   dashboard.reservationCounts['confirmed'] ?? 0,
                 ),
                 _CountRow(
-                  'Cancelled',
+                  l.statusCancelled,
                   dashboard.reservationCounts['cancelled'] ?? 0,
                 ),
                 _CountRow(
-                  'Completed',
+                  l.statusCompleted,
                   dashboard.reservationCounts['completed'] ?? 0,
                 ),
               ],
@@ -210,7 +226,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
         ),
 
         const SizedBox(height: 16),
-        _SectionLabel('By payment method'),
+        _SectionLabel(l.sectionByPaymentMethod),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -227,8 +243,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
                             children: [
                               Text(row.providerDisplay),
                               Text(
-                                '${row.bookings} '
-                                '${row.bookings == 1 ? "booking" : "bookings"}',
+                                l.bookingCount(row.bookings),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -242,14 +257,14 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
                             Text(
                               row.provider == 'cash_on_arrival'
                                   ? '—'
-                                  : '${row.collected} GNF',
+                                  : l.amountGnf(row.collected),
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             if (row.provider == 'cash_on_arrival')
                               Text(
-                                'at the till',
+                                l.atTheTill,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -265,7 +280,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
         ),
 
         const SizedBox(height: 16),
-        _SectionLabel('Needs chasing'),
+        _SectionLabel(l.sectionNeedsChasing),
         if (dashboard.needsAttention.isEmpty)
           Card(
             child: Padding(
@@ -274,9 +289,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
                 children: [
                   Icon(Icons.check_circle, color: theme.colorScheme.primary),
                   const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text('Nothing outstanding. Every booking is settled.'),
-                  ),
+                  Expanded(child: Text(l.nothingOutstanding)),
                 ],
               ),
             ),
@@ -307,7 +320,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
                             ),
                           ),
                           Text(
-                            '${DateFormat.MMMEd().format(item.dateTime)} '
+                            '${DateFormat.MMMEd(l.localeName).format(item.dateTime)} '
                             '${DateFormat.Hm().format(item.dateTime)} · '
                             '${item.spaceName}',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -316,8 +329,12 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
                           ),
                           Text(
                             item.paymentStatus == PaymentStatus.failed
-                                ? '${item.paymentProviderDisplay} payment failed'
-                                : '${item.paymentProviderDisplay} not received',
+                                ? l.providerPaymentFailed(
+                                    item.paymentProviderDisplay,
+                                  )
+                                : l.providerNotReceived(
+                                    item.paymentProviderDisplay,
+                                  ),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onErrorContainer,
                               fontWeight: FontWeight.w600,
@@ -397,7 +414,7 @@ class _MoneyCard extends StatelessWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                '$amount GNF',
+                L.of(context).amountGnf(amount),
                 style: (compact
                         ? theme.textTheme.titleMedium
                         : theme.textTheme.headlineSmall)

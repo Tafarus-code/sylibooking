@@ -4,7 +4,6 @@ import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
-import 'package:customer_app/src/locale_controller.dart';
 import 'package:customer_app/src/location_source.dart';
 import 'package:customer_app/src/screens/photo_viewer_screen.dart';
 import 'package:customer_app/src/widgets/establishment_card.dart';

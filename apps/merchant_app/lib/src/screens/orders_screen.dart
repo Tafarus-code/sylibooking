@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../labels.dart';
 
 /// The kitchen queue: tickets grouped by where they have got to.
 ///
@@ -28,11 +30,11 @@ class _OrdersViewState extends State<OrdersView> {
   int? _busyId;
 
   /// The stages a ticket passes through, in the order the pass reads them.
-  static const _stages = [
-    (OrderStatus.ready, 'Ready to collect'),
-    (OrderStatus.preparing, 'Being prepared'),
-    (OrderStatus.placed, 'New orders'),
-  ];
+  List<(OrderStatus, String)> _stages(L l) => [
+        (OrderStatus.ready, l.stageReadyToCollect),
+        (OrderStatus.preparing, l.stageBeingPrepared),
+        (OrderStatus.placed, l.stageNewOrders),
+      ];
 
   @override
   void initState() {
@@ -117,22 +119,20 @@ class _OrdersViewState extends State<OrdersView> {
   }
 
   Future<void> _cancel(Order order) async {
+    final l = L.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel this order?'),
-        content: Text(
-          '${order.customerName} will not be able to collect it, and nothing '
-          'will be owed.',
-        ),
+        title: Text(l.cancelThisOrder),
+        content: Text(l.cancelOrderDetail(order.customerName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it'),
+            child: Text(l.keepIt),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cancel order'),
+            child: Text(l.cancelOrder),
           ),
         ],
       ),
@@ -146,31 +146,33 @@ class _OrdersViewState extends State<OrdersView> {
   }
 
   Widget _body() {
+    final l = L.of(context);
+
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
       return _EmptyState(
         icon: Icons.cloud_off,
-        title: 'Could not load the queue',
+        title: l.couldNotLoadTheQueue,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
     if (_venueId == null) {
-      return const _EmptyState(
+      return _EmptyState(
         icon: Icons.storefront_outlined,
-        title: 'No venue selected',
-        detail: 'Pick a venue to see its kitchen queue.',
+        title: l.noVenueSelected,
+        detail: l.pickAVenueForQueue,
       );
     }
 
     final open = _orders.where((order) => order.status.isOpen).toList();
     if (open.isEmpty) {
-      return const _EmptyState(
+      return _EmptyState(
         icon: Icons.receipt_long_outlined,
-        title: 'Nothing in the queue',
-        detail: 'Orders placed for today land here as they come in.',
+        title: l.nothingInTheQueue,
+        detail: l.ordersLandHere,
       );
     }
 
@@ -181,7 +183,7 @@ class _OrdersViewState extends State<OrdersView> {
         maxWidth: ContentWidth.list,
       ).copyWith(bottom: 24),
       children: [
-        for (final (stageStatus, label) in _stages)
+        for (final (stageStatus, label) in _stages(l))
           ..._stage(
             label,
             open.where((order) => order.status == stageStatus).toList(),
@@ -197,7 +199,7 @@ class _OrdersViewState extends State<OrdersView> {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
         child: Text(
-          '$label · ${orders.length}',
+          L.of(context).stageHeading(label, orders.length),
           style: Theme.of(context).textTheme.titleSmall,
         ),
       ),
@@ -227,16 +229,10 @@ class OrderTicket extends StatelessWidget {
   final VoidCallback onAdvance;
   final VoidCallback onCancel;
 
-  String get _advanceLabel => switch (order.status) {
-        OrderStatus.placed => 'Start preparing',
-        OrderStatus.preparing => 'Mark ready',
-        OrderStatus.ready => 'Collected',
-        _ => 'Move on',
-      };
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -273,7 +269,7 @@ class OrderTicket extends StatelessWidget {
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
-                      'At their table',
+                      l.atTheirTable,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
@@ -322,7 +318,7 @@ class OrderTicket extends StatelessWidget {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    '${order.total} GNF',
+                    l.amountGnf(order.total),
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -335,8 +331,7 @@ class OrderTicket extends StatelessWidget {
             if (!order.canAdvance && order.isAwaitingPayment) ...[
               const SizedBox(height: 8),
               Text(
-                'Waiting on the ${order.paymentProviderDisplay} payment. '
-                'The kitchen cannot start until it clears.',
+                l.waitingOnPayment(order.paymentProviderDisplay),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.error,
                 ),
@@ -352,11 +347,11 @@ class OrderTicket extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: busy ? null : onCancel,
-                  child: const Text('Cancel'),
+                  child: Text(l.cancel),
                 ),
                 FilledButton(
                   onPressed: busy || !order.canAdvance ? null : onAdvance,
-                  child: Text(_advanceLabel),
+                  child: Text(order.status.advanceLabel(l)),
                 ),
               ],
             ),
@@ -386,44 +381,39 @@ class OrderStatusBadge extends StatelessWidget {
     // looking identical.
     //
     // Neutral for waiting, warm for cooking, the accent for done.
-    final (label, icon, background, foreground) = switch (status) {
+    final (icon, background, foreground) = switch (status) {
       OrderStatus.placed => (
-          'Placed',
           Icons.fiber_new,
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
       OrderStatus.preparing => (
-          'Preparing',
           Icons.local_fire_department,
           scheme.tertiaryContainer,
           scheme.onTertiaryContainer,
         ),
       OrderStatus.ready => (
-          'Ready',
           Icons.check_circle,
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
         ),
       OrderStatus.completed => (
-          'Collected',
           Icons.done_all,
           scheme.secondaryContainer,
           scheme.onSecondaryContainer,
         ),
       OrderStatus.cancelled => (
-          'Cancelled',
           Icons.cancel,
           scheme.errorContainer,
           scheme.onErrorContainer,
         ),
       OrderStatus.unknown => (
-          'Unknown',
           Icons.help_outline,
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
     };
+    final label = status.label(L.of(context));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -459,21 +449,23 @@ class _PaymentChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    final l = L.of(context);
+
     final (label, icon, background, foreground) = switch (order) {
       _ when order.isPaid => (
-          'Paid (${order.paymentProviderDisplay})',
+          l.paidWith(order.paymentProviderDisplay),
           Icons.check_circle,
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
         ),
       _ when order.isAwaitingPayment => (
-          'Unpaid',
+          l.unpaid,
           Icons.hourglass_top,
           scheme.errorContainer,
           scheme.onErrorContainer,
         ),
       _ => (
-          'Cash on pickup',
+          l.cashOnPickup,
           Icons.local_atm,
           Colors.transparent,
           scheme.onSurfaceVariant,

@@ -8,7 +8,6 @@ import 'customer_auth.dart';
 import 'directions.dart';
 import 'favourites_controller.dart';
 import 'image_source.dart';
-import 'locale_controller.dart';
 import 'location_source.dart';
 import 'screens/customer_home_screen.dart';
 

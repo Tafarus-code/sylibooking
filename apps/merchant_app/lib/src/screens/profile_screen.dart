@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 
 /// The venue's own details. Owner and manager only.
@@ -72,6 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final l = L.of(context);
     setState(() {
       _saving = true;
       _error = null;
@@ -89,7 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Details saved.')));
+        ..showSnackBar(SnackBar(content: Text(l.detailsSaved)));
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -107,8 +109,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Venue details')),
+      appBar: AppBar(title: Text(l.venueDetails)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Form(
@@ -116,11 +120,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _field(_name, 'Name', required: true),
-                  _field(_tagline, 'Tagline (one line)'),
-                  _field(_description, 'Description', maxLines: 4),
-                  _field(_city, 'City', required: true),
-                  _field(_address, 'Address', maxLines: 2, required: true),
+                  _field(_name, l.fieldName, required: true),
+                  _field(_tagline, l.fieldTagline),
+                  _field(_description, l.fieldDescription, maxLines: 4),
+                  _field(_city, l.fieldCity, required: true),
+                  _field(_address, l.fieldAddress, maxLines: 2, required: true),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -142,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Save'),
+                        : Text(l.save),
                   ),
                 ],
               ),
@@ -167,8 +171,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             border: const OutlineInputBorder(),
           ),
           validator: required
-              ? (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Required' : null
+              ? (value) => (value == null || value.trim().isEmpty)
+                  ? L.of(context).required
+                  : null
               : null,
         ),
       );

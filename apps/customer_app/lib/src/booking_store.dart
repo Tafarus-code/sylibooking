@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'locale_controller.dart';
+import 'package:shared_client/shared_client.dart';
 
 /// Remembers what this device booked, and who it booked as.
 ///

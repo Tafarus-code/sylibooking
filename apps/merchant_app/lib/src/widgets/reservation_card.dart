@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../labels.dart';
 import 'payment_badge.dart';
 
 /// One booking, with the actions the merchant can still take on it.
@@ -26,6 +28,7 @@ class ReservationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
     final time = DateFormat.Hm().format(reservation.dateTime);
     final isPending = reservation.status == ReservationStatus.pending;
     // The server refuses to confirm an unpaid mobile money booking, so offer
@@ -72,8 +75,7 @@ class ReservationCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         '${reservation.spaceName} · '
-                        '${reservation.partySize} '
-                        '${reservation.partySize == 1 ? "guest" : "guests"}',
+                        '${l.guestCount(reservation.partySize)}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -98,7 +100,7 @@ class ReservationCard extends StatelessWidget {
             if (blockedByPayment) ...[
               const SizedBox(height: 6),
               Text(
-                'Cannot confirm until the payment clears.',
+                l.cannotConfirmUntilPaymentClears,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.error,
                 ),
@@ -113,7 +115,7 @@ class ReservationCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: busy ? null : onCancel,
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Cancel'),
+                      label: Text(l.cancel),
                       style: TextButton.styleFrom(
                         foregroundColor: theme.colorScheme.error,
                       ),
@@ -123,7 +125,7 @@ class ReservationCard extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: (busy || !canConfirm) ? null : onConfirm,
                       icon: const Icon(Icons.check, size: 18),
-                      label: const Text('Confirm'),
+                      label: Text(l.confirm),
                     ),
                   ],
                 ],
@@ -146,33 +148,29 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final (label, background, foreground) = switch (status) {
+    final (background, foreground) = switch (status) {
       ReservationStatus.pending => (
-          'Pending',
           scheme.tertiaryContainer,
           scheme.onTertiaryContainer,
         ),
       ReservationStatus.confirmed => (
-          'Confirmed',
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
         ),
       ReservationStatus.cancelled => (
-          'Cancelled',
           scheme.errorContainer,
           scheme.onErrorContainer,
         ),
       ReservationStatus.completed => (
-          'Completed',
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
       ReservationStatus.unknown => (
-          'Unknown',
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
     };
+    final label = status.label(L.of(context));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

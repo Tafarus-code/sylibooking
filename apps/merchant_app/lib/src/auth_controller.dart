@@ -22,6 +22,11 @@ class AuthController extends ChangeNotifier {
   AuthState state = AuthState.unknown;
   MerchantUser? user;
   String? errorMessage;
+
+  /// Set when the sign-in was refused for the credentials themselves.
+  /// The wording belongs to the screen, which has a BuildContext; this
+  /// only says which case it was.
+  bool badCredentials = false;
   bool busy = false;
 
   /// Venues this account may work in, with the role at each.
@@ -106,6 +111,7 @@ class AuthController extends ChangeNotifier {
   Future<bool> signIn(String username, String password) async {
     busy = true;
     errorMessage = null;
+    badCredentials = false;
     notifyListeners();
 
     try {
@@ -115,9 +121,8 @@ class AuthController extends ChangeNotifier {
       await _loadVenues();
       return true;
     } on ApiException catch (e) {
-      errorMessage = e.statusCode == 400
-          ? 'Wrong username or password.'
-          : e.message;
+      badCredentials = e.statusCode == 400;
+      errorMessage = badCredentials ? null : e.message;
       return false;
     } on ApiUnreachableException catch (e) {
       errorMessage = e.message;

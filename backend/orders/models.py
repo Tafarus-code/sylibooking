@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils.translation import pgettext_lazy
 
 from establishments.models import Establishment, MenuItem
 
@@ -18,11 +19,11 @@ class Order(models.Model):
     """
 
     class Status(models.TextChoices):
-        PLACED = 'placed', 'Placed'
-        PREPARING = 'preparing', 'Preparing'
-        READY = 'ready', 'Ready'
-        COMPLETED = 'completed', 'Completed'
-        CANCELLED = 'cancelled', 'Cancelled'
+        PLACED = 'placed', pgettext_lazy('order status', 'Placed')
+        PREPARING = 'preparing', pgettext_lazy('order status', 'Preparing')
+        READY = 'ready', pgettext_lazy('order status', 'Ready')
+        COMPLETED = 'completed', pgettext_lazy('order status', 'Completed')
+        CANCELLED = 'cancelled', pgettext_lazy('order status', 'Cancelled')
 
     #: The kitchen's forward path. Anything else is a jump the API refuses.
     NEXT_STATUS = {

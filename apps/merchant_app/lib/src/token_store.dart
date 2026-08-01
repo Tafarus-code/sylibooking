@@ -1,3 +1,4 @@
+import 'package:shared_client/shared_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Where the auth token is kept between launches.
@@ -29,6 +30,35 @@ class SharedPreferencesTokenStore implements TokenStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
   }
+}
+
+/// Language choice in shared preferences.
+///
+/// Its own key, not the customer app's: the two apps are installed side by
+/// side on a merchant's phone and each is set independently.
+class SharedPreferencesLocaleStore implements LocaleStore {
+  static const _key = 'sylibooking.merchant.language';
+
+  @override
+  Future<String?> readLanguageCode() async =>
+      (await SharedPreferences.getInstance()).getString(_key);
+
+  @override
+  Future<void> writeLanguageCode(String code) async =>
+      (await SharedPreferences.getInstance()).setString(_key, code);
+}
+
+/// Language choice in memory, for widget tests.
+class InMemoryLocaleStore implements LocaleStore {
+  InMemoryLocaleStore([this._code]);
+
+  String? _code;
+
+  @override
+  Future<String?> readLanguageCode() async => _code;
+
+  @override
+  Future<void> writeLanguageCode(String code) async => _code = code;
 }
 
 /// Used in tests, and as a fallback if storage is unavailable.

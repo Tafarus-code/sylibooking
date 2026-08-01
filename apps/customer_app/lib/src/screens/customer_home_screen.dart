@@ -6,7 +6,6 @@ import '../booking_store.dart';
 import '../customer_auth.dart';
 import '../directions.dart';
 import '../favourites_controller.dart';
-import '../locale_controller.dart';
 import '../image_source.dart';
 import '../location_source.dart';
 import 'browse_screen.dart';

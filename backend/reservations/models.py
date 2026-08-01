@@ -3,6 +3,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import pgettext_lazy
 
 from establishments.models import Space
 
@@ -15,10 +16,10 @@ class Reservation(models.Model):
     """
 
     class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        CONFIRMED = 'confirmed', 'Confirmed'
-        CANCELLED = 'cancelled', 'Cancelled'
-        COMPLETED = 'completed', 'Completed'
+        PENDING = 'pending', pgettext_lazy('reservation status', 'Pending')
+        CONFIRMED = 'confirmed', pgettext_lazy('reservation status', 'Confirmed')
+        CANCELLED = 'cancelled', pgettext_lazy('reservation status', 'Cancelled')
+        COMPLETED = 'completed', pgettext_lazy('reservation status', 'Completed')
 
     reference = models.UUIDField(
         default=uuid.uuid4,

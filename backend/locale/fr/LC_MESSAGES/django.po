@@ -1,7 +1,8 @@
 # French messages for the Sylibooking API.
 #
-# Only strings a customer actually reads are here. Merchant-facing text stays
-# English until that app is translated, and nothing internal is listed at all.
+# Strings both apps read, and nothing internal. Statuses carry a context
+# because "Completed" is a settled payment, a finished sitting and a collected
+# order, and French wants a different word for each.
 #
 # Compile with:  python manage.py compile_po
 # (a small pure-Python compiler, so no GNU gettext install is needed).
@@ -31,14 +32,87 @@ msgstr "MTN Mobile Money"
 msgid "Cash on arrival"
 msgstr "Espèces sur place"
 
+# Payment statuses read inside a sentence, so they stay lowercase.
+msgctxt "payment status"
 msgid "Pending"
 msgstr "en attente"
 
+msgctxt "payment status"
 msgid "Completed"
 msgstr "abouti"
 
+msgctxt "payment status"
 msgid "Failed"
 msgstr "échoué"
+
+# Reservation statuses are badges on the merchant's list, agreeing with
+# "réservation".
+msgctxt "reservation status"
+msgid "Pending"
+msgstr "En attente"
+
+msgctxt "reservation status"
+msgid "Confirmed"
+msgstr "Confirmée"
+
+msgctxt "reservation status"
+msgid "Cancelled"
+msgstr "Annulée"
+
+msgctxt "reservation status"
+msgid "Completed"
+msgstr "Terminée"
+
+# Order statuses are badges on a kitchen ticket, agreeing with "commande".
+msgctxt "order status"
+msgid "Placed"
+msgstr "Reçue"
+
+msgctxt "order status"
+msgid "Preparing"
+msgstr "En préparation"
+
+msgctxt "order status"
+msgid "Ready"
+msgstr "Prête"
+
+msgctxt "order status"
+msgid "Completed"
+msgstr "Récupérée"
+
+msgctxt "order status"
+msgid "Cancelled"
+msgstr "Annulée"
+
+# Roles, shown wherever the merchant app names who someone is.
+msgid "Owner"
+msgstr "Propriétaire"
+
+msgid "Manager"
+msgstr "Gérant"
+
+msgid "Staff"
+msgstr "Personnel"
+
+# Menu categories, which head the sections of both menus.
+msgid "Food"
+msgstr "Plats"
+
+msgid "Drink"
+msgstr "Boissons"
+
+msgid "Chicha flavour"
+msgstr "Parfums chicha"
+
+# What a customer is sat at.
+msgid "Table"
+msgstr "Table"
+
+msgid "VIP room"
+msgstr "Salon VIP"
+
+msgid "Terrace"
+msgstr "Terrasse"
 
 # --- Ordering ---------------------------------------------------------------
 

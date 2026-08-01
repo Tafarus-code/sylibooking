@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
 
@@ -78,6 +79,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _toggle(MerchantMenuItem item, bool available) async {
+    final l = L.of(context);
     setState(() => _busy.add(item.id));
     try {
       final updated = await widget.auth.api.setMenuItemAvailability(
@@ -92,7 +94,11 @@ class _MenuScreenState extends State<MenuScreen> {
             existing.id == updated.id ? updated : existing,
         ];
       });
-      _notify(available ? '${item.name} is back on.' : '${item.name} marked sold out.');
+      _notify(
+        available
+            ? l.itemBackOn(item.name)
+            : l.itemMarkedSoldOut(item.name),
+      );
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
     } on ApiUnreachableException catch (e) {
@@ -116,6 +122,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _pickImage(MerchantMenuItem item) async {
+    final l = L.of(context);
     final picked = await widget.imageSource.pick();
     if (picked == null) return;
 
@@ -134,7 +141,7 @@ class _MenuScreenState extends State<MenuScreen> {
             existing.id == updated.id ? updated : existing,
         ];
       });
-      _notify('Picture added to ${item.name}.');
+      _notify(l.pictureAddedTo(item.name));
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
     } on ApiUnreachableException catch (e) {
@@ -145,25 +152,23 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _delete(MerchantMenuItem item) async {
+    final l = L.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Remove ${item.name}?'),
-        content: const Text(
-          'It disappears from the customer menu. To hide it temporarily, mark '
-          'it sold out instead.',
-        ),
+        title: Text(l.removeItemTitle(item.name)),
+        content: Text(l.removeItemDetail),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it'),
+            child: Text(l.keepIt),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Remove'),
+            child: Text(l.remove),
           ),
         ],
       ),
@@ -172,7 +177,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
     try {
       await widget.auth.api.deleteMenuItem(_venueId, item.id);
-      _notify('${item.name} removed.');
+      _notify(l.itemRemoved(item.name));
       await _load();
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
@@ -181,13 +186,15 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Menu')),
+      appBar: AppBar(title: Text(l.menu)),
       floatingActionButton: _canEdit
           ? FloatingActionButton.extended(
               onPressed: () => _edit(),
               icon: const Icon(Icons.add),
-              label: const Text('Add item'),
+              label: Text(l.addItem),
             )
           : null,
       body: RefreshIndicator(onRefresh: _load, child: _body()),
@@ -196,6 +203,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Widget _body() {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     if (_loading) return const Center(child: CircularProgressIndicator());
 
@@ -206,7 +214,7 @@ class _MenuScreenState extends State<MenuScreen> {
         children: [
           Text(_error!, textAlign: TextAlign.center),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _load, child: const Text('Try again')),
+          FilledButton(onPressed: _load, child: Text(l.tryAgain)),
         ],
       );
     }
@@ -223,15 +231,13 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No menu yet',
+            l.noMenuYet,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            _canEdit
-                ? 'Add your first item and customers will see it straight away.'
-                : 'A manager or owner adds items here.',
+            _canEdit ? l.noMenuDetailCanEdit : l.noMenuDetailStaff,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -254,8 +260,7 @@ class _MenuScreenState extends State<MenuScreen> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(
-              'You can mark items sold out. Adding and editing is done by a '
-              'manager or owner.',
+              l.staffCanMarkSoldOut,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -305,7 +310,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           ),
                           if (!item.isAvailable)
                             Text(
-                              'Sold out',
+                              l.soldOut,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.error,
                                 fontWeight: FontWeight.w600,
@@ -328,21 +333,21 @@ class _MenuScreenState extends State<MenuScreen> {
                           _ => _delete(item),
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'edit',
-                            child: Text('Edit'),
+                            child: Text(l.edit),
                           ),
                           PopupMenuItem(
                             value: 'image',
                             child: Text(
                               item.imageUrl == null
-                                  ? 'Add a picture'
-                                  : 'Replace picture',
+                                  ? l.addAPicture
+                                  : l.replacePicture,
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'delete',
-                            child: Text('Remove'),
+                            child: Text(l.remove),
                           ),
                         ],
                       ),
@@ -479,6 +484,8 @@ class _MenuItemFormState extends State<_MenuItemForm> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -494,34 +501,37 @@ class _MenuItemFormState extends State<_MenuItemForm> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.item == null ? 'Add an item' : 'Edit item',
+                widget.item == null ? l.addAnItem : l.editItem,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _name,
                 enabled: !_saving,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.fieldName,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'Give it a name'
+                    ? l.giveItAName
                     : null,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _category,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.fieldCategory,
+                  border: const OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'food', child: Text('Food')),
-                  DropdownMenuItem(value: 'drink', child: Text('Drink')),
+                items: [
+                  DropdownMenuItem(value: 'food', child: Text(l.categoryFood)),
+                  DropdownMenuItem(
+                    value: 'drink',
+                    child: Text(l.categoryDrink),
+                  ),
                   DropdownMenuItem(
                     value: 'chicha_flavor',
-                    child: Text('Chicha flavour'),
+                    child: Text(l.categoryChicha),
                   ),
                 ],
                 onChanged: _saving
@@ -533,15 +543,15 @@ class _MenuItemFormState extends State<_MenuItemForm> {
                 controller: _price,
                 enabled: !_saving,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Price (GNF)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.fieldPriceGnf,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
                   final text = (value ?? '').trim();
-                  if (text.isEmpty) return 'Give it a price';
+                  if (text.isEmpty) return l.giveItAPrice;
                   if (double.tryParse(text) == null) {
-                    return 'Numbers only';
+                    return l.numbersOnly;
                   }
                   return null;
                 },
@@ -550,9 +560,9 @@ class _MenuItemFormState extends State<_MenuItemForm> {
               TextFormField(
                 controller: _description,
                 enabled: !_saving,
-                decoration: const InputDecoration(
-                  labelText: 'One-line description (optional)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.fieldOneLineDescription,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               if (_error != null) ...[
@@ -571,7 +581,7 @@ class _MenuItemFormState extends State<_MenuItemForm> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Save'),
+                    : Text(l.save),
               ),
             ],
           ),

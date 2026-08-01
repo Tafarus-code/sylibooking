@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../labels.dart';
 
 /// Who has access to this venue, and in what capacity.
 ///
@@ -69,6 +71,7 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _add() async {
+    final l = L.of(context);
     final username = TextEditingController();
     var role = MerchantRole.staff;
 
@@ -76,37 +79,37 @@ class _StaffScreenState extends State<StaffScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add someone'),
+          title: Text(l.addSomeone),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: username,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.username,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<MerchantRole>(
                 initialValue: role,
-                decoration: const InputDecoration(
-                  labelText: 'Role',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.fieldRole,
+                  border: const OutlineInputBorder(),
                 ),
-                items: const [
+                items: [
                   DropdownMenuItem(
                     value: MerchantRole.staff,
-                    child: Text('Staff — floor work'),
+                    child: Text(l.roleStaffOption),
                   ),
                   DropdownMenuItem(
                     value: MerchantRole.manager,
-                    child: Text('Manager — venue and profile'),
+                    child: Text(l.roleManagerOption),
                   ),
                   DropdownMenuItem(
                     value: MerchantRole.owner,
-                    child: Text('Owner — everything'),
+                    child: Text(l.roleOwnerOption),
                   ),
                 ],
                 onChanged: (value) => setDialogState(
@@ -118,11 +121,11 @@ class _StaffScreenState extends State<StaffScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(l.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Add'),
+              child: Text(l.add),
             ),
           ],
         ),
@@ -137,7 +140,7 @@ class _StaffScreenState extends State<StaffScreen> {
         username: username.text.trim(),
         role: role,
       );
-      _notify('${username.text.trim()} added.');
+      _notify(l.personAdded(username.text.trim()));
       await _load();
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
@@ -147,9 +150,10 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _changeRole(Membership member, MerchantRole role) async {
+    final l = L.of(context);
     try {
       await widget.auth.api.changeStaffRole(_venueId, member.id, role);
-      _notify('${member.username} is now ${role.name}.');
+      _notify(l.personIsNowRole(member.username, role.label(l)));
       await _load();
     } on ApiException catch (e) {
       // The server refuses to leave a venue without an owner; say why.
@@ -158,22 +162,23 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _remove(Membership member) async {
+    final l = L.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Remove ${member.username}?'),
-        content: const Text('They lose access to this venue immediately.'),
+        title: Text(l.removePersonTitle(member.username)),
+        content: Text(l.removePersonDetail),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
+            child: Text(l.keep),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Remove'),
+            child: Text(l.remove),
           ),
         ],
       ),
@@ -182,7 +187,7 @@ class _StaffScreenState extends State<StaffScreen> {
 
     try {
       await widget.auth.api.removeStaff(_venueId, member.id);
-      _notify('${member.username} removed.');
+      _notify(l.personRemoved(member.username));
       await _load();
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
@@ -192,13 +197,14 @@ class _StaffScreenState extends State<StaffScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Who has access')),
+      appBar: AppBar(title: Text(l.whoHasAccess)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _add,
         icon: const Icon(Icons.person_add),
-        label: const Text('Add'),
+        label: Text(l.add),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -210,7 +216,7 @@ class _StaffScreenState extends State<StaffScreen> {
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: _load,
-                      child: const Text('Try again'),
+                      child: Text(l.tryAgain),
                     ),
                   ],
                 )
@@ -237,23 +243,23 @@ class _StaffScreenState extends State<StaffScreen> {
                                   MerchantRole.parse(choice),
                                 ),
                             },
-                            itemBuilder: (context) => const [
+                            itemBuilder: (context) => [
                               PopupMenuItem(
                                 value: 'owner',
-                                child: Text('Make owner'),
+                                child: Text(l.makeOwner),
                               ),
                               PopupMenuItem(
                                 value: 'manager',
-                                child: Text('Make manager'),
+                                child: Text(l.makeManager),
                               ),
                               PopupMenuItem(
                                 value: 'staff',
-                                child: Text('Make staff'),
+                                child: Text(l.makeStaff),
                               ),
-                              PopupMenuDivider(),
+                              const PopupMenuDivider(),
                               PopupMenuItem(
                                 value: 'remove',
-                                child: Text('Remove access'),
+                                child: Text(l.removeAccess),
                               ),
                             ],
                           ),

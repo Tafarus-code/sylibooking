@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../widgets/reservation_card.dart';
 import 'reservation_detail_screen.dart';
 
 enum DateRange {
-  today('Today'),
-  week('Next 7 days');
+  today,
+  week;
 
-  const DateRange(this.label);
-
-  final String label;
+  String label(L l) =>
+      this == DateRange.today ? l.rangeToday : l.rangeNextSevenDays;
 }
 
 /// What is booked, and act on it.
@@ -143,38 +143,43 @@ class _ReservationsViewState extends State<ReservationsView> {
   }
 
   Future<void> _confirmCancel(Reservation reservation) async {
+    final l = L.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel this reservation?'),
+        title: Text(l.cancelThisReservation),
         content: Text(
-          '${reservation.customerName} · ${reservation.spaceName} at '
-          '${DateFormat.Hm().format(reservation.dateTime)}.\n\n'
-          'The slot becomes bookable again.',
+          l.cancelReservationDetail(
+            reservation.customerName,
+            reservation.spaceName,
+            DateFormat.Hm().format(reservation.dateTime),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it'),
+            child: Text(l.keepIt),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Cancel booking'),
+            child: Text(l.cancelBooking),
           ),
         ],
       ),
     );
 
     if (confirmed ?? false) {
-      await _act(reservation, _api.cancelReservation, 'Reservation cancelled.');
+      await _act(reservation, _api.cancelReservation, l.reservationCancelled);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Column(
       children: [
         // The date range belongs to this queue alone, so it sits in the body
@@ -188,7 +193,8 @@ class _ReservationsViewState extends State<ReservationsView> {
                   value: range,
                   // No wrapping: a segment is a fixed-height pill, so a label
                   // that runs to two lines has its second one clipped off.
-                  label: Text(range.label, maxLines: 1, softWrap: false),
+                  label:
+                      Text(range.label(l), maxLines: 1, softWrap: false),
                 ),
             ],
             selected: {_range},
@@ -206,6 +212,8 @@ class _ReservationsViewState extends State<ReservationsView> {
   }
 
   Widget _body() {
+    final l = L.of(context);
+
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -213,20 +221,18 @@ class _ReservationsViewState extends State<ReservationsView> {
     if (_error != null) {
       return _Message(
         icon: Icons.cloud_off,
-        title: 'Could not load reservations',
+        title: l.couldNotLoadReservations,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
     final user = widget.auth.user;
     if (user != null && user.establishments.isEmpty && !user.isSuperuser) {
-      return const _Message(
+      return _Message(
         icon: Icons.store_mall_directory_outlined,
-        title: 'No venue assigned',
-        detail:
-            'This account is not staff at any establishment yet, so there is '
-            'nothing to show. An admin can assign one in the Django admin.',
+        title: l.noVenueAssigned,
+        detail: l.noVenueAssignedDetail,
       );
     }
 
@@ -234,9 +240,9 @@ class _ReservationsViewState extends State<ReservationsView> {
       return _Message(
         icon: Icons.event_available,
         title: _range == DateRange.today
-            ? 'Nothing booked today'
-            : 'Nothing booked this week',
-        detail: 'New reservations appear here as customers make them.',
+            ? l.nothingBookedToday
+            : l.nothingBookedThisWeek,
+        detail: l.newReservationsAppearHere,
       );
     }
 
@@ -265,7 +271,7 @@ class _ReservationsViewState extends State<ReservationsView> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Text(
-                _dayLabel(day),
+                _dayLabel(day, l),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
                     ),
@@ -284,7 +290,7 @@ class _ReservationsViewState extends State<ReservationsView> {
                 onConfirm: () => _act(
                   reservation,
                   _api.confirmReservation,
-                  'Reservation confirmed.',
+                  l.reservationConfirmed,
                 ),
                 onCancel: () => _confirmCancel(reservation),
               ),
@@ -294,14 +300,14 @@ class _ReservationsViewState extends State<ReservationsView> {
     );
   }
 
-  String _dayLabel(DateTime day) {
+  String _dayLabel(DateTime day, L l) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final difference = day.difference(today).inDays;
     return switch (difference) {
-      0 => 'Today',
-      1 => 'Tomorrow',
-      _ => DateFormat.MMMEd().format(day),
+      0 => l.dayToday,
+      1 => l.dayTomorrow,
+      _ => DateFormat.MMMEd(l.localeName).format(day),
     };
   }
 }

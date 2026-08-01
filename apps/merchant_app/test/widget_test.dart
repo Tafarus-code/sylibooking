@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,28 @@ import 'package:merchant_app/src/token_store.dart';
 import 'package:merchant_app/src/screens/orders_screen.dart';
 import 'package:merchant_app/src/widgets/reservation_card.dart';
 import 'package:shared_client/shared_client.dart';
+
+/// A locale store whose read is held open until the test lets it finish.
+///
+/// The in-memory one resolves in a microtask, which a single pump flushes —
+/// so it cannot tell "waited for the language" apart from "did not wait".
+class SlowLocaleStore implements LocaleStore {
+  SlowLocaleStore(this._code);
+
+  final String? _code;
+  final _gate = Completer<void>();
+
+  void finishRead() => _gate.complete();
+
+  @override
+  Future<String?> readLanguageCode() async {
+    await _gate.future;
+    return _code;
+  }
+
+  @override
+  Future<void> writeLanguageCode(String code) async {}
+}
 
 /// Canned backend. Routes are keyed "METHOD /path".
 class FakeBackend {
@@ -296,7 +319,10 @@ void main() {
       });
       backend.on('GET', '/api/merchant/orders/', {'results': orders});
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       // Orders is a tab on the venue desk, not its own navigation destination.
       await tester.tap(find.text('Commandes'));
@@ -581,7 +607,10 @@ void main() {
       });
       backend.on('GET', '/api/merchant/orders/', {'results': orders ?? []});
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -764,7 +793,10 @@ void main() {
         'needs_attention': [unpaidBooking(id: 2)],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       expect(find.text('Mariama Diallo'), findsWidgets);
@@ -843,7 +875,10 @@ void main() {
           ],
         });
 
-        await tester.pumpWidget(MerchantApp(auth: auth));
+        await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
         await tester.pumpAndSettle();
 
         expect(find.text('Choose a venue'), findsOneWidget);
@@ -868,7 +903,10 @@ void main() {
         'results': [],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       return Theme.of(tester.element(find.text('Reservations').first));
     }
@@ -908,7 +946,10 @@ void main() {
         ],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       final scheme =
@@ -920,7 +961,10 @@ void main() {
         (tester) async {
       final (:auth, :backend) = buildAuth(tester);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       final scheme =
@@ -933,7 +977,10 @@ void main() {
     testWidgets('is shown when there is no stored token', (tester) async {
       final (:auth, :backend) = buildAuth(tester);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       expect(find.text('Sign in'), findsOneWidget);
@@ -944,7 +991,10 @@ void main() {
         (tester) async {
       final (:auth, :backend) = buildAuth(tester);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Sign in'));
@@ -961,7 +1011,10 @@ void main() {
         'non_field_errors': ['Unable to log in with provided credentials.'],
       }, status: 400);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).first, 'amadou');
@@ -985,7 +1038,10 @@ void main() {
         'results': [booking()],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).first, 'amadou');
@@ -1005,7 +1061,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', user());
       backend.on('GET', '/api/reservations/', {'count': 0, 'results': []});
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       expect(find.text('Reservations'), findsWidgets);
@@ -1017,7 +1076,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', {'detail': 'Invalid token.'},
           status: 401);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       expect(find.text('Sign in'), findsOneWidget);
@@ -1033,7 +1095,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', user());
       backend.on('GET', '/api/reservations/', reservationsBody);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -1177,7 +1242,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', user());
       // No /reservations/ route registered -> the fake returns 404.
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       expect(find.text('Could not load reservations'), findsOneWidget);
@@ -1190,7 +1258,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', user(establishments: []));
       backend.on('GET', '/api/reservations/', {'count': 0, 'results': []});
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
 
       expect(find.text('No venue assigned'), findsWidgets);
@@ -1295,7 +1366,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', user());
       backend.on('GET', '/api/reservations/', reservationsBody);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -1407,7 +1481,10 @@ void main() {
         'results': [row],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Mariama Diallo'));
       await tester.pumpAndSettle();
@@ -1531,7 +1608,10 @@ void main() {
         );
       }
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.payments_outlined));
       await tester.pumpAndSettle();
@@ -1710,7 +1790,10 @@ void main() {
         'needs_attention': [],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       return (auth: auth, backend: backend);
     }
@@ -1841,7 +1924,10 @@ void main() {
         'results': [],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
@@ -1919,7 +2005,10 @@ void main() {
             ],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
@@ -2030,7 +2119,11 @@ void main() {
       });
 
       await tester.pumpWidget(
-        MerchantApp(auth: auth, imageSource: picker),
+        MerchantApp(
+          auth: auth,
+          imageSource: picker,
+          localeStore: InMemoryLocaleStore(),
+        ),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.tune_outlined));
@@ -2180,7 +2273,10 @@ void main() {
         'theme_preset': preset,
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
@@ -2300,7 +2396,10 @@ void main() {
         'results': [],
       });
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
@@ -2327,7 +2426,10 @@ void main() {
       backend.on('GET', '/api/auth/me/', user());
       backend.on('GET', '/api/reservations/', reservationsBody);
 
-      await tester.pumpWidget(MerchantApp(auth: auth));
+      await tester.pumpWidget(MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(),
+        ));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -2344,6 +2446,221 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Sign in'), findsOneWidget);
+    });
+  });
+
+  group('English and French', () {
+    /// Signed in on the reservation list, in the given language.
+    Future<({FakeBackend backend, InMemoryLocaleStore store})> signedIn(
+      WidgetTester tester, {
+      String? language,
+      List<Map<String, dynamic>>? reservations,
+      Size size = phoneSize,
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      final store = InMemoryLocaleStore(language);
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': reservations?.length ?? 0,
+        'next': null,
+        'results': reservations ?? [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: store),
+      );
+      await tester.pumpAndSettle();
+      return (backend: backend, store: store);
+    }
+
+    testWidgets('the app is English by default', (tester) async {
+      await signedIn(tester);
+
+      expect(find.text('Reservations'), findsWidgets);
+      expect(find.text('Manage'), findsOneWidget);
+    });
+
+    testWidgets('a stored French choice is in force at launch',
+        (tester) async {
+      await signedIn(tester, language: 'fr');
+
+      // The navigation bar, which is the first thing a merchant reads.
+      expect(find.text('Gérer'), findsOneWidget);
+      expect(find.text('Paiements'), findsOneWidget);
+    });
+
+    testWidgets('the desk switcher stays French in both languages',
+        (tester) async {
+      await signedIn(tester);
+
+      // Deliberate: these are the words merchants already use on the floor,
+      // so they do not flip with the rest of the app.
+      expect(find.text('Réservations'), findsWidgets);
+      expect(find.text('Commandes'), findsOneWidget);
+    });
+
+    testWidgets('an empty day says so in French', (tester) async {
+      await signedIn(tester, language: 'fr');
+
+      expect(find.text('Aucune réservation aujourd\'hui'), findsOneWidget);
+      expect(find.text('Nothing booked today'), findsNothing);
+    });
+
+    testWidgets('a booking on the list reads in French', (tester) async {
+      await signedIn(
+        tester,
+        language: 'fr',
+        reservations: [booking(status: 'confirmed')],
+      );
+
+      // The status badge comes from the app, not from the server's
+      // status_display, so it has to be translated here.
+      expect(find.text('Confirmée'), findsOneWidget);
+      expect(find.textContaining('2 personnes'), findsOneWidget);
+      expect(find.text('Espèces'), findsOneWidget);
+    });
+
+    testWidgets('the language toggle lives on Manage', (tester) async {
+      await signedIn(tester);
+
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Language'), findsOneWidget);
+      expect(find.text('Français'), findsOneWidget);
+      // And it is clear of the navigation bar, not hidden behind it.
+      final toggle = tester.getRect(find.text('Français'));
+      final bar = tester.getRect(find.byType(NavigationBar));
+      expect(toggle.bottom, lessThanOrEqualTo(bar.top));
+    });
+
+    testWidgets('switching to French translates the screen underneath',
+        (tester) async {
+      await signedIn(tester);
+
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+      expect(find.text('Sign out'), findsOneWidget);
+
+      await tester.tap(find.text('Français'));
+      await tester.pumpAndSettle();
+      // French runs longer, so the same rows sit further down the list.
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Se déconnecter'), findsOneWidget);
+      expect(find.text('Sign out'), findsNothing);
+      // And the toggle itself, so it can be found again to switch back.
+      expect(find.text('Langue'), findsOneWidget);
+    });
+
+    testWidgets('the choice survives the next launch', (tester) async {
+      final (:backend, :store) = await signedIn(tester);
+
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Français'));
+      await tester.pumpAndSettle();
+
+      expect(await store.readLanguageCode(), 'fr');
+    });
+
+    testWidgets('the server is told which language to answer in',
+        (tester) async {
+      final (:backend, :store) = await signedIn(tester, language: 'fr');
+
+      // The API translates its own refusals; a French app that forgot to say
+      // so would show French screens with English messages on them.
+      final me = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/auth/me/',
+      );
+      expect(me.headers['Accept-Language'], 'fr');
+    });
+
+    testWidgets('an English app sends no language header at all',
+        (tester) async {
+      final (:backend, :store) = await signedIn(tester);
+
+      // No header means English, which is what every older client sends.
+      final me = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/auth/me/',
+      );
+      expect(me.headers.containsKey('Accept-Language'), isFalse);
+    });
+
+    testWidgets('nothing is fetched before the language is known',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      final store = SlowLocaleStore('fr');
+
+      await tester.pumpWidget(MerchantApp(auth: auth, localeStore: store));
+      await tester.pump();
+
+      // Reading the stored language is still in flight. Anything sent now
+      // would go out before the app could say which language to answer in,
+      // and the first thing a merchant reads on a cold start is an error.
+      expect(backend.requests, isEmpty);
+
+      store.finishRead();
+      await tester.pumpAndSettle();
+
+      expect(backend.requests, isNotEmpty);
+      expect(backend.requests.first.headers['Accept-Language'], 'fr');
+    });
+
+    testWidgets('a French login screen refuses in French', (tester) async {
+      final (:auth, :backend) = buildAuth(tester);
+      backend.on(
+        'POST',
+        '/api/auth/login/',
+        {'detail': 'Invalid credentials.'},
+        status: 400,
+      );
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore('fr')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).first, 'amadou');
+      await tester.enterText(find.byType(TextFormField).last, 'wrong');
+      await tester.tap(find.text('Se connecter'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Nom d\'utilisateur ou mot de passe incorrect.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the French labels still fit a 360dp phone', (tester) async {
+      // French runs longer than English almost everywhere, and the navigation
+      // bar is the tightest row in the app.
+      await signedIn(tester, language: 'fr');
+
+      for (final label in ['Réservations', 'Paiements', 'Gérer']) {
+        final rect = tester.getRect(find.text(label).last);
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width), reason: label);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: label);
+      }
+      expect(tester.takeException(), isNull);
     });
   });
 }

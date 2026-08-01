@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../labels.dart';
 import '../widgets/payment_badge.dart';
 
 /// One booking in full, for when the list is not enough.
@@ -19,10 +21,11 @@ class ReservationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
     final payment = reservation.payment;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reservation')),
+      appBar: AppBar(title: Text(l.reservationTitle)),
       body: ListView(
         padding: contentInsets(context, vertical: 16, minHorizontal: 16),
         children: [
@@ -46,44 +49,39 @@ class ReservationDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _Section(
-            title: 'Booking',
+            title: l.sectionBooking,
             rows: [
               (
-                'When',
+                l.rowWhen,
                 '${DateFormat.yMMMEd().format(reservation.dateTime)} · '
                     '${DateFormat.Hm().format(reservation.dateTime)}',
                 false,
               ),
-              ('Space', reservation.spaceName, false),
-              (
-                'Party',
-                '${reservation.partySize} '
-                    '${reservation.partySize == 1 ? "guest" : "guests"}',
-                false,
-              ),
-              ('Phone', reservation.customerPhone, true),
+              (l.rowSpace, reservation.spaceName, false),
+              (l.rowParty, l.guestCount(reservation.partySize), false),
+              (l.rowPhone, reservation.customerPhone, true),
               if (reservation.reference.isNotEmpty)
-                ('Reference', reservation.reference, true),
+                (l.rowReference, reservation.reference, true),
             ],
           ),
           const SizedBox(height: 16),
           if (payment == null)
             _Section(
-              title: 'Payment',
-              rows: const [
-                ('Method', 'Cash on arrival', false),
-                ('Taken', 'Nothing yet — settled at the venue', false),
+              title: l.sectionPayment,
+              rows: [
+                (l.rowMethod, l.cashOnArrival, false),
+                (l.rowTaken, l.nothingYetSettledAtVenue, false),
               ],
             )
           else
             _Section(
-              title: 'Payment',
+              title: l.sectionPayment,
               rows: [
-                ('Method', payment.providerDisplay, false),
-                ('Amount', '${payment.amount} GNF', true),
-                ('Status', payment.statusDisplay, false),
+                (l.rowMethod, payment.providerDisplay, false),
+                (l.rowAmount, l.amountGnf(payment.amount), true),
+                (l.rowStatus, payment.statusDisplay, false),
                 if (payment.providerReference case final ref?)
-                  ('Provider reference', ref, true),
+                  (l.rowProviderReference, ref, true),
               ],
             ),
           if (reservation.isAwaitingPayment) ...[
@@ -105,8 +103,7 @@ class ReservationDetailScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'This booking cannot be confirmed until the payment '
-                      'clears. Cancel it if the customer does not pay.',
+                      l.cannotConfirmUntilPaymentClearsLong,
                       style: TextStyle(
                         color: theme.colorScheme.onErrorContainer,
                       ),
@@ -166,14 +163,18 @@ class _Section extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.copy, size: 16),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'Copy $label',
+                        tooltip: L.of(context).copyField(label),
                         onPressed: () async {
                           await Clipboard.setData(ClipboardData(text: value));
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context)
                             ..clearSnackBars()
                             ..showSnackBar(
-                              SnackBar(content: Text('$label copied')),
+                              SnackBar(
+                                content: Text(
+                                  L.of(context).fieldCopied(label),
+                                ),
+                              ),
                             );
                         },
                       ),
@@ -196,33 +197,29 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final (label, background, foreground) = switch (status) {
+    final (background, foreground) = switch (status) {
       ReservationStatus.pending => (
-          'Pending',
           scheme.tertiaryContainer,
           scheme.onTertiaryContainer,
         ),
       ReservationStatus.confirmed => (
-          'Confirmed',
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
         ),
       ReservationStatus.cancelled => (
-          'Cancelled',
           scheme.errorContainer,
           scheme.onErrorContainer,
         ),
       ReservationStatus.completed => (
-          'Completed',
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
       ReservationStatus.unknown => (
-          'Unknown',
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
     };
+    final label = status.label(L.of(context));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

@@ -233,9 +233,9 @@ class MenuItem(models.Model):
     """
 
     class Category(models.TextChoices):
-        FOOD = 'food', 'Food'
-        DRINK = 'drink', 'Drink'
-        CHICHA_FLAVOR = 'chicha_flavor', 'Chicha flavour'
+        FOOD = 'food', _('Food')
+        DRINK = 'drink', _('Drink')
+        CHICHA_FLAVOR = 'chicha_flavor', _('Chicha flavour')
 
     establishment = models.ForeignKey(
         Establishment,
@@ -287,9 +287,9 @@ class MerchantMembership(models.Model):
     """
 
     class Role(models.TextChoices):
-        OWNER = 'owner', 'Owner'
-        MANAGER = 'manager', 'Manager'
-        STAFF = 'staff', 'Staff'
+        OWNER = 'owner', _('Owner')
+        MANAGER = 'manager', _('Manager')
+        STAFF = 'staff', _('Staff')
 
     #: May edit the venue's public profile: hours, menu, photos, description.
     PROFILE_ROLES = frozenset({Role.OWNER, Role.MANAGER})
@@ -482,9 +482,9 @@ class Space(models.Model):
     """A bookable unit inside an establishment: a table, VIP room or terrace."""
 
     class Type(models.TextChoices):
-        TABLE = 'table', 'Table'
-        VIP_ROOM = 'vip_room', 'VIP room'
-        TERRACE = 'terrace', 'Terrace'
+        TABLE = 'table', _('Table')
+        VIP_ROOM = 'vip_room', _('VIP room')
+        TERRACE = 'terrace', _('Terrace')
 
     establishment = models.ForeignKey(
         Establishment,

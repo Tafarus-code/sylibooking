@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import 'orders_screen.dart';
 import 'reservations_screen.dart';
 
 /// The two halves of the front desk: who is coming, and what to cook.
 enum DeskTab {
-  reservations('Réservations'),
-  orders('Commandes');
+  reservations,
+  orders;
 
-  const DeskTab(this.label);
-
-  final String label;
+  /// Both labels stay French in either language: they are the words merchants
+  /// already use on the floor, and the switcher is read at a glance.
+  String label(L l) =>
+      this == DeskTab.reservations ? l.tabReservations : l.tabOrders;
 }
 
 /// One screen for the venue being worked, with a switcher between its two
@@ -40,15 +42,16 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = widget.auth;
+    final l = L.of(context);
     final venue = auth.selectedVenue;
-    final name = venue?.name ?? 'No venue';
+    final name = venue?.name ?? l.noVenue;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Reservations'),
+            Text(l.navReservations),
             Text(
               // The role is shown because it decides what the rest of the app
               // will let this person do.
@@ -63,17 +66,17 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
             IconButton(
               icon: const Icon(Icons.swap_horiz),
               onPressed: auth.changeVenue,
-              tooltip: 'Switch venue',
+              tooltip: l.switchVenue,
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => setState(() => _reloadToken++),
-            tooltip: 'Refresh',
+            tooltip: l.refresh,
           ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: auth.signOut,
-            tooltip: 'Sign out',
+            tooltip: l.signOut,
           ),
         ],
         bottom: PreferredSize(
@@ -87,7 +90,8 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
                     value: tab,
                     // A segment is a fixed-height pill: a label that wraps
                     // gets its second line clipped rather than growing.
-                    label: Text(tab.label, maxLines: 1, softWrap: false),
+                    label:
+                        Text(tab.label(l), maxLines: 1, softWrap: false),
                   ),
               ],
               selected: {_tab},

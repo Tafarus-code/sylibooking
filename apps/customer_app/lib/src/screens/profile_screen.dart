@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 
 import '../customer_auth.dart';
-import '../locale_controller.dart';
+import 'package:shared_client/shared_client.dart';
 import '../widgets/language_toggle.dart';
 import 'password_reset_screen.dart';
 

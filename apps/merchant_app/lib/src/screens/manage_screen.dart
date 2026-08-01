@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
+import '../widgets/language_toggle.dart';
 import 'branding_screen.dart';
 import 'hours_screen.dart';
 import 'menu_screen.dart';
@@ -20,31 +22,37 @@ class ManageScreen extends StatelessWidget {
     super.key,
     required this.auth,
     required this.imageSource,
+    required this.localeController,
   });
 
   final AuthController auth;
   final ImageSource imageSource;
+  final LocaleController localeController;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
     final role = auth.role;
     final venue = auth.selectedVenue;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage'),
+        title: Text(l.navManage),
         actions: [
           if (auth.hasMultipleVenues)
             IconButton(
               icon: const Icon(Icons.swap_horiz),
-              tooltip: 'Switch venue',
+              tooltip: l.switchVenue,
               onPressed: auth.changeVenue,
             ),
         ],
       ),
       body: ListView(
-        padding: contentInsets(context),
+        // The last rows sat under the navigation bar without this: the list
+        // grew past the fold when the language control was added, and a
+        // control half-hidden behind the bar cannot be tapped at all.
+        padding: contentInsets(context).copyWith(bottom: 32),
         children: [
           if (venue != null)
             Padding(
@@ -54,8 +62,10 @@ class ManageScreen extends StatelessWidget {
                 children: [
                   Text(venue.name, style: theme.textTheme.titleLarge),
                   Text(
-                    '${venue.city} · you are ${venue.roleDisplay.toLowerCase()}'
-                    ' here',
+                    l.youAreRoleHere(
+                      venue.city,
+                      venue.roleDisplay.toLowerCase(),
+                    ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -68,10 +78,10 @@ class ManageScreen extends StatelessWidget {
           // Staff can reach the menu: marking a dish sold out is theirs to do.
           _Entry(
             icon: Icons.restaurant_menu,
-            title: 'Menu',
+            title: l.menu,
             subtitle: role.canEditProfile
-                ? 'Items, prices, and what is sold out'
-                : 'Mark items sold out',
+                ? l.menuSubtitleEdit
+                : l.menuSubtitleStaff,
             onTap: () => _open(
               context,
               MenuScreen(auth: auth, imageSource: imageSource),
@@ -81,10 +91,10 @@ class ManageScreen extends StatelessWidget {
           // Everyone may look at the photos; only owners and managers add.
           _Entry(
             icon: Icons.photo_library_outlined,
-            title: 'Photos',
+            title: l.photos,
             subtitle: role.canEditProfile
-                ? 'What customers see of the room'
-                : 'What customers see of the room (view only)',
+                ? l.photosSubtitle
+                : l.photosSubtitleViewOnly,
             onTap: () => _open(
               context,
               PhotosScreen(auth: auth, imageSource: imageSource),
@@ -94,20 +104,20 @@ class ManageScreen extends StatelessWidget {
           if (role.canEditProfile) ...[
             _Entry(
               icon: Icons.schedule,
-              title: 'Opening hours',
-              subtitle: 'When the doors are open, including past midnight',
+              title: l.openingHours,
+              subtitle: l.openingHoursSubtitle,
               onTap: () => _open(context, HoursScreen(auth: auth)),
             ),
             _Entry(
               icon: Icons.storefront,
-              title: 'Venue details',
-              subtitle: 'Name, tagline, description, address',
+              title: l.venueDetails,
+              subtitle: l.venueDetailsSubtitle,
               onTap: () => _open(context, ProfileScreen(auth: auth)),
             ),
             _Entry(
               icon: Icons.palette_outlined,
-              title: 'Branding',
-              subtitle: 'How your venue looks to customers',
+              title: l.branding,
+              subtitle: l.brandingSubtitle,
               onTap: () => _open(context, BrandingScreen(auth: auth)),
             ),
           ],
@@ -115,8 +125,8 @@ class ManageScreen extends StatelessWidget {
           if (role.canManageStaff)
             _Entry(
               icon: Icons.people_outline,
-              title: 'Who has access',
-              subtitle: 'Add people, change roles, remove access',
+              title: l.whoHasAccess,
+              subtitle: l.whoHasAccessSubtitle,
               onTap: () => _open(context, StaffScreen(auth: auth)),
             ),
 
@@ -124,8 +134,7 @@ class ManageScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Opening hours, venue details and access are managed by an '
-                'owner or manager.',
+                l.managedByOwnerOrManager,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -133,10 +142,15 @@ class ManageScreen extends StatelessWidget {
             ),
 
           const Divider(),
+          // The language control lives here rather than behind venue details:
+          // someone who cannot read the app has to be able to find it, and
+          // Manage is the only screen reachable without reading a sentence.
+          LanguageToggle(controller: localeController),
+          const Divider(),
           ListTile(
             leading: Icon(Icons.logout, color: theme.colorScheme.error),
             title: Text(
-              'Sign out',
+              l.signOut,
               style: TextStyle(color: theme.colorScheme.error),
             ),
             onTap: auth.signOut,

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:shared_client/shared_client.dart';
+
+import 'api_client.dart';
 
 /// Which language the app is in, and remembering the choice.
+///
+/// Lives here rather than in either app because both need it and the two
+/// copies would drift — the `isLoaded` gate and the header wiring below are
+/// easy to get subtly wrong twice.
 ///
 /// Null means "whatever the phone is set to", which is the right default in a
 /// country where the phone is already in French — nobody should have to go

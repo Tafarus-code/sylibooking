@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
 import 'manage_screen.dart';
@@ -13,10 +14,12 @@ class MerchantHomeScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.imageSource,
+    required this.localeController,
   });
 
   final AuthController auth;
   final ImageSource imageSource;
+  final LocaleController localeController;
 
   @override
   State<MerchantHomeScreen> createState() => _MerchantHomeScreenState();
@@ -27,22 +30,24 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return AdaptiveScaffold(
       selectedIndex: _index,
       onDestinationSelected: (index) => setState(() => _index = index),
-      destinations: const [
+      destinations: [
         AdaptiveDestination(
-          label: 'Reservations',
+          label: l.navReservations,
           icon: Icons.event_note_outlined,
           selectedIcon: Icons.event_note,
         ),
         AdaptiveDestination(
-          label: 'Payments',
+          label: l.navPayments,
           icon: Icons.payments_outlined,
           selectedIcon: Icons.payments,
         ),
         AdaptiveDestination(
-          label: 'Manage',
+          label: l.navManage,
           icon: Icons.tune_outlined,
           selectedIcon: Icons.tune,
         ),
@@ -54,7 +59,11 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
         children: [
           VenueDeskScreen(auth: widget.auth),
           PaymentsDashboardScreen(auth: widget.auth),
-          ManageScreen(auth: widget.auth, imageSource: widget.imageSource),
+          ManageScreen(
+            auth: widget.auth,
+            imageSource: widget.imageSource,
+            localeController: widget.localeController,
+          ),
         ],
       ),
     );

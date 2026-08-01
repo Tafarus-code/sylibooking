@@ -7,6 +7,7 @@ from django.core.validators import (
     MinValueValidator,
 )
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from .theme_presets import DEFAULT_PRESET, PRESET_CHOICES
 
@@ -33,8 +34,8 @@ class Establishment(models.Model):
     """
 
     class Type(models.TextChoices):
-        LOUNGE = 'lounge', 'Lounge'
-        RESTAURANT = 'restaurant', 'Restaurant'
+        LOUNGE = 'lounge', _('Lounge')
+        RESTAURANT = 'restaurant', _('Restaurant')
 
     name = models.CharField(
         max_length=200,

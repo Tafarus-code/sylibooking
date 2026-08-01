@@ -69,6 +69,9 @@ MIDDLEWARE = [
     # headers even when another middleware would short-circuit the response.
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # Reads Accept-Language and activates it for the request, so a French app
+    # gets French error messages back. Must sit above CommonMiddleware.
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -145,6 +148,15 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
+
+# English is the source language and the fallback; French is what most
+# customers here actually read. A request with no Accept-Language gets
+# English, which keeps every existing client working unchanged.
+LANGUAGES = [
+    ('en', 'English'),
+    ('fr', 'Français'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 
 # Reservations are booked in local Guinean time; datetimes are still stored in
 # UTC (USE_TZ) and rendered in this zone.

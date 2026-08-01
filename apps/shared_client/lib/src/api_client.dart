@@ -85,7 +85,7 @@ class SylibookingApi {
         if (isAuthenticated) 'Authorization': 'Token $token',
         // The API translates its error messages, and an English sentence
         // arriving in a French app is the one thing that still gives it away.
-        if (languageCode != null) 'Accept-Language': languageCode!,
+        'Accept-Language': ?languageCode,
       };
 
   Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(

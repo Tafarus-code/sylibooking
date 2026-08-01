@@ -61,6 +61,7 @@ class _CustomerAppState extends State<CustomerApp> {
     );
     _locale = LocaleController(
       store: widget.localeStore ?? SharedPreferencesLocaleStore(),
+      api: widget.api,
     )..load();
   }
 
@@ -92,17 +93,24 @@ class _CustomerAppState extends State<CustomerApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: CustomerHomeScreen(
-          api: widget.api,
-          store: widget.store,
-          auth: _auth,
-          favourites: _favourites,
-          localeController: _locale,
-          imageSource: widget.imageSource ?? DeviceImageSource(),
-          locationSource: widget.locationSource ?? const DeviceLocationSource(),
-          directionsLauncher:
-              widget.directionsLauncher ?? const DeviceDirectionsLauncher(),
-        ),
+        // Nothing is fetched until the stored language is known. Reading it
+        // takes one frame, and without this wait the very first request goes
+        // out before the API is told which language to answer in — so a cold
+        // start would show its first error message in English.
+        home: !_locale.isLoaded
+            ? const Scaffold(body: SizedBox.shrink())
+            : CustomerHomeScreen(
+                api: widget.api,
+                store: widget.store,
+                auth: _auth,
+                favourites: _favourites,
+                localeController: _locale,
+                imageSource: widget.imageSource ?? DeviceImageSource(),
+                locationSource:
+                    widget.locationSource ?? const DeviceLocationSource(),
+                directionsLauncher: widget.directionsLauncher ??
+                    const DeviceDirectionsLauncher(),
+              ),
       ),
     );
   }

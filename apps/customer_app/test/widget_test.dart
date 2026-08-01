@@ -1132,6 +1132,53 @@ void main() {
       expect(find.text('Profil'), findsWidgets);
     });
 
+    testWidgets('the server is told which language to answer in',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: InMemoryLocaleStore('fr'),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      // The API translates its errors, so a French app that forgot to say so
+      // would show French screens with English messages on them.
+      final request = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/establishments/',
+      );
+      expect(request.headers['Accept-Language'], 'fr');
+    });
+
+    testWidgets('an English app sends no language header at all',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      // No header means English, which is what every older client sends.
+      final request = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/establishments/',
+      );
+      expect(request.headers.containsKey('Accept-Language'), isFalse);
+    });
+
     testWidgets('the choice is remembered', (tester) async {
       final localeStore = await openProfile(tester);
 

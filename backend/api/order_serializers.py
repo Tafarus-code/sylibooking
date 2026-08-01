@@ -1,6 +1,7 @@
 """Serialisers for pickup orders, customer side and merchant side."""
 
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from orders.models import Order, OrderItem
 from rest_framework import serializers
 
@@ -121,13 +122,13 @@ class OrderCreateSerializer(serializers.Serializer):
 
     def validate_items(self, items):
         if not items:
-            raise serializers.ValidationError('An order needs at least one item.')
+            raise serializers.ValidationError(_('An order needs at least one item.'))
 
         seen = set()
         for line in items:
             if line['menu_item'] in seen:
                 raise serializers.ValidationError(
-                    'Each dish should appear once, with a quantity.'
+                    _('Each dish should appear once, with a quantity.')
                 )
             seen.add(line['menu_item'])
         return items
@@ -135,14 +136,14 @@ class OrderCreateSerializer(serializers.Serializer):
     def validate_pickup_time(self, when):
         if when <= timezone.now():
             raise serializers.ValidationError(
-                'Pick a collection time in the future.'
+                _('Pick a collection time in the future.')
             )
         return when
 
     def validate_reservation_reference(self, reference):
         reservation = Reservation.objects.filter(reference=reference).first()
         if reservation is None:
-            raise serializers.ValidationError('No such booking.')
+            raise serializers.ValidationError(_('No such booking.'))
         return reservation
 
 
@@ -166,8 +167,10 @@ def resolve_menu_items(establishment, lines):
         raise serializers.ValidationError(
             {
                 'items': (
-                    'Some of those dishes are no longer on the menu or have '
-                    'sold out. Check your basket and try again.'
+                    _(
+                        'Some of those dishes are no longer on the menu or '
+                        'have sold out. Check your basket and try again.'
+                    )
                 )
             }
         )

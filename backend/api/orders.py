@@ -7,6 +7,7 @@ authenticated and scoped to venues the caller actually works at.
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from orders.models import Order, OrderItem
 from orders.rules import order_refusal_reason
 from rest_framework import status
@@ -62,7 +63,7 @@ class OrderCreateView(APIView):
             raise ValidationError(
                 {
                     'reservation_reference': (
-                        'That booking is for a different venue.'
+                        _('That booking is for a different venue.')
                     )
                 }
             )
@@ -109,7 +110,7 @@ class CustomerOrderView(APIView):
         order = order_queryset().filter(reference=reference).first()
         if order is None:
             return Response(
-                {'detail': 'No such order.'}, status=status.HTTP_404_NOT_FOUND
+                {'detail': _('No such order.')}, status=status.HTTP_404_NOT_FOUND
             )
 
         # Poll the provider while we are here, so a customer refreshing the
@@ -135,7 +136,7 @@ class MerchantOrderListView(APIView):
         establishment_id = request.query_params.get('establishment')
         if not establishment_id:
             raise ValidationError(
-                {'establishment': 'Say which venue this queue is for.'}
+                {'establishment': _('Say which venue this queue is for.')}
             )
 
         establishment = get_establishment_or_404(establishment_id)
@@ -168,22 +169,20 @@ class MerchantOrderStatusView(APIView):
         order = order_queryset().filter(pk=pk).first()
         if order is None:
             return Response(
-                {'detail': 'No such order.'}, status=status.HTTP_404_NOT_FOUND
+                {'detail': _('No such order.')}, status=status.HTTP_404_NOT_FOUND
             )
 
         require_operations_access(request.user, order.establishment)
 
         target = request.data.get('status')
         if target not in Order.Status.values:
-            raise ValidationError({'status': 'Not a status an order can have.'})
+            raise ValidationError({'status': _('Not a status an order can have.')})
 
         if order.status in Order.TERMINAL_STATUSES:
             return Response(
                 {
-                    'detail': (
-                        f'This order is already '
-                        f'{order.get_status_display().lower()}.'
-                    )
+                    'detail': _('This order is already %(status)s.')
+                    % {'status': order.get_status_display().lower()}
                 },
                 status=status.HTTP_409_CONFLICT,
             )
@@ -194,11 +193,15 @@ class MerchantOrderStatusView(APIView):
             if target != expected:
                 return Response(
                     {
-                        'detail': (
-                            f'An order goes {order.get_status_display().lower()}'
-                            f' → {Order.Status(expected).label.lower()}, not '
-                            f'straight to {Order.Status(target).label.lower()}.'
+                        'detail': _(
+                            'An order goes %(from)s → %(to)s, not straight '
+                            'to %(attempted)s.'
                         )
+                        % {
+                            'from': order.get_status_display().lower(),
+                            'to': Order.Status(expected).label.lower(),
+                            'attempted': Order.Status(target).label.lower(),
+                        }
                     },
                     status=status.HTTP_409_CONFLICT,
                 )
@@ -214,12 +217,15 @@ class MerchantOrderStatusView(APIView):
                 if order.needs_payment_before_progressing:
                     return Response(
                         {
-                            'detail': (
-                                f'{payment.get_provider_display()} payment is '
-                                f'{payment.get_status_display().lower()}. '
-                                f'Start this order once the payment '
-                                f'completes, or cancel it.'
+                            'detail': _(
+                                '%(provider)s payment is %(status)s. Start '
+                                'this order once the payment completes, or '
+                                'cancel it.'
                             )
+                            % {
+                                'provider': payment.get_provider_display(),
+                                'status': payment.get_status_display().lower(),
+                            }
                         },
                         status=status.HTTP_409_CONFLICT,
                     )

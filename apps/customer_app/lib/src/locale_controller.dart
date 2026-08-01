@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 /// Which language the app is in, and remembering the choice.
 ///
@@ -7,9 +8,14 @@ import 'package:flutter/material.dart';
 /// and set the language before they can read the app. The toggle exists for
 /// the case where the phone is wrong, not as a first step.
 class LocaleController extends ChangeNotifier {
-  LocaleController({required this.store});
+  LocaleController({required this.store, this.api});
 
   final LocaleStore store;
+
+  /// Told about the choice so the server answers in the same language. The
+  /// app is fully translated, and an English error from the API would be the
+  /// only thing left giving a French screen away.
+  final SylibookingApi? api;
 
   Locale? _locale;
   bool _loaded = false;
@@ -26,12 +32,14 @@ class LocaleController extends ChangeNotifier {
     final saved = await store.readLanguageCode();
     if (saved != null && saved.isNotEmpty) _locale = Locale(saved);
     _loaded = true;
+    api?.languageCode = _locale?.languageCode;
     notifyListeners();
   }
 
   Future<void> set(Locale locale) async {
     if (_locale?.languageCode == locale.languageCode) return;
     _locale = locale;
+    api?.languageCode = locale.languageCode;
     notifyListeners();
     await store.writeLanguageCode(locale.languageCode);
   }

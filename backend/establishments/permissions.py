@@ -6,6 +6,7 @@ the token, which is what makes a role change take effect on the caller's very
 next request instead of at their next login.
 """
 
+from django.utils.translation import gettext as _
 from rest_framework.exceptions import NotFound, PermissionDenied
 
 from .models import Establishment, MerchantMembership
@@ -35,7 +36,7 @@ def membership_for(user, establishment):
 def get_establishment_or_404(establishment_id):
     establishment = Establishment.objects.filter(pk=establishment_id).first()
     if establishment is None:
-        raise NotFound('No such establishment.')
+        raise NotFound(_('No such establishment.'))
     return establishment
 
 
@@ -49,7 +50,7 @@ def require_membership(user, establishment, allowed_roles=None, action=None):
     """
     membership = membership_for(user, establishment)
     if membership is None:
-        raise NotFound('No such establishment.')
+        raise NotFound(_('No such establishment.'))
 
     if allowed_roles is not None and membership.role not in allowed_roles:
         raise PermissionDenied(

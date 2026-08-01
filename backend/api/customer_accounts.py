@@ -10,6 +10,7 @@ So nothing here gates the booking flow. Everything is additive.
 from accounts.models import CustomerProfile
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
+from django.utils.translation import gettext as _
 from orders.models import Order
 from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
@@ -69,7 +70,7 @@ class RegisterSerializer(serializers.Serializer):
         username = username.strip()
         if User.objects.filter(username__iexact=username).exists():
             raise serializers.ValidationError(
-                'That name is taken. Try another, or sign in instead.'
+                _('That name is taken. Try another, or sign in instead.')
             )
         return username
 
@@ -79,7 +80,7 @@ class RegisterSerializer(serializers.Serializer):
         # demands punctuation gets a password written on the receipt.
         if password.strip() != password:
             raise serializers.ValidationError(
-                'Passwords cannot start or end with a space.'
+                _('Passwords cannot start or end with a space.')
             )
         return password
 
@@ -110,10 +111,12 @@ class RegisterView(APIView):
             # Two signups racing for the same name. The loser is told the same
             # thing the validator would have said.
             raise serializers.ValidationError(
-                {'username': 'That name is taken. Try another.'}
+                {'username': _('That name is taken. Try another.')}
             ) from None
 
-        token, _ = Token.objects.get_or_create(user=user)
+        # Not `_`: that name is gettext in this module, and rebinding it here
+        # made the message above it an UnboundLocalError waiting to happen.
+        token, _created = Token.objects.get_or_create(user=user)
         return Response(
             {'token': token.key, 'user': CustomerSerializer(user).data},
             status=status.HTTP_201_CREATED,
@@ -223,7 +226,7 @@ class FavouritesView(APIView):
             single = request.data.get('establishment')
             if single is None:
                 raise serializers.ValidationError(
-                    {'establishment': 'Say which venue to save.'}
+                    {'establishment': _('Say which venue to save.')}
                 )
             ids = [single]
 

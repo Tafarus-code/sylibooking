@@ -16,6 +16,8 @@ from accounts.notifications import NotificationError, get_notifier, mask
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -26,13 +28,13 @@ User = get_user_model()
 
 #: Said to everyone, whether or not there was an account to find. Confirming
 #: that a username exists is a gift to whoever is guessing them.
-SENT_MESSAGE = (
+SENT_MESSAGE = gettext_lazy(
     'If that account exists, a code is on its way. It is good for 15 minutes.'
 )
 
 #: One message for wrong, expired and never-existed. Which of the three it was
 #: is exactly what an attacker would like to know.
-BAD_CODE_MESSAGE = (
+BAD_CODE_MESSAGE = gettext_lazy(
     'That code is wrong or has expired. Ask for a new one and try again.'
 )
 
@@ -103,7 +105,7 @@ class RequestResetView(APIView):
             # the customer waiting for a message that is never coming.
             return Response(
                 {
-                    'detail': (
+                    'detail': _(
                         'That account has no phone number or email on it, so '
                         'we have no way to send a code. Ask the venue to help '
                         'you, or make a new account.'
@@ -118,11 +120,10 @@ class RequestResetView(APIView):
             get_notifier(channel).send(
                 destination=destination,
                 subject='Your Sylibooking code',
-                body=(
-                    f'Your Sylibooking code is {code}. '
-                    f'It expires in 15 minutes. '
-                    f'If you did not ask for it, ignore this message.'
-                ),
+                body=_(
+                    'Your Sylibooking code is %(code)s. It expires in 15 '
+                    'minutes. If you did not ask for it, ignore this message.'
+                ) % {'code': code},
             )
         except NotificationError:
             logger.exception('Could not send reset code to %s', mask(destination))
@@ -130,7 +131,7 @@ class RequestResetView(APIView):
             record.consume()
             return Response(
                 {
-                    'detail': (
+                    'detail': _(
                         'We could not send the code just now. Try again in a '
                         'moment.'
                     )
@@ -157,7 +158,7 @@ class ConfirmResetSerializer(serializers.Serializer):
     def validate_new_password(self, password):
         if password.strip() != password:
             raise serializers.ValidationError(
-                'Passwords cannot start or end with a space.'
+                _('Passwords cannot start or end with a space.')
             )
         return password
 
@@ -212,7 +213,7 @@ class ConfirmResetView(APIView):
         )
         return Response(
             {
-                'detail': (
+                'detail': _(
                     'Password changed. You can sign in with it now — you have '
                     'been signed out everywhere else.'
                 )

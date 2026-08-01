@@ -1,0 +1,155 @@
+# French messages for the Sylibooking API.
+#
+# Only strings a customer actually reads are here. Merchant-facing text stays
+# English until that app is translated, and nothing internal is listed at all.
+#
+# Compile with:  python manage.py compile_po
+# (a small pure-Python compiler, so no GNU gettext install is needed).
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+# --- Choice labels ----------------------------------------------------------
+#
+# These reach the customer through get_type_display() and friends, both in
+# payloads and inside the sentences below.
+
+msgid "Lounge"
+msgstr "Salon"
+
+msgid "Restaurant"
+msgstr "Restaurant"
+
+msgid "Orange Money"
+msgstr "Orange Money"
+
+msgid "MTN Mobile Money"
+msgstr "MTN Mobile Money"
+
+msgid "Cash on arrival"
+msgstr "Espèces sur place"
+
+msgid "Pending"
+msgstr "en attente"
+
+msgid "Completed"
+msgstr "abouti"
+
+msgid "Failed"
+msgstr "échoué"
+
+# --- Ordering ---------------------------------------------------------------
+
+msgid ""
+"%(venue)s is a %(type)s, and only restaurants take orders ahead. You can "
+"still book a table."
+msgstr ""
+"%(venue)s est un %(type)s, et seuls les restaurants prennent des commandes à "
+"l'avance. Vous pouvez toujours réserver une table."
+
+msgid "An order needs at least one item."
+msgstr "Une commande doit contenir au moins un article."
+
+msgid "Each dish should appear once, with a quantity."
+msgstr "Chaque plat ne doit apparaître qu'une fois, avec une quantité."
+
+msgid "Pick a collection time in the future."
+msgstr "Choisissez une heure de retrait à venir."
+
+msgid "No such booking."
+msgstr "Réservation introuvable."
+
+msgid "That booking is for a different venue."
+msgstr "Cette réservation concerne un autre établissement."
+
+msgid ""
+"Some of those dishes are no longer on the menu or have sold out. Check your "
+"basket and try again."
+msgstr ""
+"Certains de ces plats ne sont plus au menu ou sont épuisés. Vérifiez votre "
+"panier et réessayez."
+
+msgid "Say which venue this queue is for."
+msgstr "Indiquez de quel établissement il s'agit."
+
+msgid "Not a status an order can have."
+msgstr "Ce statut n'existe pas pour une commande."
+
+msgid "This order is already %(status)s."
+msgstr "Cette commande est déjà %(status)s."
+
+msgid "An order goes %(from)s → %(to)s, not straight to %(attempted)s."
+msgstr "Une commande passe de %(from)s à %(to)s, pas directement à %(attempted)s."
+
+msgid ""
+"%(provider)s payment is %(status)s. Start this order once the payment "
+"completes, or cancel it."
+msgstr ""
+"Le paiement %(provider)s est %(status)s. Lancez cette commande une fois le "
+"paiement abouti, ou annulez-la."
+
+# --- Accounts ---------------------------------------------------------------
+
+msgid "That name is taken. Try another, or sign in instead."
+msgstr "Ce nom est déjà pris. Essayez-en un autre, ou connectez-vous."
+
+msgid "That name is taken. Try another."
+msgstr "Ce nom est déjà pris. Essayez-en un autre."
+
+msgid "Passwords cannot start or end with a space."
+msgstr "Un mot de passe ne peut pas commencer ni finir par un espace."
+
+msgid "Say which venue to save."
+msgstr "Indiquez l'établissement à enregistrer."
+
+# --- Password reset ---------------------------------------------------------
+
+msgid "If that account exists, a code is on its way. It is good for 15 minutes."
+msgstr ""
+"Si ce compte existe, un code est en route. Il est valable 15 minutes."
+
+msgid "That code is wrong or has expired. Ask for a new one and try again."
+msgstr ""
+"Ce code est incorrect ou a expiré. Demandez-en un nouveau et réessayez."
+
+msgid ""
+"That account has no phone number or email on it, so we have no way to send a "
+"code. Ask the venue to help you, or make a new account."
+msgstr ""
+"Ce compte n'a ni numéro de téléphone ni e-mail : nous n'avons aucun moyen "
+"d'envoyer un code. Demandez de l'aide à l'établissement, ou créez un nouveau "
+"compte."
+
+msgid "We could not send the code just now. Try again in a moment."
+msgstr "Nous n'avons pas pu envoyer le code. Réessayez dans un instant."
+
+msgid ""
+"Password changed. You can sign in with it now — you have been signed out "
+"everywhere else."
+msgstr ""
+"Mot de passe modifié. Vous pouvez vous connecter avec — vous avez été "
+"déconnecté partout ailleurs."
+
+msgid ""
+"Your Sylibooking code is %(code)s. It expires in 15 minutes. If you did not "
+"ask for it, ignore this message."
+msgstr ""
+"Votre code Sylibooking est %(code)s. Il expire dans 15 minutes. Si vous ne "
+"l'avez pas demandé, ignorez ce message."
+
+# --- Reservations -----------------------------------------------------------
+
+msgid ""
+"%(provider)s payment is pending. Confirm this booking once the payment "
+"completes, or cancel it."
+msgstr ""
+"Le paiement %(provider)s est en attente. Confirmez cette réservation une "
+"fois le paiement abouti, ou annulez-la."
+
+msgid "No such establishment."
+msgstr "Établissement introuvable."
+
+msgid "No such order."
+msgstr "Commande introuvable."

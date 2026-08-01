@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class Payment(models.Model):
@@ -11,14 +12,14 @@ class Payment(models.Model):
     """
 
     class Provider(models.TextChoices):
-        ORANGE_MONEY = 'orange_money', 'Orange Money'
-        MTN_MONEY = 'mtn_money', 'MTN Mobile Money'
-        CASH_ON_ARRIVAL = 'cash_on_arrival', 'Cash on arrival'
+        ORANGE_MONEY = 'orange_money', _('Orange Money')
+        MTN_MONEY = 'mtn_money', _('MTN Mobile Money')
+        CASH_ON_ARRIVAL = 'cash_on_arrival', _('Cash on arrival')
 
     class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        COMPLETED = 'completed', 'Completed'
-        FAILED = 'failed', 'Failed'
+        PENDING = 'pending', _('Pending')
+        COMPLETED = 'completed', _('Completed')
+        FAILED = 'failed', _('Failed')
 
     #: Providers that are settled through an external API rather than in person.
     MOBILE_MONEY_PROVIDERS = frozenset(

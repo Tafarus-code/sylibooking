@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// Greeting over a search field, with the one amber glow on this screen.
 ///
 /// The glow is deliberate and singular: used once here, behind the search
@@ -21,13 +23,13 @@ class BrowseHeader extends StatelessWidget {
   /// From the last booking made on this device; customers have no accounts.
   final String? customerName;
 
-  String get _greeting {
+  String _greeting(L l) {
     final hour = DateTime.now().hour;
     // Lounges here fill up after dark, so the evening greeting is the one
     // most customers will see.
-    if (hour < 12) return 'Bonjour';
-    if (hour < 17) return 'Bon après-midi';
-    return 'Bonsoir';
+    if (hour < 12) return l.greetingMorning;
+    if (hour < 17) return l.greetingAfternoon;
+    return l.greetingEvening;
   }
 
   /// Below this the greeting is dropped and only the search field is kept.
@@ -39,6 +41,7 @@ class BrowseHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final name = (customerName ?? '').trim();
     final firstName = name.isEmpty ? null : name.split(' ').first;
@@ -75,21 +78,23 @@ class BrowseHeader extends StatelessWidget {
                 // The subtitle carries on alone: it names the screen, which
                 // the greeting never did.
                 Text(
-                  'Find a table',
+                  l.findATable,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 )
               else ...[
                 Text(
-                  firstName == null ? _greeting : '$_greeting, $firstName',
+                  firstName == null
+                      ? _greeting(l)
+                      : l.greetingWithName(_greeting(l), firstName),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Find a table',
+                  l.findATable,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -101,7 +106,7 @@ class BrowseHeader extends StatelessWidget {
                 onChanged: onChanged,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Search by name',
+                  hintText: l.searchByName,
                   prefixIcon: const Icon(Icons.search),
                   isDense: true,
                   suffixIcon: controller.text.isEmpty

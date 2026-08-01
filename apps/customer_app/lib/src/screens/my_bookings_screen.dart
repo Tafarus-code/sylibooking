@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import '../image_source.dart';
 import 'write_review_screen.dart';
@@ -79,28 +80,29 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   Future<void> _cancel(Reservation reservation) async {
+    final l = L.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel this booking?'),
+        title: Text(l.cancelBookingTitle),
         content: Text(
-          '${reservation.establishmentName} on '
-          '${DateFormat.MMMEd().format(reservation.dateTime)} at '
-          '${DateFormat.Hm().format(reservation.dateTime)}.\n\n'
-          'The table goes back to other customers, so you may not get it '
-          'again.',
+          l.cancelBookingWhen(
+            '${reservation.establishmentName} · '
+            '${DateFormat.MMMEd(l.localeName).format(reservation.dateTime)} '
+            '${DateFormat.Hm(l.localeName).format(reservation.dateTime)}',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it'),
+            child: Text(l.keepIt),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Cancel booking'),
+            child: Text(l.cancelBooking),
           ),
         ],
       ),
@@ -119,7 +121,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             r.reference == updated.reference ? updated : r,
         ];
       });
-      _notify('Booking cancelled.');
+      _notify(L.of(context).bookingCancelled);
     } on ApiException catch (e) {
       if (!mounted) return;
       _notify(e.message, isError: true);
@@ -143,7 +145,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
 
     if ((posted ?? false) && mounted) {
-      _notify('Thanks — your review is live.');
+      _notify(L.of(context).reviewIsLive);
     }
   }
 
@@ -163,23 +165,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       builder: (context) {
         final controller = TextEditingController();
         return AlertDialog(
-          title: const Text('Add a caption'),
+          title: Text(L.of(context).addACaption),
           content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Optional',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              hintText: L.of(context).optional,
+              border: const OutlineInputBorder(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(L.of(context).cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('Share'),
+              child: Text(L.of(context).share),
             ),
           ],
         );
@@ -196,7 +198,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         reservationReference: reservation.reference,
         caption: caption,
       );
-      _notify('Thanks — your photo is shared.');
+      if (mounted) _notify(L.of(context).photoShared);
     } on ApiException catch (e) {
       if (mounted) _notify(e.message, isError: true);
     } on ApiUnreachableException catch (e) {
@@ -246,7 +248,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
-          FilledButton(onPressed: _load, child: const Text('Try again')),
+          FilledButton(onPressed: _load, child: Text(L.of(context).tryAgain)),
         ],
       );
     }
@@ -263,13 +265,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No bookings yet',
+            L.of(context).noBookingsYet,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Reservations you make on this phone show up here.',
+            L.of(context).noBookingsOnThisPhone,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -346,7 +348,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     onPressed:
                         busy ? null : () => _addPhoto(reservation),
                     icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                    label: const Text('Add a photo'),
+                    label: Text(L.of(context).addAPhoto),
                   ),
                 ),
                 if (reservation.status == ReservationStatus.completed) ...[
@@ -355,7 +357,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     child: TextButton.icon(
                       onPressed: () => _review(reservation),
                       icon: const Icon(Icons.rate_review_outlined, size: 18),
-                      label: const Text('Write a review'),
+                      label: Text(L.of(context).writeAReview),
                     ),
                   ),
                 ] else if (reservation.canCancel) ...[
@@ -365,7 +367,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     child: TextButton.icon(
                       onPressed: busy ? null : () => _cancel(reservation),
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Cancel booking'),
+                      label: Text(L.of(context).cancelBooking),
                       style: TextButton.styleFrom(
                         foregroundColor: theme.colorScheme.error,
                       ),

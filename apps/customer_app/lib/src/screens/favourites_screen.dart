@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 import '../booking_store.dart';
 import '../directions.dart';
 import '../favourites_controller.dart';
@@ -95,12 +97,13 @@ class _FavouritesScreenState extends State<FavouritesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Favourites')),
+      appBar: AppBar(title: Text(L.of(context).favourites)),
       body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }
 
   Widget _body() {
+    final l = L.of(context);
     final theme = Theme.of(context);
 
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -108,18 +111,17 @@ class _FavouritesScreenState extends State<FavouritesScreen> {
     if (_error != null) {
       return _Empty(
         icon: Icons.cloud_off,
-        title: 'Could not load your favourites',
+        title: l.couldNotLoadFavourites,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
     if (_venues.isEmpty) {
-      return const _Empty(
+      return _Empty(
         icon: Icons.favorite_border,
-        title: 'Nothing saved yet',
-        detail: 'Tap the heart on a place you like and it will wait for you '
-            'here.',
+        title: l.nothingSavedYet,
+        detail: l.nothingSavedDetail,
       );
     }
 
@@ -148,8 +150,7 @@ class _FavouritesScreenState extends State<FavouritesScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 child: Text(
-                  'Saved on this phone. Make an account from Profile and they '
-                  'follow you to the next one.',
+                  l.savedOnThisPhone,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,

@@ -603,6 +603,12 @@ class Establishment {
   bool get hasPosition => position != null;
 
   /// "Open until 02:00", "Closed today", or "Hours not listed".
+  /// Just the closing time, "02:00", with no words around it.
+  ///
+  /// The words are the app's to choose and to translate; this package should
+  /// not be shipping English copy to two apps in two languages.
+  String get closesAtDisplay => closesAt == null ? '' : _hhmm(closesAt!);
+
   String get openSummary {
     if (isOpenNow) {
       final until = closesAt == null ? null : _hhmm(closesAt!);

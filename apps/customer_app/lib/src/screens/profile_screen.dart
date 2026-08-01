@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
+
 import '../customer_auth.dart';
+import '../locale_controller.dart';
+import '../widgets/language_toggle.dart';
+import 'password_reset_screen.dart';
 
 /// The account, if there is one.
 ///
@@ -8,36 +13,43 @@ import '../customer_auth.dart';
 /// already works, and the copy says exactly what signing up would add rather
 /// than implying anything is being withheld.
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key, required this.auth});
+  const ProfileScreen({
+    super.key,
+    required this.auth,
+    required this.localeController,
+  });
 
   final CustomerAuth auth;
+  final LocaleController localeController;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text(L.of(context).profile)),
       body: ListenableBuilder(
         listenable: auth,
         builder: (context, _) => auth.isSignedIn
-            ? _SignedIn(auth: auth)
-            : _SignedOut(auth: auth),
+            ? _SignedIn(auth: auth, localeController: localeController)
+            : _SignedOut(auth: auth, localeController: localeController),
       ),
     );
   }
 }
 
 class _SignedIn extends StatelessWidget {
-  const _SignedIn({required this.auth});
+  const _SignedIn({required this.auth, required this.localeController});
 
   final CustomerAuth auth;
+  final LocaleController localeController;
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final customer = auth.customer;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 96),
       children: [
         CircleAvatar(
           radius: 36,
@@ -73,8 +85,7 @@ class _SignedIn extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Your bookings, orders and favourites are saved to this '
-                    'account. Sign in on another phone and they follow you.',
+                    l.accountKeepsEverything,
                     style: theme.textTheme.bodyMedium,
                   ),
                 ),
@@ -86,26 +97,28 @@ class _SignedIn extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: auth.signOut,
           icon: const Icon(Icons.logout),
-          label: const Text('Sign out'),
+          label: Text(l.signOut),
         ),
         const SizedBox(height: 8),
         Text(
-          'Signing out leaves this phone with what it had before — nothing '
-          'is deleted.',
+          l.signOutKeepsPhone,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
+        const SizedBox(height: 32),
+        LanguageToggle(controller: localeController),
       ],
     );
   }
 }
 
 class _SignedOut extends StatefulWidget {
-  const _SignedOut({required this.auth});
+  const _SignedOut({required this.auth, required this.localeController});
 
   final CustomerAuth auth;
+  final LocaleController localeController;
 
   @override
   State<_SignedOut> createState() => _SignedOutState();
@@ -116,6 +129,8 @@ class _SignedOutState extends State<_SignedOut> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
 
   /// Registering by default: someone arriving here has no account, or they
   /// would already be signed in on this phone.
@@ -126,7 +141,25 @@ class _SignedOutState extends State<_SignedOut> {
     _usernameController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _forgotten() async {
+    final message = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => PasswordResetScreen(
+          api: widget.auth.api,
+          initialIdentifier: _usernameController.text.trim(),
+        ),
+      ),
+    );
+    if (message != null && mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   Future<void> _submit() async {
@@ -137,6 +170,8 @@ class _SignedOutState extends State<_SignedOut> {
             username: _usernameController.text.trim(),
             password: _passwordController.text,
             name: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+            email: _emailController.text.trim(),
           )
         : await widget.auth.signIn(
             username: _usernameController.text.trim(),
@@ -147,22 +182,23 @@ class _SignedOutState extends State<_SignedOut> {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Signed in. Everything on this phone is saved.'),
-          ),
+          SnackBar(content: Text(L.of(context).signedInEverythingSaved)),
         );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final auth = widget.auth;
 
     return Form(
       key: _formKey,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        // Generous at the bottom: the last controls are buttons, and on a
+        // 360dp phone they otherwise finish underneath the navigation bar.
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
         children: [
           Icon(
             Icons.person_outline,
@@ -171,7 +207,7 @@ class _SignedOutState extends State<_SignedOut> {
           ),
           const SizedBox(height: 12),
           Text(
-            _registering ? 'Make an account' : 'Welcome back',
+            _registering ? l.makeAnAccount : l.welcomeBack,
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall,
           ),
@@ -188,32 +224,62 @@ class _SignedOutState extends State<_SignedOut> {
           if (_registering) ...[
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Your name'),
+              decoration: InputDecoration(labelText: l.yourName),
               textInputAction: TextInputAction.next,
               validator: (value) => (value ?? '').trim().isEmpty
-                  ? 'What should we call you?'
+                  ? l.whatShouldWeCallYou
                   : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _phoneController,
+              decoration: InputDecoration(
+                labelText: l.phoneNumber,
+                helperText: l.phoneHelper,
+              ),
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                // Not required — an account with no contact is allowed, and
+                // the app says what that costs rather than refusing it.
+                final phone = (value ?? '').trim();
+                if (phone.isEmpty) return null;
+                return phone.length < 8 ? l.phoneTooShort : null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _emailController,
+              decoration: InputDecoration(labelText: l.emailOptional),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                final email = (value ?? '').trim();
+                if (email.isEmpty) return null;
+                return email.contains('@') ? null : l.emailLooksWrong;
+              },
             ),
             const SizedBox(height: 12),
           ],
           TextFormField(
             controller: _usernameController,
-            decoration: const InputDecoration(labelText: 'Username'),
+            decoration: InputDecoration(labelText: l.username),
             textInputAction: TextInputAction.next,
             autocorrect: false,
             validator: (value) =>
-                (value ?? '').trim().isEmpty ? 'Pick a username.' : null,
+                (value ?? '').trim().isEmpty ? l.pickAUsername : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _passwordController,
-            decoration: const InputDecoration(labelText: 'Password'),
+            decoration: InputDecoration(labelText: l.password),
             obscureText: true,
             validator: (value) {
               final password = value ?? '';
-              if (password.isEmpty) return 'Enter a password.';
+              if (password.isEmpty) return l.enterAPassword;
               if (_registering && password.length < 8) {
-                return 'At least 8 characters.';
+                return l.atLeast8Characters;
               }
               return null;
             },
@@ -244,6 +310,19 @@ class _SignedOutState extends State<_SignedOut> {
                   : 'I need an account',
             ),
           ),
+          if (!_registering)
+            TextButton(
+              onPressed: auth.busy ? null : _forgotten,
+              child: Text(l.iForgotMyPassword),
+            ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          // Offered signed out as well as signed in. Someone who cannot read
+          // the app is exactly the person who has not made an account yet,
+          // and making them sign up first to change the language would be
+          // the wrong way round.
+          LanguageToggle(controller: widget.localeController),
         ],
       ),
     );

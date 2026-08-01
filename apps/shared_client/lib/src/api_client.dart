@@ -337,11 +337,16 @@ class SylibookingApi {
     required String username,
     required String password,
     String name = '',
+    // Optional, and the only way back in after a forgotten password.
+    String phone = '',
+    String email = '',
   }) async {
     final json = await _post('/customer/register/', {
       'username': username,
       'password': password,
       'name': name,
+      'phone': phone,
+      'email': email,
     });
     final session = CustomerSession.fromJson(json as Map<String, dynamic>);
     token = session.token;
@@ -367,6 +372,29 @@ class SylibookingApi {
     );
     token = session.token;
     return session;
+  }
+
+  /// Ask for a reset code. The answer is the same whether or not the account
+  /// exists, so the app must not treat "sent" as proof of anything.
+  Future<PasswordResetRequest> requestPasswordReset(String identifier) async {
+    final json = await _post('/customer/password-reset/', {
+      'identifier': identifier,
+    });
+    return PasswordResetRequest.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Use the code. Succeeds or throws with a message worth showing.
+  Future<String> confirmPasswordReset({
+    required String identifier,
+    required String code,
+    required String newPassword,
+  }) async {
+    final json = await _post('/customer/password-reset/confirm/', {
+      'identifier': identifier,
+      'code': code,
+      'new_password': newPassword,
+    });
+    return (json as Map<String, dynamic>)['detail'] as String? ?? '';
   }
 
   Future<CustomerAccount> customerMe() async {

@@ -9,10 +9,15 @@ class CustomerAccount {
     required this.id,
     required this.username,
     required this.name,
+    this.canResetPassword = false,
   });
 
   final int id;
   final String username;
+
+  /// False when the account has neither a phone nor an email, so a forgotten
+  /// password would lock them out. The app warns while there is time to fix it.
+  final bool canResetPassword;
 
   /// What to greet them by — their given name, or the username if they gave
   /// nothing else.
@@ -50,5 +55,33 @@ class CustomerSession {
         customer: CustomerAccount.fromJson(
           json['user'] as Map<String, dynamic>,
         ),
+      );
+}
+
+/// What came back from asking for a reset code.
+///
+/// [sentTo] is masked by the server — enough for the right person to
+/// recognise, not enough for anyone else to use. It is null when no account
+/// matched, because the answer is deliberately the same either way.
+class PasswordResetRequest {
+  const PasswordResetRequest({
+    required this.detail,
+    this.channel,
+    this.sentTo,
+  });
+
+  final String detail;
+
+  /// 'sms' or 'email', or null when nothing was actually sent.
+  final String? channel;
+  final String? sentTo;
+
+  bool get wasSent => channel != null;
+
+  factory PasswordResetRequest.fromJson(Map<String, dynamic> json) =>
+      PasswordResetRequest(
+        detail: json['detail'] as String? ?? '',
+        channel: json['channel'] as String?,
+        sentTo: json['sent_to'] as String?,
       );
 }

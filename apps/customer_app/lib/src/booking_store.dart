@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'locale_controller.dart';
+
 /// Remembers what this device booked, and who it booked as.
 ///
 /// Customers have no account in the MVP — a reservation is just a name and a
@@ -167,6 +169,32 @@ class InMemoryBookingStore implements BookingStore {
   Future<void> rememberCustomer(String name, String phone) async {
     customer = (name: name, phone: phone);
   }
+}
+
+/// Language choice in shared preferences.
+class SharedPreferencesLocaleStore implements LocaleStore {
+  static const _key = 'sylibooking.customer.language';
+
+  @override
+  Future<String?> readLanguageCode() async =>
+      (await SharedPreferences.getInstance()).getString(_key);
+
+  @override
+  Future<void> writeLanguageCode(String code) async =>
+      (await SharedPreferences.getInstance()).setString(_key, code);
+}
+
+/// Language choice in memory, for widget tests.
+class InMemoryLocaleStore implements LocaleStore {
+  InMemoryLocaleStore([this._code]);
+
+  String? _code;
+
+  @override
+  Future<String?> readLanguageCode() async => _code;
+
+  @override
+  Future<void> writeLanguageCode(String code) async => _code = code;
 }
 
 /// Token in shared preferences, for the real app.

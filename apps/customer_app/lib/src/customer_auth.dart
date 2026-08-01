@@ -62,12 +62,16 @@ class CustomerAuth extends ChangeNotifier {
     required String username,
     required String password,
     required String name,
+    String phone = '',
+    String email = '',
   }) =>
       _authenticate(
         () => api.registerCustomer(
           username: username,
           password: password,
           name: name,
+          phone: phone,
+          email: email,
         ),
       );
 

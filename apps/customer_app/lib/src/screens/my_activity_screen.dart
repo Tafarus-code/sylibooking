@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/app_localizations.dart';
 import 'package:shared_client/shared_client.dart';
 
 import '../booking_store.dart';
@@ -9,12 +11,13 @@ import 'my_orders_view.dart';
 
 /// The two things a customer has going: tables booked, and food ordered.
 enum ActivityTab {
-  bookings('Bookings'),
-  orders('Orders');
+  bookings,
+  orders;
 
-  const ActivityTab(this.label);
-
-  final String label;
+  /// Resolved against the current language rather than baked into the enum,
+  /// so the switcher changes with the rest of the app.
+  String label(L l) =>
+      this == ActivityTab.bookings ? l.tabBookings : l.tabOrders;
 }
 
 /// Everything this customer has on, under one heading.
@@ -45,9 +48,11 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My bookings'),
+        title: Text(l.myBookings),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(
@@ -59,7 +64,7 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
                     value: tab,
                     // A segment is a fixed-height pill: a wrapped label loses
                     // its second line.
-                    label: Text(tab.label, maxLines: 1, softWrap: false),
+                    label: Text(tab.label(l), maxLines: 1, softWrap: false),
                   ),
               ],
               selected: {_tab},

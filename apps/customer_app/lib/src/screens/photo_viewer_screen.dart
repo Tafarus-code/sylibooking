@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// One venue photo at full size, with the rest of the album a step away.
 ///
 /// Deliberately dark rather than themed: a photograph is judged against black,
@@ -73,6 +75,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final photo = widget.photos[_index];
 
     return Focus(
@@ -87,11 +90,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.close),
-            tooltip: 'Back to photos',
+            tooltip: l.backToPhotos,
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(
-            '${_index + 1} of ${widget.photos.length}',
+            l.photoOf(_index + 1, widget.photos.length),
             style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
         ),
@@ -109,14 +112,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               _ArrowButton(
                 alignment: Alignment.centerLeft,
                 icon: Icons.chevron_left,
-                tooltip: 'Previous photo',
+                tooltip: l.previousPhoto,
                 onPressed: () => _go(-1),
               ),
             if (_hasNext)
               _ArrowButton(
                 alignment: Alignment.centerRight,
                 icon: Icons.chevron_right,
-                tooltip: 'Next photo',
+                tooltip: l.nextPhoto,
                 onPressed: () => _go(1),
               ),
             if (photo.caption.isNotEmpty)
@@ -168,15 +171,19 @@ class _Unavailable extends StatelessWidget {
   const _Unavailable();
 
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
-            SizedBox(height: 12),
+            const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 48,
+            ),
+            const SizedBox(height: 12),
             Text(
-              'This photo could not be loaded',
-              style: TextStyle(color: Colors.white54),
+              L.of(context).photoCouldNotLoad,
+              style: const TextStyle(color: Colors.white54),
             ),
           ],
         ),

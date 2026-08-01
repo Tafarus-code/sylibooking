@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// The receipt.
 ///
 /// A cash booking is a request the venue still has to accept. A booking paid
@@ -85,48 +87,43 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final payment = _payment;
     final failed = payment?.status == PaymentStatus.failed;
     final settling = _needsPolling && !_gaveUp;
+    final venue = widget.establishment.name;
 
     final (icon, colour, headline, blurb) = switch (payment?.status) {
       null => (
           Icons.check_circle,
           theme.colorScheme.primary,
-          'Request sent',
-          '${widget.establishment.name} will confirm shortly. '
-              'They may call ${_reservation.customerPhone}.',
+          l.requestSent,
+          l.willConfirmShortly(venue, _reservation.customerPhone),
         ),
       PaymentStatus.completed => (
           Icons.check_circle,
           theme.colorScheme.primary,
-          'Table confirmed',
-          'Paid and confirmed at ${widget.establishment.name}. '
-              'Show this reference when you arrive.',
+          l.tableConfirmed,
+          l.paidAndConfirmed(venue),
         ),
       PaymentStatus.failed => (
           Icons.error_outline,
           theme.colorScheme.error,
-          'Payment did not go through',
-          'Your table is still held as a request. '
-              '${widget.establishment.name} will confirm it, or you can pay '
-              'on arrival.',
+          l.paymentDidNotGoThrough,
+          l.stillHeldAsRequest(venue),
         ),
       _ => (
           Icons.hourglass_top,
           theme.colorScheme.tertiary,
-          _gaveUp ? 'Still waiting on payment' : 'Waiting for payment',
-          _gaveUp
-              ? 'It has not come through yet. Check My bookings in a moment — '
-                  'the table is held either way.'
-              : 'Approve the payment on your phone. This updates by itself.',
+          _gaveUp ? l.stillWaitingOnPayment : l.waitingForPaymentTitle,
+          _gaveUp ? l.notComeThroughYet : l.approveOnYourPhone,
         ),
     };
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Booked'),
+        title: Text(l.booked),
         automaticallyImplyLeading: false,
       ),
       body: ListView(
@@ -167,7 +164,7 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Booking', style: theme.textTheme.labelLarge),
+                      Text(l.bookingLabel, style: theme.textTheme.labelLarge),
                       Text(
                         '#${_reservation.id}',
                         style: theme.textTheme.labelLarge,
@@ -186,14 +183,14 @@ class _BookingConfirmedScreenState extends State<BookingConfirmedScreen> {
                   _Row('Status', _reservation.statusDisplay),
                   if (_reservation.reference.isNotEmpty)
                     _Row(
-                      'Reference',
+                      l.reference,
                       // Short enough to read down the phone, and the venue can
                       // find the booking from it in the admin.
                       _reservation.reference.split('-').first.toUpperCase(),
                     ),
                   if (payment != null) ...[
                     const Divider(height: 24),
-                    _Row('Paid with', payment.providerDisplay),
+                    _Row(l.paidWith, payment.providerDisplay),
                     _Row('Amount', '${payment.amount} GNF'),
                     _Row('Payment', payment.statusDisplay),
                   ],

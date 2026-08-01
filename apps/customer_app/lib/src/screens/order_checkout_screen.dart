@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import 'order_tracking_screen.dart';
 
@@ -135,10 +136,11 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
+      appBar: AppBar(title: Text(l.checkout)),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -149,9 +151,7 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
               style: theme.textTheme.titleLarge,
             ),
             Text(
-              '${widget.lines.length} '
-              '${widget.lines.length == 1 ? "dish" : "dishes"} · collect at '
-              'the counter',
+              l.dishCount(widget.lines.length),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -168,7 +168,7 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Timed to your table booking',
+                      l.timedToYourBooking,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                       ),
@@ -180,26 +180,26 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
             const SizedBox(height: 20),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Your name'),
+              decoration: InputDecoration(labelText: l.yourName),
               textInputAction: TextInputAction.next,
               validator: (value) => (value ?? '').trim().isEmpty
-                  ? 'The counter needs a name to call out.'
+                  ? l.counterNeedsName
                   : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _phoneController,
-              decoration: const InputDecoration(labelText: 'Phone number'),
+              decoration: InputDecoration(labelText: l.phoneNumber),
               keyboardType: TextInputType.phone,
               validator: (value) {
                 final phone = (value ?? '').trim();
-                if (phone.isEmpty) return 'A number to reach you on.';
-                if (phone.length < 8) return 'That number looks too short.';
+                if (phone.isEmpty) return l.phoneRequired;
+                if (phone.length < 8) return l.phoneTooShort;
                 return null;
               },
             ),
             const SizedBox(height: 20),
-            Text('Collection time', style: theme.textTheme.titleSmall),
+            Text(l.collectionTime, style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -207,7 +207,7 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
               children: [
                 for (final slot in _slots)
                   ChoiceChip(
-                    label: Text(DateFormat('HH:mm').format(slot)),
+                    label: Text(DateFormat('HH:mm', l.localeName).format(slot)),
                     selected: slot == _pickupTime,
                     onSelected: _submitting
                         ? null
@@ -216,7 +216,7 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            Text('Payment', style: theme.textTheme.titleSmall),
+            Text(l.payment, style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
             RadioGroup<PaymentProvider>(
               groupValue: _provider,
@@ -228,22 +228,18 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
                 children: [
                   RadioListTile<PaymentProvider>(
                     value: PaymentProvider.cashOnArrival,
-                    title: const Text('Cash on pickup'),
-                    subtitle: const Text('Pay at the counter when you collect'),
+                    title: Text(l.cashOnPickup),
+                    subtitle: Text(l.cashOnPickupDetail),
                   ),
                   RadioListTile<PaymentProvider>(
                     value: PaymentProvider.orangeMoney,
-                    title: const Text('Orange Money'),
-                    subtitle: const Text(
-                      'The kitchen starts once the payment clears',
-                    ),
+                    title: Text(l.orangeMoney),
+                    subtitle: Text(l.kitchenStartsWhenPaid),
                   ),
                   RadioListTile<PaymentProvider>(
                     value: PaymentProvider.mtnMoney,
-                    title: const Text('MTN Mobile Money'),
-                    subtitle: const Text(
-                      'The kitchen starts once the payment clears',
-                    ),
+                    title: Text(l.mtnMoney),
+                    subtitle: Text(l.kitchenStartsWhenPaid),
                   ),
                 ],
               ),
@@ -260,10 +256,10 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
               onPressed: _submitting ? null : _submit,
               child: Text(
                 _submitting
-                    ? 'Placing…'
+                    ? l.placing
                     : _provider == PaymentProvider.cashOnArrival
-                        ? 'Place order'
-                        : 'Pay and order',
+                        ? l.placeOrder
+                        : l.payAndOrder,
               ),
             ),
           ],

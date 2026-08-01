@@ -4,6 +4,7 @@ import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
 import 'package:customer_app/src/directions.dart';
 import 'package:customer_app/src/image_source.dart';
+import 'package:customer_app/src/locale_controller.dart';
 import 'package:customer_app/src/location_source.dart';
 import 'package:customer_app/src/screens/photo_viewer_screen.dart';
 import 'package:customer_app/src/widgets/establishment_card.dart';
@@ -283,6 +284,9 @@ const landscapePhoneSize = Size(900, 360);
 
   /// A token already on the device, i.e. a customer who signed in last time.
   String? storedToken,
+
+  /// A language already chosen on this phone.
+  LocaleStore? localeStore,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -304,6 +308,7 @@ const landscapePhoneSize = Size(900, 360);
       ),
       store: store,
       tokenStore: InMemoryCustomerTokenStore(storedToken),
+      localeStore: localeStore ?? InMemoryLocaleStore(),
       imageSource: imageSource,
       // Default: no location at all, which is the state most tests want and
       // the one the app must never depend on.
@@ -317,6 +322,33 @@ const landscapePhoneSize = Size(900, 360);
     backend: backend,
     store: store,
   );
+}
+
+/// Taps a control on the profile form, dragging it clear of the bottom bar
+/// first.
+///
+/// The form is taller than a 360dp phone and its last controls finish just
+/// where the navigation bar begins, so a plain tap lands on the bar. This is
+/// the same drag a customer makes with their thumb.
+Future<void> tapOnProfileForm(WidgetTester tester, String label) async {
+  // .first: the form's own ListView. Nested scrollers below it (a dropdown
+  // menu, for one) also count as descendants.
+  final scroller = find
+      .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
+      .first;
+
+  for (var attempt = 0; attempt < 8; attempt++) {
+    final found = find.text(label);
+    if (found.evaluate().isNotEmpty &&
+        tester.getRect(found).bottom < 760) {
+      break;
+    }
+    await tester.drag(scroller, const Offset(0, -160));
+    await tester.pumpAndSettle();
+  }
+
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -899,8 +931,7 @@ void main() {
         (tester) async {
       await openProfile(tester);
 
-      await tester.tap(find.text('I already have an account'));
-      await tester.pumpAndSettle();
+      await tapOnProfileForm(tester, 'I already have an account');
 
       expect(find.text('Welcome back'), findsOneWidget);
       // No name field when signing in: they already told us once.
@@ -915,6 +946,96 @@ void main() {
       expect(find.text('Sign out'), findsOneWidget);
     });
 
+    testWidgets('signup asks for a phone and says what it is for',
+        (tester) async {
+      await openProfile(tester);
+
+      expect(find.widgetWithText(TextFormField, 'Phone number'), findsOneWidget);
+      expect(
+        find.textContaining('if you forget the password'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the contact details are sent with the signup',
+        (tester) async {
+      final backend = await openProfile(tester);
+      backend.on('POST', '/api/customer/register/', {
+        'token': 'customer-token',
+        'user': {
+          'id': 1,
+          'username': 'mariama',
+          'name': 'Mariama',
+          'can_reset_password': true,
+        },
+      }, status: 201);
+      backend.on('POST', '/api/customer/claim/', {
+        'reservations': 0,
+        'orders': 0,
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Phone number'),
+        '+224620001122',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'),
+        'mariama',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+
+      final post = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/customer/register/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['phone'], '+224620001122');
+    });
+
+    testWidgets('an account with no contact can still be made',
+        (tester) async {
+      final backend = await openProfile(tester);
+      backend.on('POST', '/api/customer/register/', {
+        'token': 'customer-token',
+        'user': {
+          'id': 1,
+          'username': 'sekou',
+          'name': 'Sékou',
+          'can_reset_password': false,
+        },
+      }, status: 201);
+      backend.on('POST', '/api/customer/claim/', {
+        'reservations': 0,
+        'orders': 0,
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Your name'),
+        'Sékou',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username'),
+        'sekou',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+
+      // Contact details are an offer, not a gate.
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
     testWidgets('signing out returns to the offer, keeping the phone list',
         (tester) async {
       final backend = await openProfile(tester, storedToken: 'customer-token');
@@ -924,6 +1045,367 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Make an account'), findsOneWidget);
+    });
+  });
+
+  group('English and French', () {
+    Future<InMemoryLocaleStore> openProfile(
+      WidgetTester tester, {
+      String? language,
+    }) async {
+      final localeStore = InMemoryLocaleStore(language);
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: localeStore,
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      // The tab is named in whichever language is already in force.
+      await tester.tap(find.text(language == 'fr' ? 'Profil' : 'Profile'));
+      await tester.pumpAndSettle();
+      return localeStore;
+    }
+
+    /// Scrolls the profile form back to the top.
+    ///
+    /// The list is lazy, so reading the toggle at the bottom disposes the
+    /// heading at the top — which is what most of these assertions are about.
+    Future<void> backToTop(WidgetTester tester) async {
+      await tester.drag(
+        find
+            .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
+            .first,
+        const Offset(0, 600),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the app starts in English by default', (tester) async {
+      await openProfile(tester);
+
+      expect(find.text('Make an account'), findsOneWidget);
+      expect(find.text('Browse'), findsOneWidget);
+    });
+
+    testWidgets('the toggle names each language in its own language',
+        (tester) async {
+      await openProfile(tester);
+
+      // Below the fold on a 360dp phone, as it is for a customer.
+      await tester.scrollUntilVisible(
+        find.text('Français'),
+        150,
+        scrollable: find
+            .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
+            .first,
+      );
+
+      // The person who needs this control is the one who cannot read what is
+      // currently on screen, so "French" would be no help.
+      expect(find.text('Français'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+    });
+
+    testWidgets('switching to French translates the app immediately',
+        (tester) async {
+      await openProfile(tester);
+
+      await tapOnProfileForm(tester, 'Français');
+      await backToTop(tester);
+
+      expect(find.text('Créer un compte'), findsOneWidget);
+      // The navigation is part of it: a half-translated app is the failure
+      // this whole change exists to avoid.
+      expect(find.text('Explorer'), findsOneWidget);
+      expect(find.text('Favoris'), findsOneWidget);
+      expect(find.text('Profil'), findsWidgets);
+    });
+
+    testWidgets('the choice is remembered', (tester) async {
+      final localeStore = await openProfile(tester);
+
+      await tapOnProfileForm(tester, 'Français');
+
+      expect(await localeStore.readLanguageCode(), 'fr');
+    });
+
+    testWidgets('a phone that already chose French starts French',
+        (tester) async {
+      await openProfile(tester, language: 'fr');
+
+      expect(find.text('Créer un compte'), findsOneWidget);
+    });
+
+    testWidgets('switching back to English works too', (tester) async {
+      await openProfile(tester, language: 'fr');
+
+      await tapOnProfileForm(tester, 'English');
+      await backToTop(tester);
+
+      expect(find.text('Make an account'), findsOneWidget);
+    });
+
+    testWidgets('browse is translated, not only the profile tab',
+        (tester) async {
+      await openProfile(tester, language: 'fr');
+      await tester.tap(find.text('Explorer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trouver une table'), findsOneWidget);
+      expect(find.text('Restaurants'), findsOneWidget);
+      expect(find.text('Salons'), findsOneWidget);
+    });
+  });
+
+  group('forgotten password', () {
+    /// At the sign-in form, one tap from the reset screen.
+    Future<FakeBackend> openSignIn(WidgetTester tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/photos/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+      await tapOnProfileForm(tester, 'I already have an account');
+      return backend;
+    }
+
+    Future<FakeBackend> openReset(WidgetTester tester) async {
+      final backend = await openSignIn(tester);
+      await tapOnProfileForm(tester, 'I have forgotten my password');
+      return backend;
+    }
+
+    testWidgets('the way back in is offered on the sign-in form',
+        (tester) async {
+      await openSignIn(tester);
+
+      expect(find.text('I have forgotten my password'), findsOneWidget);
+    });
+
+    testWidgets('it is not offered while signing up', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+
+      // Nothing to forget yet.
+      expect(find.text('I have forgotten my password'), findsNothing);
+    });
+
+    testWidgets('any of username, phone or email can be given',
+        (tester) async {
+      await openReset(tester);
+
+      expect(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('asking sends the identifier and moves to the code step',
+        (tester) async {
+      final backend = await openReset(tester);
+      backend.on('POST', '/api/customer/password-reset/', {
+        'detail': 'If that account exists, a code is on its way.',
+        'channel': 'sms',
+        'sent_to': '2246…22',
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        'mariama',
+      );
+      await tester.tap(find.text('Send me a code'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enter the code'), findsOneWidget);
+      // Masked, and shown so the right person knows they are in the right
+      // place.
+      expect(find.textContaining('2246…22'), findsOneWidget);
+    });
+
+    testWidgets('an unknown account looks exactly like a known one',
+        (tester) async {
+      final backend = await openReset(tester);
+      // What the server says when nothing matched.
+      backend.on('POST', '/api/customer/password-reset/', {
+        'detail': 'If that account exists, a code is on its way.',
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        'nobody',
+      );
+      await tester.tap(find.text('Send me a code'));
+      await tester.pumpAndSettle();
+
+      // The app must not leak the difference by behaving differently.
+      expect(find.text('Enter the code'), findsOneWidget);
+    });
+
+    testWidgets('a short new password is refused before the server sees it',
+        (tester) async {
+      final backend = await openReset(tester);
+      backend.on('POST', '/api/customer/password-reset/', {
+        'detail': 'sent',
+        'channel': 'sms',
+        'sent_to': '2246…22',
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        'mariama',
+      );
+      await tester.tap(find.text('Send me a code'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Six digit code'),
+        '123456',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'New password'),
+        'short',
+      );
+      await tester.tap(find.text('Change my password'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('At least 8 characters.'), findsOneWidget);
+    });
+
+    testWidgets('a wrong code is reported without saying which part was wrong',
+        (tester) async {
+      final backend = await openReset(tester);
+      backend.on('POST', '/api/customer/password-reset/', {
+        'detail': 'sent',
+        'channel': 'sms',
+        'sent_to': '2246…22',
+      });
+      backend.on(
+        'POST',
+        '/api/customer/password-reset/confirm/',
+        {
+          'detail': 'That code is wrong or has expired. Ask for a new one '
+              'and try again.',
+        },
+        status: 400,
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        'mariama',
+      );
+      await tester.tap(find.text('Send me a code'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Six digit code'),
+        '000000',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'New password'),
+        'brand-new-password',
+      );
+      await tester.tap(find.text('Change my password'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('wrong or has expired'), findsOneWidget);
+    });
+
+    testWidgets('a successful reset returns to sign in with the news',
+        (tester) async {
+      final backend = await openReset(tester);
+      backend.on('POST', '/api/customer/password-reset/', {
+        'detail': 'sent',
+        'channel': 'sms',
+        'sent_to': '2246…22',
+      });
+      backend.on('POST', '/api/customer/password-reset/confirm/', {
+        'detail': 'Password changed. You can sign in with it now.',
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        'mariama',
+      );
+      await tester.tap(find.text('Send me a code'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Six digit code'),
+        '123456',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'New password'),
+        'brand-new-password',
+      );
+      await tester.tap(find.text('Change my password'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.textContaining('Password changed'), findsOneWidget);
+    });
+
+    testWidgets('the code sent is the one submitted', (tester) async {
+      final backend = await openReset(tester);
+      backend.on('POST', '/api/customer/password-reset/', {
+        'detail': 'sent',
+        'channel': 'sms',
+        'sent_to': '2246…22',
+      });
+      backend.on('POST', '/api/customer/password-reset/confirm/', {
+        'detail': 'done',
+      });
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Username, phone or email'),
+        'mariama',
+      );
+      await tester.tap(find.text('Send me a code'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Six digit code'),
+        '246810',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'New password'),
+        'brand-new-password',
+      );
+      await tester.tap(find.text('Change my password'));
+      await tester.pumpAndSettle();
+
+      final post = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/customer/password-reset/confirm/',
+      );
+      final sent = jsonDecode(post.body) as Map<String, dynamic>;
+      expect(sent['code'], '246810');
+      expect(sent['identifier'], 'mariama');
     });
   });
 

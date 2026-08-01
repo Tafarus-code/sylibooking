@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
+
 /// Where the order has got to: placed, preparing, ready.
 ///
 /// Polls while it is on screen, because the kitchen moving an order along is
@@ -67,11 +69,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final order = _order;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Your order')),
+      appBar: AppBar(title: Text(l.yourOrder)),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -90,7 +93,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             else ...[
               Text(order.establishmentName, style: theme.textTheme.titleLarge),
               Text(
-                'Collect at ${DateFormat('EEEE HH:mm').format(order.pickupTime)}',
+                l.collectAt(
+                  DateFormat('EEEE HH:mm', l.localeName)
+                      .format(order.pickupTime),
+                ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -101,19 +107,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 const SizedBox(height: 16),
                 _Notice(
                   icon: Icons.hourglass_top,
-                  text: 'Waiting for your ${order.paymentProviderDisplay} '
-                      'payment. The kitchen starts once it clears.',
+                  text: l.waitingOnPaymentDetail(
+                    order.paymentProviderDisplay,
+                  ),
                 ),
               ],
               if (order.status == OrderStatus.cancelled) ...[
                 const SizedBox(height: 16),
                 _Notice(
                   icon: Icons.cancel_outlined,
-                  text: 'This order was cancelled. Nothing is owed.',
+                  text: l.orderCancelledNothingOwed,
                 ),
               ],
               const SizedBox(height: 24),
-              Text('What you ordered', style: theme.textTheme.titleSmall),
+              Text(l.whatYouOrdered, style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               for (final line in order.items)
                 Padding(
@@ -122,7 +129,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     children: [
                       Text('${line.quantity}×  '),
                       Expanded(child: Text(line.menuItemName)),
-                      Text('${line.lineTotal} GNF'),
+                      Text(l.priceWithCurrency(line.lineTotal)),
                     ],
                   ),
                 ),
@@ -130,10 +137,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Total', style: theme.textTheme.titleMedium),
+                    child: Text(l.total, style: theme.textTheme.titleMedium),
                   ),
                   Text(
-                    '${order.total} GNF',
+                    l.priceWithCurrency(order.total),
                     style: sylibookingPriceStyle(context),
                   ),
                 ],
@@ -163,19 +170,19 @@ class OrderProgress extends StatelessWidget {
 
   final OrderStatus status;
 
-  static const steps = [
-    (OrderStatus.placed, 'Placed'),
-    (OrderStatus.preparing, 'Preparing'),
-    (OrderStatus.ready, 'Ready'),
-  ];
+  static List<(OrderStatus, String)> stepsFor(L l) => [
+        (OrderStatus.placed, l.progressPlaced),
+        (OrderStatus.preparing, l.progressPreparing),
+        (OrderStatus.ready, l.progressReady),
+      ];
 
   /// What the customer should be doing about the stage they are at.
-  static String captionFor(OrderStatus status) => switch (status) {
-        OrderStatus.placed => 'The restaurant has your order',
-        OrderStatus.preparing => 'It is being cooked',
-        OrderStatus.ready => 'Collect it at the counter',
-        OrderStatus.completed => 'Collected. Enjoy it.',
-        OrderStatus.cancelled => 'This order was cancelled',
+  static String captionFor(L l, OrderStatus status) => switch (status) {
+        OrderStatus.placed => l.progressPlacedDetail,
+        OrderStatus.preparing => l.progressPreparingDetail,
+        OrderStatus.ready => l.progressReadyDetail,
+        OrderStatus.completed => l.progressCollectedDetail,
+        OrderStatus.cancelled => l.progressCancelledDetail,
         OrderStatus.unknown => '',
       };
 
@@ -189,7 +196,9 @@ class OrderProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
+    final steps = stepsFor(l);
 
     Color colourFor(int index) => index <= _reached
         ? theme.colorScheme.primary
@@ -243,7 +252,7 @@ class OrderProgress extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          captionFor(status),
+          captionFor(l, status),
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,

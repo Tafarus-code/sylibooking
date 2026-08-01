@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import '../customer_auth.dart';
 import 'order_tracking_screen.dart';
@@ -100,23 +101,24 @@ class _MyOrdersViewState extends State<MyOrdersView> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
       return _Empty(
         icon: Icons.cloud_off,
-        title: 'Could not load your orders',
+        title: l.couldNotLoadOrders,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
     if (_orders.isEmpty) {
-      return const _Empty(
+      return _Empty(
         icon: Icons.receipt_long_outlined,
-        title: 'No orders yet',
-        detail: 'Order ahead from a restaurant and it will show up here, '
-            'with its progress while the kitchen works on it.',
+        title: l.noOrdersYet,
+        detail: l.noOrdersDetail,
       );
     }
 
@@ -128,11 +130,11 @@ class _MyOrdersViewState extends State<MyOrdersView> {
             .copyWith(bottom: 24),
         children: [
           if (_active.isNotEmpty) ...[
-            _Heading('Active · ${_active.length}'),
+            _Heading(l.sectionActive(_active.length)),
             for (final order in _active) _tile(order),
           ],
           if (_past.isNotEmpty) ...[
-            _Heading('Past · ${_past.length}'),
+            _Heading(l.sectionPast(_past.length)),
             for (final order in _past) _tile(order),
           ],
         ],
@@ -167,6 +169,8 @@ class OrderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: ListTile(
@@ -177,9 +181,10 @@ class OrderTile extends StatelessWidget {
           children: [
             const SizedBox(height: 2),
             Text(
-              '${order.itemCount} '
-              '${order.itemCount == 1 ? "item" : "items"} · '
-              '${DateFormat('EEE d MMM, HH:mm').format(order.pickupTime)}',
+              '${l.itemCount(order.itemCount)} · '
+              // The date format follows the app's language too, so a French
+              // screen does not read "Wed 3 Sep".
+              '${DateFormat('EEE d MMM, HH:mm', l.localeName).format(order.pickupTime)}',
             ),
             const SizedBox(height: 6),
             Row(
@@ -212,41 +217,42 @@ class OrderStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final scheme = Theme.of(context).colorScheme;
 
     final (label, icon, background, foreground) = switch (order.status) {
       OrderStatus.placed when order.isAwaitingPayment => (
-          'Waiting on payment',
+          l.orderWaitingPayment,
           Icons.hourglass_top,
           scheme.errorContainer,
           scheme.onErrorContainer,
         ),
       OrderStatus.placed => (
-          'Placed',
+          l.orderPlaced,
           Icons.receipt_long,
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
       OrderStatus.preparing => (
-          'Being prepared',
+          l.orderPreparing,
           Icons.local_fire_department,
           scheme.tertiaryContainer,
           scheme.onTertiaryContainer,
         ),
       OrderStatus.ready => (
-          'Ready to collect',
+          l.orderReady,
           Icons.check_circle,
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
         ),
       OrderStatus.completed => (
-          'Collected',
+          l.orderCollected,
           Icons.done_all,
           scheme.secondaryContainer,
           scheme.onSecondaryContainer,
         ),
       OrderStatus.cancelled => (
-          'Cancelled',
+          l.orderCancelled,
           Icons.cancel,
           scheme.errorContainer,
           scheme.onErrorContainer,

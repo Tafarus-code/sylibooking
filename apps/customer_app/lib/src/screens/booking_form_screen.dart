@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import 'booking_confirmed_screen.dart';
 
@@ -106,11 +107,12 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final theme = Theme.of(context);
     final option = widget.option;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Confirm booking')),
+      appBar: AppBar(title: Text(l.confirmBooking)),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -155,13 +157,13 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               enabled: !_submitting,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Your name',
+              decoration: InputDecoration(
+                labelText: l.yourName,
                 prefixIcon: Icon(Icons.person_outline),
                 border: OutlineInputBorder(),
               ),
               validator: (value) => (value == null || value.trim().isEmpty)
-                  ? 'The venue needs a name for the booking'
+                  ? l.nameRequiredBooking
                   : null,
             ),
             const SizedBox(height: 16),
@@ -170,8 +172,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               enabled: !_submitting,
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Phone number',
+              decoration: InputDecoration(
+                labelText: l.phoneNumber,
                 hintText: '+224 620 00 00 00',
                 prefixIcon: Icon(Icons.phone_outlined),
                 border: OutlineInputBorder(),
@@ -179,9 +181,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               validator: (value) {
                 final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
                 if (digits.isEmpty) {
-                  return 'The venue will call to confirm';
+                  return l.phoneRequiredBooking;
                 }
-                if (digits.length < 8) return 'That number looks too short';
+                if (digits.length < 8) return l.phoneTooShortBooking;
                 return null;
               },
             ),
@@ -215,7 +217,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            Text('How would you like to pay?',
+            Text(l.howWouldYouLikeToPay,
                 style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             RadioGroup<PaymentProvider>(
@@ -231,25 +233,25 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               },
               child: Column(
                 children: [
-                  for (final choice in const [
+                  // No longer const: the labels come from the current
+                  // language now, not from the source file.
+                  for (final choice in [
                     (
                       PaymentProvider.cashOnArrival,
-                      'Pay on arrival',
-                      'Nothing is charged now. The venue confirms your table.',
+                      l.payOnArrival,
+                      l.payOnArrivalDetail,
                       Icons.storefront,
                     ),
                     (
                       PaymentProvider.orangeMoney,
-                      'Orange Money',
-                      'Pay a deposit now — your table is confirmed straight '
-                          'away.',
+                      l.orangeMoney,
+                      l.payDepositDetail,
                       Icons.account_balance_wallet_outlined,
                     ),
                     (
                       PaymentProvider.mtnMoney,
-                      'MTN Mobile Money',
-                      'Pay a deposit now — your table is confirmed straight '
-                          'away.',
+                      l.mtnMoney,
+                      l.payDepositDetail,
                       Icons.account_balance_wallet_outlined,
                     ),
                   ])
@@ -287,8 +289,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     )
                   : Text(
                       _paymentProvider.isMobileMoney
-                          ? 'Pay and reserve'
-                          : 'Reserve',
+                          ? l.payAndReserve
+                          : l.reserve,
                     ),
             ),
           ],

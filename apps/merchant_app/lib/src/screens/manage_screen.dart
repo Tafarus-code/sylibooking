@@ -10,6 +10,7 @@ import 'branding_screen.dart';
 import 'hours_screen.dart';
 import 'menu_screen.dart';
 import 'photos_screen.dart';
+import 'spaces_screen.dart';
 import 'profile_screen.dart';
 import 'staff_screen.dart';
 
@@ -103,6 +104,14 @@ class ManageScreen extends StatelessWidget {
           ),
 
           if (role.canEditProfile) ...[
+            // Above the hours on purpose: a venue is defined by its rooms
+            // before it is defined by when they are open.
+            _Entry(
+              icon: Icons.table_restaurant_outlined,
+              title: l.tablesAndRooms,
+              subtitle: l.tablesAndRoomsSubtitle,
+              onTap: () => _open(context, SpacesScreen(auth: auth)),
+            ),
             _Entry(
               icon: Icons.schedule,
               title: l.openingHours,

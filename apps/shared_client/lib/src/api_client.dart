@@ -660,6 +660,58 @@ class SylibookingApi {
         .toList();
   }
 
+  // --- Merchant spaces ----------------------------------------------------
+
+  /// Every space including retired ones. Any member may read it.
+  ///
+  /// Retired spaces are included so a merchant can see what they took out of
+  /// service and bring it back; the customer-facing payload omits them.
+  Future<List<Space>> merchantSpaces(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/spaces/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => Space.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Space> createSpace(
+    int establishmentId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/spaces/',
+      fields,
+    );
+    return Space.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Space> updateSpace(
+    int establishmentId,
+    int spaceId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/spaces/$spaceId/',
+      fields,
+    );
+    return Space.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Take a space out of service, or delete it outright if it never held a
+  /// booking.
+  ///
+  /// Returns null when the row is gone, and the retired space when it was
+  /// kept — the server decides which, because only it knows whether anything
+  /// was ever booked there. The caller uses the answer to say the right thing.
+  Future<Space?> removeSpace(int establishmentId, int spaceId) async {
+    final json = await _delete(
+      '/merchant/establishments/$establishmentId/spaces/$spaceId/',
+    );
+    return json == null
+        ? null
+        : Space.fromJson(json as Map<String, dynamic>);
+  }
+
   // --- Merchant menu ------------------------------------------------------
 
   /// Every item including unavailable ones. Any member may read it.

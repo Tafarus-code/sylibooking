@@ -37,12 +37,12 @@ early keeps the plan moving.
 | # | Decision | Blocks | My recommendation |
 |---|---|---|---|
 | D1 | **What a deposit means.** Forfeit on no-show, offset against the bill, or refund on arrival? | Slice 5 | **Offset against the bill, forfeit on no-show.** It is the only version a customer perceives as fair and a merchant perceives as worth having. |
-| D2 | **How long after its time a booking is a no-show.** | Slice 4, 5 | **90 minutes**, configurable per venue later. A lounge table is not lost at minute 16. |
+| D2 | **How long after its time a booking is a no-show** — as a default per establishment type, not one number for both. | Slice 4, 5 | **30 minutes for a restaurant, 90 for a lounge.** A lounge table is not lost at minute 16, and its turnover pressure comes late. A restaurant table held 90 minutes through a dinner rush costs more in refused walk-ins than the 50,000 GNF deposit is worth — the grace period would be losing the venue money to protect a smaller sum. Per-venue override stays a later door, as planned. |
 | D3 | **May staff edit tables/rooms, or owners and managers only?** | Slice 1, 2 | **Owners and managers**, matching hours and menu editing. Staff already mark items sold out; spaces are structural. |
 | D4 | **Which SMS aggregator.** | Slice 9 | Needs a local quote — this is a commercial choice, not a technical one. The `Notifier` interface is already in place, so the code cost is one adapter whichever you pick. |
 
 Two more will come up later and can wait: whether merchants may hide reviews or
-only flag them (Slice 13), and where this is hosted (Slice 20).
+only flag them (Slice 14), and where this is hosted (Slice 21).
 
 ---
 
@@ -52,11 +52,11 @@ only flag them (Slice 13), and where this is hosted (Slice 20).
 Phase 0  Unblock the MVP          Slices 1–3    ← nothing real can happen without this
 Phase 1  Close the lifecycle      Slices 4–5    ← stops the data telling a lie
 Phase 2  The async layer          Slices 6–8    ← retrofitting later touches every write path
-Phase 3  Real money               Slices 9–12
-Phase 4  Merchant completeness    Slices 13–15
-Phase 5  Correctness and polish   Slices 16–18
-Phase 6  Operability              Slices 19–21
-Phase 7  Beyond the MVP           Slices 22+
+Phase 3  Real money               Slices 9–13   ← throttles (10) land before the gateway (11)
+Phase 4  Merchant completeness    Slices 14–16
+Phase 5  Correctness and polish   Slices 17–19
+Phase 6  Operability              Slices 20–22
+Phase 7  Beyond the MVP           Slices 23+
 ```
 
 The order is not arbitrary. Phase 0 is the difference between "demo" and
@@ -204,9 +204,30 @@ permanently zero. This gets worse with every booking taken.
   operations access, refusing a booking that is cancelled or in the future.
 - `backend/reservations/models.py` — `arrived_at`, set when a merchant marks
   arrival.
-- **Automatic lapse.** A confirmed booking whose time passed by more than the
-  no-show window (**D2**) and was never marked arrived becomes `no_show` — a
-  new status, distinct from `completed`, because the two mean opposite things
+- **The no-show window is per establishment type** (**D2**), not one constant:
+
+  ```python
+  # A lounge table is not lost at minute 16; a restaurant table held through
+  # a dinner service is. One number cannot serve both.
+  NO_SHOW_WINDOW_MINUTES = {
+      'restaurant': config('NO_SHOW_WINDOW_RESTAURANT', default=30, cast=int),
+      'lounge': config('NO_SHOW_WINDOW_LOUNGE', default=90, cast=int),
+  }
+  ```
+
+  with a single resolver — `no_show_window(establishment)` in
+  `backend/reservations/` — that reads the type default today and will consult
+  a per-venue override column later. One function, so the later door opens in
+  one place rather than at every call site.
+- **The window is captured on the booking, not read at lapse time.**
+  `Reservation.no_show_after_minutes`, set at creation from the resolver. A
+  customer is told the grace period when they book; if a merchant later
+  shortens it, that must not retroactively turn an existing booking into a
+  forfeited deposit. This matters more in Slice 5 than here, but the field has
+  to exist from the start or the history cannot support the argument.
+- **Automatic lapse.** A confirmed booking whose time passed by more than
+  *its own* window and was never marked arrived becomes `no_show` — a new
+  status, distinct from `completed`, because the two mean opposite things
   commercially and Slice 5 needs to tell them apart. Implemented as a
   management command now, moved onto the scheduler in Slice 7.
 - `backend/reservations/availability.py` — `no_show` releases the slot;
@@ -215,17 +236,26 @@ permanently zero. This gets worse with every booking taken.
 **Client.**
 - Merchant: a "Mark arrived" action on the reservation card and detail screen,
   visible only for a confirmed booking whose time has come.
+- Customer: the booking screen states the grace period in words — "we will
+  hold your table for 30 minutes" — which now varies by venue, so it is a
+  placeholder string rather than a fixed one. A forfeited deposit is only
+  defensible if this sentence was on screen beforehand.
 - Customer: past bookings read "Completed" or "Missed" rather than sitting on
   "Confirmed" forever.
 - Both catalogues.
 
-**Tests.** ~25 backend: the action's role gating; refusing to complete a
-future or cancelled booking; the lapse command's boundary at exactly the
-window; a no-show releasing its slot; a completed booking still holding it;
-idempotency when the command runs twice. Plus widget tests both sides.
+**Tests.** ~30 backend: the action's role gating; refusing to complete a
+future or cancelled booking; **the lapse boundary at exactly the window, run
+once per type** — a restaurant booking 31 minutes late lapses while a lounge
+booking at the same delay does not; a no-show releasing its slot; a completed
+booking still holding it; idempotency when the command runs twice; and the one
+that protects the customer — **changing a venue's window does not move the
+deadline of a booking already taken**. Plus widget tests both sides, including
+that the stated grace period matches the venue's type.
 
-**Done when.** A day's bookings can be worked to a conclusion, and yesterday's
-data is a true record.
+**Done when.** A day's bookings can be worked to a conclusion, yesterday's
+data is a true record, and a restaurant is not holding tables to a lounge's
+timetable.
 
 **Size:** M
 
@@ -240,7 +270,7 @@ is the commercial point of taking one, and it depends on Slice 4 being able to
 tell a no-show from a completed visit.
 
 **Blocked on D1 and D2.** Written below for my recommendation — offset on
-arrival, forfeit on no-show.
+arrival, forfeit on no-show, against the per-type window from Slice 4.
 
 **Backend.**
 - `backend/payments/models.py` — `Payment.outcome`: `offset`, `forfeited`,
@@ -248,25 +278,36 @@ arrival, forfeit on no-show.
   outcome is a separate axis.
 - `backend/payments/services.py` — `settle_deposit(reservation)`, called when a
   booking completes (offset) or lapses to no-show (forfeit).
+- **Forfeiture reads the booking's own `no_show_after_minutes`**, captured at
+  creation in Slice 4 — never the current setting. A merchant who shortens
+  their window on Tuesday must not thereby forfeit a deposit taken on Monday
+  under a longer one. This is the whole reason that field exists, and it is
+  the first thing a customer will dispute.
 - A refund path on the provider interface — `PaymentProvider.refund()` — even
-  though the mock is the only implementation until Slice 9. Designing it now
-  keeps Slice 9 from being an interface change as well as an adapter.
+  though the mock is the only implementation until Slice 11. Designing it now
+  keeps Slice 11 from being an interface change as well as an adapter.
 - Dashboard: forfeited deposits are revenue and belong in the totals; offset
   ones are not, and double-counting them would overstate takings.
 
 **Client.**
 - Customer: the booking screen says plainly what happens to the deposit before
-  it is taken, and the confirmation repeats it. This is the sentence that
-  decides whether deposits get accepted in the market at all — worth writing
-  carefully in both languages.
+  it is taken — including the grace period, which now differs between a
+  restaurant and a lounge — and the confirmation repeats it. This is the
+  sentence that decides whether deposits get accepted in the market at all,
+  and it is what makes a forfeiture defensible rather than a surprise. Worth
+  writing carefully in both languages.
 - Merchant: the reservation detail shows the deposit's outcome, and the
   payments dashboard separates forfeited from collected.
 
-**Tests.** ~20: each transition; a cash booking having no deposit to settle;
-settling twice being a no-op; the dashboard's arithmetic under a mix.
+**Tests.** ~24: each transition; a cash booking having no deposit to settle;
+settling twice being a no-op; the dashboard's arithmetic under a mix;
+forfeiture at a restaurant's 30 minutes and a lounge's 90 from the same
+fixture; and **a booking whose venue changed its window after the booking was
+taken settling against the window it was sold under**.
 
-**Done when.** Every deposit taken has an outcome, and the dashboard's total
-is defensible to a merchant counting cash.
+**Done when.** Every deposit taken has an outcome, the dashboard's total is
+defensible to a merchant counting cash, and every forfeiture can be explained
+to the customer it was taken from.
 
 **Size:** M
 
@@ -293,7 +334,7 @@ slice where a failure is ambiguous. This one is deliberately boring.
 - `backend/notifications/` — a new app owning task definitions, so tasks do
   not accrete inside `api/`.
 - One task: `send_test_notification`, which logs. Proves wiring end to end.
-- `docker-compose.yml` for a local Redis — the first piece of Slice 20.
+- `docker-compose.yml` for a local Redis — the first piece of Slice 21.
 - CI: a Redis service on the Postgres job; tasks eager elsewhere.
 
 **Tests.** ~8: a task runs eagerly under test; a failing task retries and then
@@ -328,7 +369,7 @@ being refreshed by hand, which is not how a service works.
 
 **Client.** Merchant: a quiet unread marker on the desk when new work has
 arrived since the screen was last loaded. Not a push notification yet — that
-needs Firebase and a signing story, which is Slice 21.
+needs Firebase and a signing story, which is Slice 22.
 
 **Tests.** ~20: reminder timing against venue hours; no reminder for a
 cancelled booking; exactly one reminder when the beat runs twice; a notifier
@@ -351,7 +392,7 @@ rather than a latency one.
 
 **Backend.** A task polling pending payments on a decaying schedule, giving up
 after a defined window and marking them failed. Runs against the mock exactly
-as it will against a real provider, so Slice 9 inherits a working poller.
+as it will against a real provider, so Slice 11 inherits a working poller.
 
 **Tests.** ~12: a payment completing between polls; giving up cleanly; not
 polling something already settled; the poller confirming the reservation the
@@ -385,7 +426,67 @@ masking helper and the tests already exist.
 
 ---
 
-## Slice 10 — Orange Money, sandbox 🟡 → ✅
+## Slice 10 — Throttle the doors real money opens ❌ → ✅
+
+**Goal.** Login, registration, password reset and — above all — booking and
+order creation cannot be hammered, **before** a live payment gateway is
+attached to them.
+
+**Why here.** This was Slice 18, in "Correctness and polish". It is not
+polish. Booking creation is unauthenticated by design, which is correct, and
+today the worst an abuser gets is junk rows in a table. The moment Slice 11
+lands, the same unauthenticated endpoint initiates a **real payment against a
+real provider account**, and three things change character at once:
+
+- **Payment prompts are sent to a phone number the caller chose.** Mobile
+  money initiation pushes a USSD or app prompt to the payer. An unthrottled
+  booking-create → payment-initiate chain lets anyone fire prompts at any
+  number in Guinea, as often as they like, from our provider account. That is
+  a harassment vector wearing our name, and it is the single strongest reason
+  this moves.
+- **Provider quota and per-call cost** become someone else's lever to pull.
+- **Reconciliation noise** (Slice 13) is only readable if the ledger is not
+  full of abandoned initiations.
+
+Ordering it *after* the integration would mean shipping that window open and
+closing it later. Ordering it before costs nothing — the throttles are
+testable against the mock exactly as they will behave against the real thing.
+
+**Backend.**
+- DRF throttle classes, scoped per endpoint rather than one global rate:
+  - `POST /api/auth/login/` — tight, per IP and per username, so a merchant
+    account cannot be walked through a password list.
+  - `POST /api/customer/register/`
+  - `POST /api/customer/password-reset/` — **the gap worth naming.** The
+    5-attempt cap is *per code*; nothing caps how many codes may be
+    requested. Unthrottled, that is unlimited attempts wearing a fresh code
+    each time, and once Slice 9 lands it is also unlimited SMS billed to us.
+  - `POST /api/customer/password-reset/confirm/`
+  - `POST /api/reservations/` and `POST /api/orders/` — the unauthenticated
+    pair. Per IP *and* per phone number.
+- A per-phone cap on bookings and orders in a rolling window, which is the
+  one that actually blunts prompt-spam, since an abuser rotating IPs still
+  has to pick a victim number.
+- Failures must be a clean `429` with `Retry-After`, not a 500.
+
+**Client.** Both apps render a 429 as a plain "too many attempts, try again in
+a moment" rather than the generic failure message — in both languages. A
+throttle the user cannot distinguish from a crash gets reported as a crash.
+
+**Tests.** ~18: each endpoint's limit and its reset; per-username login
+throttling not locking out an innocent third party who shares an IP; the
+password-reset *request* cap, tested explicitly since it is the hole this
+slice exists to close; a 429 surfacing as a message in both apps; throttles
+off under test elsewhere so the other 900 tests are unaffected.
+
+**Done when.** Every unauthenticated write path has a ceiling, and the
+payment work lands behind it rather than in front of it.
+
+**Size:** S–M
+
+---
+
+## Slice 11 — Orange Money, sandbox 🟡 → ✅
 
 **Goal.** A real payment, in a sandbox, end to end.
 
@@ -417,14 +518,14 @@ callback and by poller, and neither path double-confirms.
 
 ---
 
-## Slice 11 — MTN Mobile Money ✅
+## Slice 12 — MTN Mobile Money ✅
 
-Same shape as Slice 10 against a second API. Cheaper — the callback pattern,
+Same shape as Slice 11 against a second API. Cheaper — the callback pattern,
 the retry policy and the tests are established. **Size:** M
 
 ---
 
-## Slice 12 — Reconciliation and refunds 🟡 → ✅
+## Slice 13 — Reconciliation and refunds 🟡 → ✅
 
 **Goal.** A merchant can answer "did this land" without calling the provider.
 
@@ -448,7 +549,7 @@ pending.
 
 # Phase 4 — Merchant completeness
 
-## Slice 13 — Merchants can see their reviews 🔶 → ✅
+## Slice 14 — Merchants can see their reviews 🔶 → ✅
 
 **Goal.** A merchant reads their reviews in the app and can flag one.
 
@@ -475,7 +576,7 @@ customers until an admin acts, the average rating ignoring hidden reviews.
 
 ---
 
-## Slice 14 — Walk-in orders ❌ → ✅
+## Slice 15 — Walk-in orders ❌ → ✅
 
 **Goal.** A merchant rings up an order at the counter.
 
@@ -495,7 +596,7 @@ is valid, and that it appears in the same queue as a customer's.
 
 ---
 
-## Slice 15 — Pagination in the merchant app ❌ → ✅
+## Slice 16 — Pagination in the merchant app ❌ → ✅
 
 **Goal.** The desk and the queue stay usable at real volume.
 
@@ -516,7 +617,7 @@ point.
 
 # Phase 5 — Correctness and polish
 
-## Slice 16 — The visible defects ✅
+## Slice 17 — The visible defects ✅
 
 From §10. Small, cheap, and they are what a merchant notices first.
 
@@ -535,7 +636,7 @@ From §10. Small, cheap, and they are what a merchant notices first.
 
 ---
 
-## Slice 17 — Customer profile and account deletion ❌ → ✅
+## Slice 18 — Customer profile and account deletion ❌ → ✅
 
 **Goal.** A returning customer's details are theirs, not re-typed per booking;
 an account can be deleted.
@@ -556,28 +657,44 @@ in the merchant's dashboard while carrying no personal data.
 
 ---
 
-## Slice 18 — Rate limiting and abuse ❌ → ✅
+## Slice 19 — The rest of the abuse surface ❌ → ✅
 
-**Goal.** Login, registration, password reset and booking creation cannot be
-hammered.
+**Goal.** The systematic sweep, once the exposed paths are already closed.
 
-**Why here.** §9.6. The per-code attempt cap exists; nothing else does.
-Booking creation is unauthenticated by design, which is correct and also an
-open door.
+**Why here.** The urgent half of this slice moved to Slice 10, ahead of the
+payment integration. What is left is genuinely a polish pass: it protects
+against nuisance and cost, not against a live gateway being used as a weapon,
+and some of it wants the observability from Slice 20 to be worth tuning.
 
-**Backend.** DRF throttling, tighter on the auth and reset paths, plus a
-per-phone cap on bookings in a window.
+**Scope — what stayed behind, and why.**
+- **A global default throttle** across the remaining API surface, so a new
+  endpoint is covered by default rather than by remembering. Deliberately not
+  in Slice 10: a blanket rate needs real traffic to size, and guessing it
+  early risks throttling legitimate use during the first pilot.
+- **Read-path scraping** — the browse and search endpoints are public and
+  currently unlimited. A competitor pulling the whole venue list nightly is
+  an annoyance, not an exposure.
+- **Upload abuse** — photo size and count caps per venue per day. Bounded
+  today by needing merchant credentials.
+- **Enumeration hardening** — the password-reset lookup answers in constant
+  time regardless of whether the identifier exists. The *message* is already
+  identical either way; the timing is not.
+- **Review and favourite spam** — largely blunted already, since a review is
+  `OneToOne` with a reservation and a favourite is unique per user and venue.
+  Worth confirming with tests rather than assuming.
+- **Tuning what Slice 10 set**, using the throttle-hit metrics from Slice 20.
+  This is the part that genuinely cannot happen earlier.
 
-**Tests.** ~12, including that a throttled response is a clean 429 the apps
-render as a message rather than a crash.
+**Tests.** ~12, including that the global default does not shadow the tighter
+per-endpoint limits set in Slice 10.
 
-**Size:** S–M
+**Size:** S
 
 ---
 
 # Phase 6 — Operability
 
-## Slice 19 — Observability ❌ → ✅
+## Slice 20 — Observability ❌ → ✅
 
 **Goal.** When something breaks in Conakry, you find out from a dashboard
 rather than from a merchant.
@@ -585,7 +702,7 @@ rather than from a merchant.
 **Backend.** Structured logging, an error reporter (Sentry or equivalent), a
 health endpoint, and metrics on the numbers that matter: bookings created,
 payments initiated versus completed, notification delivery rate. **Slice 7's
-notification log and Slice 12's reconciliation are the two places where silent
+notification log and Slice 13's reconciliation are the two places where silent
 failure is most expensive**, so instrument those first.
 
 **Client.** Crash reporting in both apps, behind a consent line.
@@ -594,7 +711,7 @@ failure is most expensive**, so instrument those first.
 
 ---
 
-## Slice 20 — Deployment ❌ → ✅
+## Slice 21 — Deployment ❌ → ✅
 
 **Goal.** It runs somewhere other than a laptop.
 
@@ -615,7 +732,7 @@ better host you cannot pay for is not a better host.
 
 ---
 
-## Slice 21 — Release process and push ❌ → ✅
+## Slice 22 — Release process and push ❌ → ✅
 
 - `main` is many slices behind `dev` and has never been merged. Define what
   `main` means — I suggest "what is deployed" — and merge to it deliberately,
@@ -635,12 +752,12 @@ cheapest, not in order of appeal.
 
 | Slice | Feature | Why it is cheap now |
 |---|---|---|
-| 22 | **Kitchen tickets / printing** | The queue and stages exist; this is a printer adapter and a layout |
-| 23 | **Analytics for merchants** — covers per night, turnover, popular dishes, repeat customers | The data is all there; the payments dashboard is the pattern to copy |
-| 24 | **Loyalty** | Needs Slice 17's stable customer identity, which is why it is not earlier |
-| 25 | **Inventory** | Extends `MenuItem` availability from a boolean to a count |
-| 26 | **WhatsApp fallback** | Another `Notifier` implementation; the interface already fits |
-| 27 | **Waiting lists / overbooking** | Needs the availability engine, which is the best-tested code in the repo |
+| 23 | **Kitchen tickets / printing** | The queue and stages exist; this is a printer adapter and a layout |
+| 24 | **Analytics for merchants** — covers per night, turnover, popular dishes, repeat customers | The data is all there; the payments dashboard is the pattern to copy |
+| 25 | **Loyalty** | Needs Slice 18's stable customer identity, which is why it is not earlier |
+| 26 | **Inventory** | Extends `MenuItem` availability from a boolean to a count |
+| 27 | **WhatsApp fallback** | Another `Notifier` implementation; the interface already fits |
+| 28 | **Waiting lists / overbooking** | Needs the availability engine, which is the best-tested code in the repo |
 
 ---
 
@@ -650,8 +767,9 @@ Phases 0 and 1 — five slices — are the difference between what exists and a
 product a real merchant in Conakry can use with real customers, on mock money.
 That is the shortest path to something worth showing.
 
-Phases 2 and 3 — seven more — are the difference between that and taking
-actual payments reliably.
+Phases 2 and 3 — eight more — are the difference between that and taking
+actual payments reliably, with the exposure that opens closed before it opens
+rather than after.
 
 Everything from Phase 4 on improves a working, earning product, and can be
 reordered freely against what the first pilot venues actually complain about.

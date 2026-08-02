@@ -4,6 +4,7 @@ import 'package:shared_client/shared_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../labels.dart';
+import 'create_venue_screen.dart';
 
 /// Which venue am I working tonight?
 ///
@@ -40,8 +41,15 @@ class VenuePickerScreen extends StatelessWidget {
               )
             : null,
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => CreateVenueScreen(auth: auth)),
+        ),
+        icon: const Icon(Icons.add_business_outlined),
+        label: Text(l.newVenue),
+      ),
       body: ListView(
-        padding: contentInsets(context, vertical: 8),
+        padding: contentInsets(context, vertical: 8).copyWith(bottom: 88),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -135,6 +143,16 @@ class NoVenueScreen extends StatelessWidget {
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CreateVenueScreen(auth: auth),
+                  ),
+                ),
+                icon: const Icon(Icons.add_business_outlined),
+                label: Text(l.createVenue),
               ),
             ],
           ),

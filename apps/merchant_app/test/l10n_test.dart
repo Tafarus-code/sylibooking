@@ -46,8 +46,10 @@ void main() {
       'dateRange',
       'stageHeading',
       // "Table" is the same word in French, and a venue's staff say it the
-      // same way in both languages.
+      // same way in both languages. So is "Restaurant" — the backend
+      // catalogue translates it to itself for the same reason.
       'spaceTypeTable',
+      'venueKindRestaurant',
     };
 
     final untranslated = [

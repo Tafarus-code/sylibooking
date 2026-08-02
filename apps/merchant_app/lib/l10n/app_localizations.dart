@@ -310,7 +310,7 @@ abstract class L {
   /// No description provided for @noVenueYetDetail.
   ///
   /// In en, this message translates to:
-  /// **'This account is not a member of any establishment. An owner can add you to theirs, or an admin can set one up.'**
+  /// **'Create your own venue to start taking bookings, or ask an owner to add you to theirs.'**
   String get noVenueYetDetail;
 
   /// No description provided for @rangeToday.
@@ -1638,6 +1638,54 @@ abstract class L {
   /// In en, this message translates to:
   /// **'A table seats at least one guest.'**
   String get seatsAtLeastOne;
+
+  /// No description provided for @createVenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your venue'**
+  String get createVenue;
+
+  /// No description provided for @newVenue.
+  ///
+  /// In en, this message translates to:
+  /// **'New venue'**
+  String get newVenue;
+
+  /// No description provided for @createVenueIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The essentials only. Hours, menu, photos and branding all have their own screens once this exists.'**
+  String get createVenueIntro;
+
+  /// No description provided for @venueKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get venueKind;
+
+  /// No description provided for @venueKindLounge.
+  ///
+  /// In en, this message translates to:
+  /// **'Lounge'**
+  String get venueKindLounge;
+
+  /// No description provided for @venueKindRestaurant.
+  ///
+  /// In en, this message translates to:
+  /// **'Restaurant'**
+  String get venueKindRestaurant;
+
+  /// No description provided for @createVenueCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Create venue'**
+  String get createVenueCta;
+
+  /// No description provided for @venueCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is yours. Add your tables next.'**
+  String venueCreated(String name);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

@@ -505,6 +505,15 @@ class Space(models.Model):
     capacity = models.PositiveSmallIntegerField(
         help_text='Maximum number of guests this space seats.',
     )
+    is_active = models.BooleanField(
+        default=True,
+        help_text=(
+            'Whether this space can still be booked. Taking a table out of '
+            'service deactivates it rather than deleting it: its past '
+            'bookings are part of the venue’s history, and the reservation '
+            'row protects it from deletion anyway.'
+        ),
+    )
 
     class Meta:
         ordering = ['establishment', 'name']

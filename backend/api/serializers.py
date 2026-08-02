@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from establishments.hours import (
@@ -94,6 +95,65 @@ class SpaceSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'type', 'type_display', 'capacity']
 
 
+class SpaceWriteSerializer(serializers.ModelSerializer):
+    """A merchant laying out their room.
+
+    Separate from `SpaceSerializer` because that one is what a customer sees,
+    and `is_active` is not a customer's business — a deactivated space is
+    simply absent from their payload rather than present and marked.
+    """
+
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+
+    class Meta:
+        model = Space
+        fields = [
+            'id',
+            'name',
+            'type',
+            'type_display',
+            'capacity',
+            'is_active',
+        ]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError(_('Give the space a name.'))
+        return value
+
+    def validate_capacity(self, value):
+        # PositiveSmallIntegerField already refuses negatives, but zero is a
+        # valid positive integer and not a valid table.
+        if value < 1:
+            raise serializers.ValidationError(
+                _('A space seats at least one guest.')
+            )
+        return value
+
+    def validate(self, attrs):
+        """Surface the per-venue unique name as a field error, not a 500.
+
+        The database constraint is the real guard; without this the second
+        "Table 4" is an IntegrityError escaping as a server error.
+        """
+        establishment = self.context.get('establishment')
+        name = attrs.get('name', getattr(self.instance, 'name', None))
+
+        if establishment is not None and name is not None:
+            clash = Space.objects.filter(
+                establishment=establishment, name__iexact=name
+            )
+            if self.instance is not None:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError(
+                    {'name': _('There is already a space called that here.')}
+                )
+
+        return attrs
+
+
 class EstablishmentListSerializer(serializers.ModelSerializer):
     """Slim payload for the customer's browse screen."""
 
@@ -140,7 +200,7 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
 
 class EstablishmentDetailSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
-    spaces = SpaceSerializer(many=True, read_only=True)
+    spaces = serializers.SerializerMethodField()
 
     is_open_now = serializers.SerializerMethodField()
     closes_at = serializers.SerializerMethodField()
@@ -176,6 +236,17 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'spaces',
             'created_at',
         ]
+
+    def get_spaces(self, establishment):
+        """Only spaces still in service.
+
+        A deactivated table is absent rather than present and marked: a
+        customer has no use for the distinction, and listing it invites the
+        app to offer a table that is no longer there.
+        """
+        return SpaceSerializer(
+            establishment.spaces.filter(is_active=True), many=True
+        ).data
 
     def get_is_open_now(self, establishment):
         return is_open_at(establishment)
@@ -351,6 +422,14 @@ class ReservationSerializer(serializers.ModelSerializer):
         space = attrs.get('space')
         party_size = attrs.get('party_size')
         start = attrs.get('datetime')
+
+        # A deactivated space is absent from every list the app builds from,
+        # so reaching this means a stale screen or a direct call. Either way
+        # the table is gone.
+        if space and not space.is_active:
+            raise serializers.ValidationError(
+                {'space': _('%(name)s is no longer bookable.') % {'name': space.name}}
+            )
 
         if space and party_size and party_size > space.capacity:
             raise serializers.ValidationError(

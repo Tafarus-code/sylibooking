@@ -23,6 +23,8 @@ from .merchant import (
     MerchantMenuAvailabilityView,
     MerchantMenuItemView,
     MerchantMenuView,
+    MerchantSpaceItemView,
+    MerchantSpacesView,
     MerchantStaffMemberView,
     MerchantStaffView,
     ThemePresetsView,
@@ -156,6 +158,16 @@ urlpatterns = [
         'merchant/establishments/<int:pk>/menu/<int:item_id>/availability/',
         MerchantMenuAvailabilityView.as_view(),
         name='merchant-menu-availability',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/spaces/',
+        MerchantSpacesView.as_view(),
+        name='merchant-spaces',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/spaces/<int:space_id>/',
+        MerchantSpaceItemView.as_view(),
+        name='merchant-space-item',
     ),
     path(
         'merchant/establishments/<int:pk>/staff/',

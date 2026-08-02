@@ -810,4 +810,99 @@ class LFr extends L {
 
   @override
   String get detailsSaved => 'Détails enregistrés.';
+
+  @override
+  String get tablesAndRooms => 'Tables et salons';
+
+  @override
+  String get tablesAndRoomsSubtitle => 'Où vos clients s’assoient vraiment';
+
+  @override
+  String get noSpacesYet => 'Aucune table';
+
+  @override
+  String get noSpacesDetail =>
+      'Un établissement a besoin de places assises avant de pouvoir prendre une réservation. Ajoutez votre première table pour commencer.';
+
+  @override
+  String get addSpace => 'Ajouter une table';
+
+  @override
+  String get editSpace => 'Modifier';
+
+  @override
+  String get spaceName => 'Nom';
+
+  @override
+  String get spaceNameHint => 'Le nom utilisé en salle, ex. « Table 4 »';
+
+  @override
+  String get spaceType => 'Type';
+
+  @override
+  String get spaceTypeTable => 'Table';
+
+  @override
+  String get spaceTypeVipRoom => 'Salon VIP';
+
+  @override
+  String get spaceTypeTerrace => 'Terrasse';
+
+  @override
+  String get spaceCapacity => 'Places';
+
+  @override
+  String get spaceCapacityHint => 'Nombre maximum de clients';
+
+  @override
+  String spaceSeats(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count places',
+      one: '1 place',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get spaceRetired => 'Hors service';
+
+  @override
+  String spaceSaved(String name) {
+    return '$name enregistrée.';
+  }
+
+  @override
+  String removeSpaceTitle(String name) {
+    return 'Supprimer $name ?';
+  }
+
+  @override
+  String get removeSpaceDetail => 'Elle cesse immédiatement d’être réservable.';
+
+  @override
+  String get removeSpaceKeepsHistory =>
+      'Les réservations déjà prises dessus sont conservées et restent consultables — la table est mise hors service, pas effacée.';
+
+  @override
+  String spaceDeleted(String name) {
+    return '$name supprimée.';
+  }
+
+  @override
+  String spaceRetiredNotice(String name) {
+    return '$name est hors service. Ses réservations passées sont conservées.';
+  }
+
+  @override
+  String get bringSpaceBack => 'Remettre en service';
+
+  @override
+  String spaceBroughtBack(String name) {
+    return '$name est de nouveau réservable.';
+  }
+
+  @override
+  String get seatsAtLeastOne => 'Une table accueille au moins un client.';
 }

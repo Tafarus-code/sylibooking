@@ -2691,4 +2691,354 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('tables and rooms', () {
+    Map<String, dynamic> spaceJson({
+      int id = 1,
+      String name = 'Table 4',
+      String type = 'table',
+      int capacity = 4,
+      bool isActive = true,
+    }) =>
+        {
+          'id': id,
+          'name': name,
+          'type': type,
+          'type_display': switch (type) {
+            'vip_room' => 'VIP room',
+            'terrace' => 'Terrace',
+            _ => 'Table',
+          },
+          'capacity': capacity,
+          'is_active': isActive,
+        };
+
+    /// On the spaces screen, for the given role.
+    Future<FakeBackend> openSpaces(
+      WidgetTester tester, {
+      String role = 'owner',
+      List<Map<String, dynamic>>? spaces,
+      String? language,
+      Size size = phoneSize,
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/7/spaces/', {
+        'results': spaces ?? [spaceJson()],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('an owner is offered tables and rooms', (tester) async {
+      await openSpaces(tester);
+
+      expect(find.text('Tables and rooms'), findsOneWidget);
+    });
+
+    testWidgets('staff are not', (tester) async {
+      // They may read the layout over the API — the desk names the table a
+      // booking is on — but there is nothing here they can change.
+      await openSpaces(tester, role: 'staff');
+
+      expect(find.text('Tables and rooms'), findsNothing);
+    });
+
+    testWidgets('it sits above opening hours', (tester) async {
+      // A venue is defined by its rooms before it is defined by its hours.
+      await openSpaces(tester);
+
+      final spaces = tester.getRect(find.text('Tables and rooms'));
+      final hours = tester.getRect(find.text('Opening hours'));
+      expect(spaces.top, lessThan(hours.top));
+    });
+
+    testWidgets('the seating plan lists what is there', (tester) async {
+      await openSpaces(tester, spaces: [
+        spaceJson(name: 'Table 4', capacity: 4),
+        spaceJson(id: 2, name: 'VIP Room 1', type: 'vip_room', capacity: 8),
+      ]);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Table 4'), findsOneWidget);
+      expect(find.text('VIP Room 1'), findsOneWidget);
+      expect(find.text('4 seats'), findsOneWidget);
+      expect(find.text('8 seats'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no tables says what to do about it',
+        (tester) async {
+      await openSpaces(tester, spaces: []);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No tables yet'), findsOneWidget);
+      expect(
+        find.textContaining('needs somewhere to sit'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('adding a table posts what the server expects',
+        (tester) async {
+      final backend = await openSpaces(tester, spaces: []);
+      backend.on('POST', '/api/merchant/establishments/7/spaces/',
+          spaceJson(name: 'Terrace 1', type: 'terrace', capacity: 6));
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add a table'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).first, 'Terrace 1');
+      await tester.enterText(find.byType(TextFormField).last, '6');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests.lastWhere(
+        (r) => r.method == 'POST' && r.url.path.endsWith('/spaces/'),
+      );
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body['name'], 'Terrace 1');
+      expect(body['capacity'], 6);
+      // The wire value, not the enum name: the server speaks snake_case.
+      expect(body['type'], 'table');
+    });
+
+    testWidgets('a duplicate name is shown, not swallowed', (tester) async {
+      final backend = await openSpaces(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/7/spaces/',
+        {'name': ['There is already a space called that here.']},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add a table'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Table 4');
+      await tester.enterText(find.byType(TextFormField).last, '2');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('already a space called that'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a table seating nobody is refused before the round trip',
+        (tester) async {
+      final backend = await openSpaces(tester, spaces: []);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add a table'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Nowhere');
+      await tester.enterText(find.byType(TextFormField).last, '0');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('A table seats at least one guest.'), findsOneWidget);
+      expect(
+        backend.requests.where(
+          (r) => r.method == 'POST' && r.url.path.endsWith('/spaces/'),
+        ),
+        isEmpty,
+      );
+    });
+
+    testWidgets('removing a table explains that its bookings are kept',
+        (tester) async {
+      await openSpaces(tester);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remove Table 4?'), findsOneWidget);
+      // Said before the tap, not after.
+      expect(
+        find.textContaining('retired rather than erased'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a table with no history reports as deleted', (tester) async {
+      final backend = await openSpaces(tester);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      // Registered only now: overriding the list before navigating would
+      // have the screen load its post-delete state and never show the row.
+      backend.on(
+        'DELETE',
+        '/api/merchant/establishments/7/spaces/1/',
+        null,
+        status: 204,
+      );
+      backend.on('GET', '/api/merchant/establishments/7/spaces/', {
+        'results': [],
+      });
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Table 4 removed.'), findsOneWidget);
+    });
+
+    testWidgets('a booked table reports as retired instead', (tester) async {
+      final backend = await openSpaces(tester);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      // 200 with the space: the server kept it, because it has history.
+      backend.on(
+        'DELETE',
+        '/api/merchant/establishments/7/spaces/1/',
+        spaceJson(isActive: false),
+      );
+      backend.on('GET', '/api/merchant/establishments/7/spaces/', {
+        'results': [spaceJson(isActive: false)],
+      });
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('past bookings are kept'),
+        findsOneWidget,
+      );
+      // And it is still on the list, marked, so it can be brought back.
+      expect(find.text('Out of service'), findsOneWidget);
+    });
+
+    testWidgets('a retired table can be brought back', (tester) async {
+      final backend = await openSpaces(
+        tester,
+        spaces: [spaceJson(isActive: false)],
+      );
+      backend.on(
+        'PATCH',
+        '/api/merchant/establishments/7/spaces/1/',
+        spaceJson(),
+      );
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bring back'));
+      await tester.pumpAndSettle();
+
+      final patched = backend.requests.lastWhere((r) => r.method == 'PATCH');
+      expect(
+        jsonDecode(patched.body) as Map<String, dynamic>,
+        {'is_active': true},
+      );
+    });
+
+    testWidgets('a retired table offers no edit menu', (tester) async {
+      // Editing a table that is out of service is not a thing to offer;
+      // bringing it back is.
+      await openSpaces(tester, spaces: [spaceJson(isActive: false)]);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.more_vert), findsNothing);
+      expect(find.text('Bring back'), findsOneWidget);
+    });
+
+    testWidgets('the form fits a 360dp phone', (tester) async {
+      await openSpaces(tester, spaces: []);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add a table'));
+      await tester.pumpAndSettle();
+
+      for (final field in tester.widgetList(find.byType(TextFormField))) {
+        final rect = tester.getRect(find.byWidget(field));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width));
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('French labels do not overflow the row', (tester) async {
+      await openSpaces(
+        tester,
+        language: 'fr',
+        spaces: [spaceJson(name: 'Salon VIP 1', type: 'vip_room', capacity: 8)],
+      );
+
+      await tester.tap(find.text('Tables et salons'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Salon VIP'), findsOneWidget);
+      expect(find.text('8 places'), findsOneWidget);
+      final rect = tester.getRect(find.text('8 places'));
+      expect(rect.right, lessThanOrEqualTo(phoneSize.width));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the layout is grouped by kind', (tester) async {
+      await openSpaces(tester, spaces: [
+        spaceJson(id: 1, name: 'Table 4', capacity: 4),
+        spaceJson(id: 2, name: 'Terrace 1', type: 'terrace', capacity: 6),
+        spaceJson(id: 3, name: 'Table 5', capacity: 2),
+      ]);
+
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      // Two tables under one heading, the terrace under its own.
+      expect(find.text('Table'), findsOneWidget);
+      expect(find.text('Terrace'), findsOneWidget);
+      final tableHeading = tester.getRect(find.text('Table'));
+      final terraceHeading = tester.getRect(find.text('Terrace'));
+      expect(tester.getRect(find.text('Table 5')).top,
+          lessThan(terraceHeading.top));
+      expect(tableHeading.top, lessThan(terraceHeading.top));
+    });
+  });
 }

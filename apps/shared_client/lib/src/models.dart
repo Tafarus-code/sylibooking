@@ -69,6 +69,7 @@ class Space {
     required this.type,
     required this.typeDisplay,
     required this.capacity,
+    this.isActive = true,
   });
 
   final int id;
@@ -77,12 +78,20 @@ class Space {
   final String typeDisplay;
   final int capacity;
 
+  /// Whether the space can still be booked.
+  ///
+  /// Only the merchant list carries this. The customer payload omits retired
+  /// spaces entirely rather than sending them flagged, so anything a customer
+  /// is shown is bookable by construction — hence the default.
+  final bool isActive;
+
   factory Space.fromJson(Map<String, dynamic> json) => Space(
         id: json['id'] as int,
         name: json['name'] as String? ?? '',
         type: SpaceType.parse(json['type'] as String?),
         typeDisplay: json['type_display'] as String? ?? '',
         capacity: json['capacity'] as int? ?? 0,
+        isActive: json['is_active'] as bool? ?? true,
       );
 }
 

@@ -45,6 +45,9 @@ void main() {
       'amountGnf',
       'dateRange',
       'stageHeading',
+      // "Table" is the same word in French, and a venue's staff say it the
+      // same way in both languages.
+      'spaceTypeTable',
     };
 
     final untranslated = [

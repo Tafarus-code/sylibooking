@@ -1488,6 +1488,156 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Details saved.'**
   String get detailsSaved;
+
+  /// No description provided for @tablesAndRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Tables and rooms'**
+  String get tablesAndRooms;
+
+  /// No description provided for @tablesAndRoomsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Where your guests actually sit'**
+  String get tablesAndRoomsSubtitle;
+
+  /// No description provided for @noSpacesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No tables yet'**
+  String get noSpacesYet;
+
+  /// No description provided for @noSpacesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A venue needs somewhere to sit before it can take a booking. Add your first table to start.'**
+  String get noSpacesDetail;
+
+  /// No description provided for @addSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a table'**
+  String get addSpace;
+
+  /// No description provided for @editSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get editSpace;
+
+  /// No description provided for @spaceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get spaceName;
+
+  /// No description provided for @spaceNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What staff call it, e.g. \"Table 4\"'**
+  String get spaceNameHint;
+
+  /// No description provided for @spaceType.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get spaceType;
+
+  /// No description provided for @spaceTypeTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get spaceTypeTable;
+
+  /// No description provided for @spaceTypeVipRoom.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP room'**
+  String get spaceTypeVipRoom;
+
+  /// No description provided for @spaceTypeTerrace.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrace'**
+  String get spaceTypeTerrace;
+
+  /// No description provided for @spaceCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Seats'**
+  String get spaceCapacity;
+
+  /// No description provided for @spaceCapacityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Most guests it takes'**
+  String get spaceCapacityHint;
+
+  /// No description provided for @spaceSeats.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 seat} other{{count} seats}}'**
+  String spaceSeats(int count);
+
+  /// No description provided for @spaceRetired.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of service'**
+  String get spaceRetired;
+
+  /// No description provided for @spaceSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} saved.'**
+  String spaceSaved(String name);
+
+  /// No description provided for @removeSpaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String removeSpaceTitle(String name);
+
+  /// No description provided for @removeSpaceDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It stops being bookable straight away.'**
+  String get removeSpaceDetail;
+
+  /// No description provided for @removeSpaceKeepsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookings already made on it are kept, and stay readable — the table is retired rather than erased.'**
+  String get removeSpaceKeepsHistory;
+
+  /// No description provided for @spaceDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} removed.'**
+  String spaceDeleted(String name);
+
+  /// No description provided for @spaceRetiredNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is out of service. Its past bookings are kept.'**
+  String spaceRetiredNotice(String name);
+
+  /// No description provided for @bringSpaceBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring back'**
+  String get bringSpaceBack;
+
+  /// No description provided for @spaceBroughtBack.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is bookable again.'**
+  String spaceBroughtBack(String name);
+
+  /// No description provided for @seatsAtLeastOne.
+  ///
+  /// In en, this message translates to:
+  /// **'A table seats at least one guest.'**
+  String get seatsAtLeastOne;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

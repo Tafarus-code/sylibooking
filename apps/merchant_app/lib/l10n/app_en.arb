@@ -479,5 +479,72 @@
   "fieldDescription": "Description",
   "fieldCity": "City",
   "fieldAddress": "Address",
-  "detailsSaved": "Details saved."
+  "detailsSaved": "Details saved.",
+  "tablesAndRooms": "Tables and rooms",
+  "tablesAndRoomsSubtitle": "Where your guests actually sit",
+  "noSpacesYet": "No tables yet",
+  "noSpacesDetail": "A venue needs somewhere to sit before it can take a booking. Add your first table to start.",
+  "addSpace": "Add a table",
+  "editSpace": "Edit",
+  "spaceName": "Name",
+  "spaceNameHint": "What staff call it, e.g. \"Table 4\"",
+  "spaceType": "Kind",
+  "spaceTypeTable": "Table",
+  "spaceTypeVipRoom": "VIP room",
+  "spaceTypeTerrace": "Terrace",
+  "spaceCapacity": "Seats",
+  "spaceCapacityHint": "Most guests it takes",
+  "spaceSeats": "{count, plural, =1{1 seat} other{{count} seats}}",
+  "@spaceSeats": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "spaceRetired": "Out of service",
+  "spaceSaved": "{name} saved.",
+  "@spaceSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeSpaceTitle": "Remove {name}?",
+  "@removeSpaceTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeSpaceDetail": "It stops being bookable straight away.",
+  "removeSpaceKeepsHistory": "Bookings already made on it are kept, and stay readable — the table is retired rather than erased.",
+  "spaceDeleted": "{name} removed.",
+  "@spaceDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "spaceRetiredNotice": "{name} is out of service. Its past bookings are kept.",
+  "@spaceRetiredNotice": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "bringSpaceBack": "Bring back",
+  "spaceBroughtBack": "{name} is bookable again.",
+  "@spaceBroughtBack": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "seatsAtLeastOne": "A table seats at least one guest."
 }

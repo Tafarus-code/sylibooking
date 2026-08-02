@@ -802,4 +802,99 @@ class LEn extends L {
 
   @override
   String get detailsSaved => 'Details saved.';
+
+  @override
+  String get tablesAndRooms => 'Tables and rooms';
+
+  @override
+  String get tablesAndRoomsSubtitle => 'Where your guests actually sit';
+
+  @override
+  String get noSpacesYet => 'No tables yet';
+
+  @override
+  String get noSpacesDetail =>
+      'A venue needs somewhere to sit before it can take a booking. Add your first table to start.';
+
+  @override
+  String get addSpace => 'Add a table';
+
+  @override
+  String get editSpace => 'Edit';
+
+  @override
+  String get spaceName => 'Name';
+
+  @override
+  String get spaceNameHint => 'What staff call it, e.g. \"Table 4\"';
+
+  @override
+  String get spaceType => 'Kind';
+
+  @override
+  String get spaceTypeTable => 'Table';
+
+  @override
+  String get spaceTypeVipRoom => 'VIP room';
+
+  @override
+  String get spaceTypeTerrace => 'Terrace';
+
+  @override
+  String get spaceCapacity => 'Seats';
+
+  @override
+  String get spaceCapacityHint => 'Most guests it takes';
+
+  @override
+  String spaceSeats(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count seats',
+      one: '1 seat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get spaceRetired => 'Out of service';
+
+  @override
+  String spaceSaved(String name) {
+    return '$name saved.';
+  }
+
+  @override
+  String removeSpaceTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get removeSpaceDetail => 'It stops being bookable straight away.';
+
+  @override
+  String get removeSpaceKeepsHistory =>
+      'Bookings already made on it are kept, and stay readable — the table is retired rather than erased.';
+
+  @override
+  String spaceDeleted(String name) {
+    return '$name removed.';
+  }
+
+  @override
+  String spaceRetiredNotice(String name) {
+    return '$name is out of service. Its past bookings are kept.';
+  }
+
+  @override
+  String get bringSpaceBack => 'Bring back';
+
+  @override
+  String spaceBroughtBack(String name) {
+    return '$name is bookable again.';
+  }
+
+  @override
+  String get seatsAtLeastOne => 'A table seats at least one guest.';
 }

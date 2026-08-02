@@ -7,6 +7,7 @@ nothing relies on the UI having hidden a button.
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -18,6 +19,7 @@ from establishments.models import (
     MenuItem,
     MerchantMembership,
     OpeningHours,
+    Space,
 )
 from establishments.permissions import (
     get_establishment_or_404,
@@ -29,6 +31,7 @@ from establishments.permissions import (
 from establishments.theme_presets import DEFAULT_PRESET, PRESETS
 
 from .reviews import validate_photo_file  # noqa: E402  (after app imports)
+from .serializers import SpaceWriteSerializer  # noqa: E402
 
 User = get_user_model()
 
@@ -227,6 +230,89 @@ class MerchantEstablishmentsView(APIView):
             EstablishmentProfileSerializer(establishment).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class MerchantSpacesView(APIView):
+    """GET every space including deactivated ones; POST to add one.
+
+    Staff read this — the desk shows which table a booking is on — but only
+    owners and managers change it. A room's layout is structural, the same
+    class of decision as opening hours.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        establishment = get_establishment_or_404(pk)
+        require_operations_access(request.user, establishment)
+        return Response(
+            {
+                'results': SpaceWriteSerializer(
+                    establishment.spaces.all(), many=True
+                ).data
+            }
+        )
+
+    def post(self, request, pk):
+        establishment = get_establishment_or_404(pk)
+        require_profile_access(request.user, establishment)
+
+        serializer = SpaceWriteSerializer(
+            data=request.data, context={'establishment': establishment}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(establishment=establishment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class MerchantSpaceItemView(APIView):
+    """PATCH one space, or take it out of service. Owner and manager only."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_space(self, establishment, space_id):
+        # Scoped to the establishment in the path, so a space id belonging to
+        # another venue is a 404 rather than someone else's table.
+        return get_object_or_404(Space, pk=space_id, establishment=establishment)
+
+    def patch(self, request, pk, space_id):
+        establishment = get_establishment_or_404(pk)
+        require_profile_access(request.user, establishment)
+
+        space = self.get_space(establishment, space_id)
+        serializer = SpaceWriteSerializer(
+            space,
+            data=request.data,
+            partial=True,
+            context={'establishment': establishment},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk, space_id):
+        """Remove the space if nothing was ever booked on it; else retire it.
+
+        `Reservation.space` is PROTECT, so the database refuses to delete a
+        space with history — that refusal is the real guard, not this check.
+        A venue's past bookings name the table they were on, and a merchant
+        rearranging their room must not silently rewrite last month.
+
+        204 means the row is gone. 200 with the space means it was retired
+        instead, so the app can tell the merchant which of the two happened.
+        """
+        establishment = get_establishment_or_404(pk)
+        require_profile_access(request.user, establishment)
+        space = self.get_space(establishment, space_id)
+
+        try:
+            space.delete()
+        except ProtectedError:
+            space.is_active = False
+            space.save(update_fields=['is_active'])
+            return Response(SpaceWriteSerializer(space).data)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ThemePresetsView(APIView):

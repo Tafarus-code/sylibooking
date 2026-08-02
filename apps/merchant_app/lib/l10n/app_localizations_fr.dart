@@ -117,7 +117,7 @@ class LFr extends L {
 
   @override
   String get noVenueYetDetail =>
-      'Ce compte n\'est rattaché à aucun établissement. Un propriétaire peut vous ajouter au sien, ou un administrateur peut en créer un.';
+      'Créez votre propre établissement pour commencer à prendre des réservations, ou demandez à un propriétaire de vous ajouter au sien.';
 
   @override
   String get rangeToday => 'Aujourd\'hui';
@@ -905,4 +905,31 @@ class LFr extends L {
 
   @override
   String get seatsAtLeastOne => 'Une table accueille au moins un client.';
+
+  @override
+  String get createVenue => 'Créer votre établissement';
+
+  @override
+  String get newVenue => 'Nouvel établissement';
+
+  @override
+  String get createVenueIntro =>
+      'L’essentiel seulement. Les heures, le menu, les photos et l’identité visuelle ont chacun leur écran une fois qu’il existe.';
+
+  @override
+  String get venueKind => 'Type';
+
+  @override
+  String get venueKindLounge => 'Salon';
+
+  @override
+  String get venueKindRestaurant => 'Restaurant';
+
+  @override
+  String get createVenueCta => 'Créer l’établissement';
+
+  @override
+  String venueCreated(String name) {
+    return '$name est à vous. Ajoutez vos tables ensuite.';
+  }
 }

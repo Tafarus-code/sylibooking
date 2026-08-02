@@ -35,7 +35,7 @@
   "keepCurrentVenue": "Garder l'établissement actuel",
   "everythingAppliesToVenue": "Tout ce que vous ferez ensuite s'applique à l'établissement choisi.",
   "noVenueYet": "Aucun établissement",
-  "noVenueYetDetail": "Ce compte n'est rattaché à aucun établissement. Un propriétaire peut vous ajouter au sien, ou un administrateur peut en créer un.",
+  "noVenueYetDetail": "Créez votre propre établissement pour commencer à prendre des réservations, ou demandez à un propriétaire de vous ajouter au sien.",
   "rangeToday": "Aujourd'hui",
   "rangeNextSevenDays": "7 prochains jours",
   "dayToday": "Aujourd'hui",
@@ -256,5 +256,13 @@
   "spaceRetiredNotice": "{name} est hors service. Ses réservations passées sont conservées.",
   "bringSpaceBack": "Remettre en service",
   "spaceBroughtBack": "{name} est de nouveau réservable.",
-  "seatsAtLeastOne": "Une table accueille au moins un client."
+  "seatsAtLeastOne": "Une table accueille au moins un client.",
+  "createVenue": "Créer votre établissement",
+  "newVenue": "Nouvel établissement",
+  "createVenueIntro": "L’essentiel seulement. Les heures, le menu, les photos et l’identité visuelle ont chacun leur écran une fois qu’il existe.",
+  "venueKind": "Type",
+  "venueKindLounge": "Salon",
+  "venueKindRestaurant": "Restaurant",
+  "createVenueCta": "Créer l’établissement",
+  "venueCreated": "{name} est à vous. Ajoutez vos tables ensuite."
 }

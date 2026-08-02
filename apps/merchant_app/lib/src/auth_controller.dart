@@ -64,6 +64,30 @@ class AuthController extends ChangeNotifier {
     state = AuthState.choosingVenue;
   }
 
+  /// Reload the venue list and work in the one just created.
+  ///
+  /// The creator is made its owner server-side, so the reloaded list will
+  /// contain it; selecting by id rather than trusting the response keeps the
+  /// role and permissions coming from the same place as every other venue.
+  ///
+  /// Returns whether it is now the selected venue. False means the reload
+  /// did not bring it back — the venue exists, but nothing downstream may
+  /// assume there is one selected.
+  Future<bool> adoptVenue(int establishmentId) async {
+    await _loadVenues();
+    var adopted = false;
+    for (final venue in venues) {
+      if (venue.id == establishmentId) {
+        selectedVenue = venue;
+        state = AuthState.signedIn;
+        adopted = true;
+        break;
+      }
+    }
+    notifyListeners();
+    return adopted;
+  }
+
   void selectVenue(MerchantVenue venue) {
     selectedVenue = venue;
     state = AuthState.signedIn;

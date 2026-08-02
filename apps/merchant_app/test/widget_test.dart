@@ -3041,4 +3041,273 @@ void main() {
       expect(tableHeading.top, lessThan(terraceHeading.top));
     });
   });
+
+  group('registering a venue', () {
+    Map<String, dynamic> createdVenueJson({
+      int id = 9,
+      String name = 'Chez Aissatou',
+      String type = 'restaurant',
+      String city = 'Conakry',
+    }) =>
+        {
+          'id': id,
+          'name': name,
+          'type': type,
+          'city': city,
+          'address': 'Kaloum',
+          'latitude': null,
+          'longitude': null,
+          'tagline': '',
+          'description': '',
+          'opening_hours': '',
+          'theme_preset': 'ember',
+        };
+
+    /// Signed in with no venue at all — the state a brand-new account is in.
+    Future<FakeBackend> openWithNoVenue(
+      WidgetTester tester, {
+      String? language,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user(establishments: []));
+      backend.on('GET', '/api/merchant/establishments/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('an account with no venue is offered one', (tester) async {
+      await openWithNoVenue(tester);
+
+      expect(find.text('Create your venue'), findsOneWidget);
+    });
+
+    testWidgets('and is no longer told to go and find an admin',
+        (tester) async {
+      // The old copy was accurate until this slice and is now the opposite
+      // of the truth.
+      await openWithNoVenue(tester);
+
+      expect(find.textContaining('admin can set one up'), findsNothing);
+      expect(find.textContaining('Create your own venue'), findsOneWidget);
+    });
+
+    testWidgets('the form asks for the essentials and nothing else',
+        (tester) async {
+      await openWithNoVenue(tester);
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Name'), findsOneWidget);
+      expect(find.text('Kind'), findsOneWidget);
+      expect(find.text('City'), findsOneWidget);
+      expect(find.text('Address'), findsOneWidget);
+      // Deliberately absent: each has its own screen once the venue exists.
+      expect(find.text('Tagline (one line)'), findsNothing);
+      expect(find.text('Description'), findsNothing);
+    });
+
+    testWidgets('an empty form is refused before the round trip',
+        (tester) async {
+      final backend = await openWithNoVenue(tester);
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create venue'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Required'), findsNWidgets(3));
+      expect(
+        backend.requests.where((r) => r.method == 'POST'),
+        isEmpty,
+      );
+    });
+
+    testWidgets('creating one posts what the server expects', (tester) async {
+      final backend = await openWithNoVenue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/',
+        createdVenueJson(),
+        status: 201,
+      );
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(id: 9, name: 'Chez Aissatou')],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/9/spaces/', {
+        'results': [],
+      });
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Chez Aissatou');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Conakry');
+      await tester.enterText(find.byType(TextFormField).at(2), 'Kaloum');
+      await tester.tap(find.text('Create venue'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests.lastWhere((r) => r.method == 'POST');
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body['name'], 'Chez Aissatou');
+      expect(body['city'], 'Conakry');
+      expect(body['address'], 'Kaloum');
+      expect(body['type'], 'restaurant');
+    });
+
+    testWidgets('and lands on the seating plan, not the desk', (tester) async {
+      // A venue with no tables cannot take a booking, so the next step is
+      // the only step.
+      final backend = await openWithNoVenue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/',
+        createdVenueJson(),
+        status: 201,
+      );
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(id: 9, name: 'Chez Aissatou')],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/9/spaces/', {
+        'results': [],
+      });
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Chez Aissatou');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Conakry');
+      await tester.enterText(find.byType(TextFormField).at(2), 'Kaloum');
+      await tester.tap(find.text('Create venue'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No tables yet'), findsOneWidget);
+      expect(
+        find.textContaining('needs somewhere to sit'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the new venue becomes the one being worked', (tester) async {
+      final backend = await openWithNoVenue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/',
+        createdVenueJson(),
+        status: 201,
+      );
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(id: 9, name: 'Chez Aissatou')],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/establishments/9/spaces/', {
+        'results': [],
+      });
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Chez Aissatou');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Conakry');
+      await tester.enterText(find.byType(TextFormField).at(2), 'Kaloum');
+      await tester.tap(find.text('Create venue'));
+      await tester.pumpAndSettle();
+
+      // Back out of the seating plan and the desk underneath is the new
+      // venue's, not the empty state that sent us here.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Chez Aissatou'), findsWidgets);
+      expect(find.text('No venue yet'), findsNothing);
+    });
+
+    testWidgets('a server refusal is shown on the form', (tester) async {
+      final backend = await openWithNoVenue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/',
+        {'name': ['An establishment with that name already exists.']},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Chez Fatou');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Conakry');
+      await tester.enterText(find.byType(TextFormField).at(2), 'Kaloum');
+      await tester.tap(find.text('Create venue'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('already exists'), findsOneWidget);
+      // Still on the form, with what was typed intact.
+      expect(find.text('Create venue'), findsOneWidget);
+    });
+
+    testWidgets('an account that already runs one can add another',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [
+          venueJson(),
+          venueJson(id: 8, name: 'Chez Fatou', city: 'Labé', role: 'manager'),
+        ],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      // Two venues means the picker, which is where a third would start.
+      expect(find.text('Choose a venue'), findsOneWidget);
+      expect(find.text('New venue'), findsOneWidget);
+    });
+
+    testWidgets('the form reads in French', (tester) async {
+      await openWithNoVenue(tester, language: 'fr');
+
+      await tester.tap(find.text('Créer votre établissement'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ville'), findsOneWidget);
+      // Typographic apostrophe, matching the catalogue rather than a keyboard.
+      expect(find.text('Créer l’établissement'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the form fits a 360dp phone', (tester) async {
+      await openWithNoVenue(tester);
+
+      await tester.tap(find.text('Create your venue'));
+      await tester.pumpAndSettle();
+
+      for (final field in tester.widgetList(find.byType(TextFormField))) {
+        final rect = tester.getRect(find.byWidget(field));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

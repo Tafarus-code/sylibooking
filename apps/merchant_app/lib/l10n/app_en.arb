@@ -41,7 +41,7 @@
   "keepCurrentVenue": "Keep current venue",
   "everythingAppliesToVenue": "Everything you do next applies to the venue you pick.",
   "noVenueYet": "No venue yet",
-  "noVenueYetDetail": "This account is not a member of any establishment. An owner can add you to theirs, or an admin can set one up.",
+  "noVenueYetDetail": "Create your own venue to start taking bookings, or ask an owner to add you to theirs.",
   "rangeToday": "Today",
   "rangeNextSevenDays": "Next 7 days",
   "dayToday": "Today",
@@ -546,5 +546,20 @@
       }
     }
   },
-  "seatsAtLeastOne": "A table seats at least one guest."
+  "seatsAtLeastOne": "A table seats at least one guest.",
+  "createVenue": "Create your venue",
+  "newVenue": "New venue",
+  "createVenueIntro": "The essentials only. Hours, menu, photos and branding all have their own screens once this exists.",
+  "venueKind": "Kind",
+  "venueKindLounge": "Lounge",
+  "venueKindRestaurant": "Restaurant",
+  "createVenueCta": "Create venue",
+  "venueCreated": "{name} is yours. Add your tables next.",
+  "@venueCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

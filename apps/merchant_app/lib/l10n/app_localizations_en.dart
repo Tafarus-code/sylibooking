@@ -116,7 +116,7 @@ class LEn extends L {
 
   @override
   String get noVenueYetDetail =>
-      'This account is not a member of any establishment. An owner can add you to theirs, or an admin can set one up.';
+      'Create your own venue to start taking bookings, or ask an owner to add you to theirs.';
 
   @override
   String get rangeToday => 'Today';
@@ -897,4 +897,31 @@ class LEn extends L {
 
   @override
   String get seatsAtLeastOne => 'A table seats at least one guest.';
+
+  @override
+  String get createVenue => 'Create your venue';
+
+  @override
+  String get newVenue => 'New venue';
+
+  @override
+  String get createVenueIntro =>
+      'The essentials only. Hours, menu, photos and branding all have their own screens once this exists.';
+
+  @override
+  String get venueKind => 'Kind';
+
+  @override
+  String get venueKindLounge => 'Lounge';
+
+  @override
+  String get venueKindRestaurant => 'Restaurant';
+
+  @override
+  String get createVenueCta => 'Create venue';
+
+  @override
+  String venueCreated(String name) {
+    return '$name is yours. Add your tables next.';
+  }
 }

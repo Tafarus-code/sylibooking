@@ -287,6 +287,41 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                 ],
               ),
             ),
+            // Only when a deposit is actually being taken. Said before the
+            // money moves, because a forfeiture the customer did not see
+            // coming is a dispute rather than a policy.
+            if (_paymentProvider != PaymentProvider.cashOnArrival &&
+                widget.establishment.depositAmount != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l.depositTerms(
+                          widget.establishment.depositAmount!,
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _submitting ? null : _submit,

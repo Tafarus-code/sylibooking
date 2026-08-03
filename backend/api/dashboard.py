@@ -103,22 +103,49 @@ class PaymentDashboardView(APIView):
         return counts
 
     def _payment_totals(self, payments):
-        """Money in, money still owed, money that failed."""
+        """Money in, money still owed, money that failed — and its fate.
+
+        `collected` stays every completed payment, because that is what
+        actually arrived. Splitting it would understate what the venue took
+        through the platform.
+
+        What the two extra figures answer is a different question: of the
+        money that arrived, how much was handed back over the counter as a
+        discount on the bill, and how much was kept because nobody came. Only
+        the second is money the venue is better off by, and a merchant
+        counting cash needs to see which is which rather than inferring it.
+        """
+        completed = Q(status=Payment.Status.COMPLETED)
         totals = payments.aggregate(
-            collected=Sum('amount', filter=Q(status=Payment.Status.COMPLETED)),
+            collected=Sum('amount', filter=completed),
             awaiting=Sum('amount', filter=Q(status=Payment.Status.PENDING)),
             failed=Sum('amount', filter=Q(status=Payment.Status.FAILED)),
-            completed_count=Count('id', filter=Q(status=Payment.Status.COMPLETED)),
+            forfeited=Sum(
+                'amount',
+                filter=completed & Q(outcome=Payment.Outcome.FORFEITED),
+            ),
+            offset=Sum(
+                'amount',
+                filter=completed & Q(outcome=Payment.Outcome.OFFSET),
+            ),
+            completed_count=Count('id', filter=completed),
             pending_count=Count('id', filter=Q(status=Payment.Status.PENDING)),
             failed_count=Count('id', filter=Q(status=Payment.Status.FAILED)),
+            forfeited_count=Count(
+                'id',
+                filter=completed & Q(outcome=Payment.Outcome.FORFEITED),
+            ),
         )
         return {
             'collected': str(totals['collected'] or ZERO),
             'awaiting': str(totals['awaiting'] or ZERO),
             'failed': str(totals['failed'] or ZERO),
+            'forfeited': str(totals['forfeited'] or ZERO),
+            'offset': str(totals['offset'] or ZERO),
             'completed_count': totals['completed_count'],
             'pending_count': totals['pending_count'],
             'failed_count': totals['failed_count'],
+            'forfeited_count': totals['forfeited_count'],
         }
 
     def _by_provider(self, reservations, payments):

@@ -571,5 +571,20 @@
       }
     }
   },
-  "statusMissed": "Missed"
+  "statusMissed": "Missed",
+  "rowDepositOutcome": "Deposit",
+  "depositNotSettled": "Not settled yet",
+  "depositOffset": "Taken off the bill",
+  "depositForfeited": "Kept — nobody arrived",
+  "depositRefunded": "Refunded",
+  "keptFromNoShows": "Kept from no-shows",
+  "offsetAgainstBills": "Taken off bills",
+  "depositCount": "{count, plural, =1{1 deposit} other{{count} deposits}}",
+  "@depositCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -1704,6 +1704,54 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Missed'**
   String get statusMissed;
+
+  /// No description provided for @rowDepositOutcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit'**
+  String get rowDepositOutcome;
+
+  /// No description provided for @depositNotSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not settled yet'**
+  String get depositNotSettled;
+
+  /// No description provided for @depositOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken off the bill'**
+  String get depositOffset;
+
+  /// No description provided for @depositForfeited.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept — nobody arrived'**
+  String get depositForfeited;
+
+  /// No description provided for @depositRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get depositRefunded;
+
+  /// No description provided for @keptFromNoShows.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept from no-shows'**
+  String get keptFromNoShows;
+
+  /// No description provided for @offsetAgainstBills.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken off bills'**
+  String get offsetAgainstBills;
+
+  /// No description provided for @depositCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 deposit} other{{count} deposits}}'**
+  String depositCount(int count);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

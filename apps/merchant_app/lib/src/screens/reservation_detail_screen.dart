@@ -80,6 +80,9 @@ class ReservationDetailScreen extends StatelessWidget {
                 (l.rowMethod, payment.providerDisplay, false),
                 (l.rowAmount, l.amountGnf(payment.amount), true),
                 (l.rowStatus, payment.statusDisplay, false),
+                // What happened to the money, which is a different question
+                // from whether it arrived.
+                (l.rowDepositOutcome, payment.outcome.label(l), false),
                 if (payment.providerReference case final ref?)
                   (l.rowProviderReference, ref, true),
               ],

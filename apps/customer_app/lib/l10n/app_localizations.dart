@@ -1470,6 +1470,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Nobody arrived before the venue stopped holding the table.'**
   String get bookingMissedDetail;
+
+  /// No description provided for @depositTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Your {amount} GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.'**
+  String depositTerms(String amount);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

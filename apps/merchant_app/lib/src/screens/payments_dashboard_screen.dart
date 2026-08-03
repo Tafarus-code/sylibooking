@@ -196,6 +196,39 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
           ],
         ),
 
+        // Of what was collected, what the venue is actually better off by.
+        // A deposit taken off a bill arrived and was handed straight back as
+        // a discount; only a kept one is money gained.
+        if (_isPositive(dashboard.forfeited) ||
+            _isPositive(dashboard.offset)) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _MoneyCard(
+                  label: l.keptFromNoShows,
+                  amount: dashboard.forfeited,
+                  detail: l.depositCount(dashboard.forfeitedCount),
+                  icon: Icons.savings_outlined,
+                  tone: _Tone.good,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MoneyCard(
+                  label: l.offsetAgainstBills,
+                  amount: dashboard.offset,
+                  detail: '',
+                  icon: Icons.receipt_long_outlined,
+                  tone: _Tone.neutral,
+                  compact: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+
         const SizedBox(height: 16),
         _SectionLabel(l.sectionBookings),
         Card(
@@ -351,6 +384,9 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
     );
   }
 }
+
+/// Amounts travel as strings, so "is there any" is a parse, not a compare.
+bool _isPositive(String amount) => (double.tryParse(amount) ?? 0) > 0;
 
 enum _Tone { good, warn, bad, neutral }
 

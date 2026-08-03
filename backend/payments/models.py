@@ -22,6 +22,24 @@ class Payment(models.Model):
         COMPLETED = 'completed', pgettext_lazy('payment status', 'Completed')
         FAILED = 'failed', pgettext_lazy('payment status', 'Failed')
 
+    class Outcome(models.TextChoices):
+        """What became of a deposit once the booking reached its end.
+
+        A separate axis from `Status`: the payment itself stays `completed`
+        whatever happens next. "Did the money arrive" and "what did we do
+        with it" are different questions, and a merchant counting cash needs
+        both answered.
+        """
+
+        NONE = 'none', pgettext_lazy('deposit outcome', 'Not settled yet')
+        OFFSET = 'offset', pgettext_lazy(
+            'deposit outcome', 'Taken off the bill'
+        )
+        FORFEITED = 'forfeited', pgettext_lazy(
+            'deposit outcome', 'Kept for a no-show'
+        )
+        REFUNDED = 'refunded', pgettext_lazy('deposit outcome', 'Refunded')
+
     #: Providers that are settled through an external API rather than in person.
     MOBILE_MONEY_PROVIDERS = frozenset(
         {Provider.ORANGE_MONEY, Provider.MTN_MONEY}
@@ -50,6 +68,16 @@ class Payment(models.Model):
         max_length=20,
         choices=Provider.choices,
         help_text='How the money is being collected.',
+    )
+    outcome = models.CharField(
+        max_length=20,
+        choices=Outcome.choices,
+        default=Outcome.NONE,
+        help_text=(
+            'What became of the deposit once the booking ended: taken off '
+            'the bill when the guests arrived, kept when they did not. Set '
+            'by payments.services.settle_deposit, never by a client.'
+        ),
     )
     amount = models.DecimalField(
         max_digits=12,

@@ -935,4 +935,36 @@ class LEn extends L {
 
   @override
   String get statusMissed => 'Missed';
+
+  @override
+  String get rowDepositOutcome => 'Deposit';
+
+  @override
+  String get depositNotSettled => 'Not settled yet';
+
+  @override
+  String get depositOffset => 'Taken off the bill';
+
+  @override
+  String get depositForfeited => 'Kept — nobody arrived';
+
+  @override
+  String get depositRefunded => 'Refunded';
+
+  @override
+  String get keptFromNoShows => 'Kept from no-shows';
+
+  @override
+  String get offsetAgainstBills => 'Taken off bills';
+
+  @override
+  String depositCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count deposits',
+      one: '1 deposit',
+    );
+    return '$_temp0';
+  }
 }

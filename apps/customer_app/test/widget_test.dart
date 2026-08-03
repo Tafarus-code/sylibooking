@@ -4460,4 +4460,122 @@ void main() {
       expect(find.text('Confirmed'), findsNothing);
     });
   });
+
+  group('deposit terms', () {
+    Future<({FakeBackend backend, InMemoryBookingStore store})> reachForm(
+      WidgetTester tester, {
+      String? depositAmount = '50000.00',
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/',
+        {
+          ...establishmentDetailJson(),
+          'deposit_amount': depositAmount,
+        },
+      );
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('19:00'));
+      await tester.pumpAndSettle();
+      return (backend: backend, store: store);
+    }
+
+    testWidgets('cash on arrival is told nothing about a deposit',
+        (tester) async {
+      await reachForm(tester);
+
+      expect(find.textContaining('comes off the bill'), findsNothing);
+    });
+
+    testWidgets('choosing mobile money states what happens to the money',
+        (tester) async {
+      // Before it is taken. A forfeiture the customer did not see coming is
+      // a dispute, not a policy.
+      await reachForm(tester);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('50000.00 GNF deposit comes off the bill'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('the venue keeps it'), findsOneWidget);
+    });
+
+    testWidgets('and it disappears again if they switch back to cash',
+        (tester) async {
+      await reachForm(tester);
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Pay on arrival'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('comes off the bill'), findsNothing);
+    });
+
+    testWidgets('a venue that sent no amount says nothing', (tester) async {
+      await reachForm(tester, depositAmount: null);
+
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('comes off the bill'), findsNothing);
+    });
+
+    testWidgets('the terms read in French', (tester) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: InMemoryLocaleStore('fr'),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', {
+        ...establishmentDetailJson(),
+        'deposit_amount': '50000.00',
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('19:00'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Orange Money'));
+      await tester.pumpAndSettle();
+      // French runs longer, so the terms sit below the fold on a 360dp
+      // phone; a customer scrolls to them the same way.
+      await tester.drag(find.byType(ListView), const Offset(0, -250));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('déduit de l’addition'),
+        findsOneWidget,
+      );
+    });
+  });
 }

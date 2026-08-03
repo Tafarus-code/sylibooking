@@ -806,4 +806,9 @@ class LFr extends L {
   @override
   String get bookingMissedDetail =>
       'Personne ne s’est présenté avant que l’établissement cesse de garder la table.';
+
+  @override
+  String depositTerms(String amount) {
+    return 'Votre acompte de $amount GNF est déduit de l’addition à votre arrivée. Si personne ne se présente dans ce délai, l’établissement le conserve.';
+  }
 }

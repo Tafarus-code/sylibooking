@@ -14,6 +14,7 @@ extension ReservationStatusLabel on ReservationStatus {
         ReservationStatus.confirmed => l.statusConfirmed,
         ReservationStatus.cancelled => l.statusCancelled,
         ReservationStatus.completed => l.statusCompleted,
+        ReservationStatus.noShow => l.statusMissed,
         ReservationStatus.unknown => l.statusUnknown,
       };
 }

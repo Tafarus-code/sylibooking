@@ -794,4 +794,16 @@ class LFr extends L {
 
   @override
   String get photoCouldNotLoad => 'Cette photo n\'a pas pu être chargée';
+
+  @override
+  String tableHeldFor(int minutes) {
+    return 'Nous gardons votre table pendant $minutes minutes après l’heure réservée.';
+  }
+
+  @override
+  String get bookingMissed => 'Absent';
+
+  @override
+  String get bookingMissedDetail =>
+      'Personne ne s’est présenté avant que l’établissement cesse de garder la table.';
 }

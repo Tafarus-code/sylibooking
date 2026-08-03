@@ -1452,6 +1452,24 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This photo could not be loaded'**
   String get photoCouldNotLoad;
+
+  /// No description provided for @tableHeldFor.
+  ///
+  /// In en, this message translates to:
+  /// **'We will hold your table for {minutes} minutes after your booking time.'**
+  String tableHeldFor(int minutes);
+
+  /// No description provided for @bookingMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get bookingMissed;
+
+  /// No description provided for @bookingMissedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody arrived before the venue stopped holding the table.'**
+  String get bookingMissedDetail;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

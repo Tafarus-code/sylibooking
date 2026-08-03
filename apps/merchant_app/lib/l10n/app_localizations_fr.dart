@@ -932,4 +932,15 @@ class LFr extends L {
   String venueCreated(String name) {
     return '$name est à vous. Ajoutez vos tables ensuite.';
   }
+
+  @override
+  String get markArrived => 'Marquer arrivé';
+
+  @override
+  String guestsArrived(String name) {
+    return '$name marqué comme arrivé.';
+  }
+
+  @override
+  String get statusMissed => 'Absent';
 }

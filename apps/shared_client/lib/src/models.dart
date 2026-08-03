@@ -39,6 +39,13 @@ enum ReservationStatus {
   confirmed,
   cancelled,
   completed,
+
+  /// Nobody arrived before the venue's grace period ran out.
+  ///
+  /// Distinct from cancelled — one is a customer who told the venue, the
+  /// other is a table held empty — and distinct from completed, which they
+  /// mean the opposite of commercially.
+  noShow,
   unknown;
 
   static ReservationStatus parse(String? value) => switch (value) {
@@ -46,6 +53,7 @@ enum ReservationStatus {
         'confirmed' => ReservationStatus.confirmed,
         'cancelled' => ReservationStatus.cancelled,
         'completed' => ReservationStatus.completed,
+        'no_show' => ReservationStatus.noShow,
         _ => ReservationStatus.unknown,
       };
 
@@ -54,6 +62,7 @@ enum ReservationStatus {
         ReservationStatus.confirmed => 'confirmed',
         ReservationStatus.cancelled => 'cancelled',
         ReservationStatus.completed => 'completed',
+        ReservationStatus.noShow => 'no_show',
         ReservationStatus.unknown => '',
       };
 
@@ -545,6 +554,7 @@ class Establishment {
     this.latitude,
     this.longitude,
     this.themePreset = 'ember',
+    this.noShowWindowMinutes,
   });
 
   final int id;
@@ -597,6 +607,13 @@ class Establishment {
   /// Which curated branding preset this venue uses. Only the key travels;
   /// the colours and fonts live in the shared design file.
   final String themePreset;
+
+  /// How long this venue holds a table for someone who has not arrived.
+  ///
+  /// Differs between a restaurant and a lounge, so the customer is told this
+  /// venue's own figure rather than a constant baked into the app. Detail
+  /// endpoint only.
+  final int? noShowWindowMinutes;
 
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
@@ -660,6 +677,7 @@ class Establishment {
         latitude: _toDouble(json['latitude']),
         longitude: _toDouble(json['longitude']),
         themePreset: json['theme_preset'] as String? ?? 'ember',
+        noShowWindowMinutes: json['no_show_window_minutes'] as int?,
       );
 }
 
@@ -684,6 +702,8 @@ class Reservation {
     this.paymentStatus,
     this.isPaid = false,
     this.payment,
+    this.arrivedAt,
+    this.noShowAfterMinutes,
   });
 
   final int id;
@@ -725,6 +745,15 @@ class Reservation {
   /// The most recent payment, or null for a cash-on-arrival booking.
   final Payment? payment;
 
+  /// When the merchant marked the guests as arrived.
+  final DateTime? arrivedAt;
+
+  /// The grace period this booking was taken under, in minutes.
+  ///
+  /// Captured server-side when the booking was made, so it is what this
+  /// booking is judged by even if the venue has changed its default since.
+  final int? noShowAfterMinutes;
+
   /// True when money is owed through a provider and has not arrived.
   ///
   /// The distinction that matters on a merchant's screen: an unpaid mobile
@@ -757,6 +786,10 @@ class Reservation {
             ? null
             : PaymentStatus.parse(json['payment_status'] as String?),
         isPaid: json['is_paid'] as bool? ?? false,
+        arrivedAt: json['arrived_at'] == null
+            ? null
+            : DateTime.parse(json['arrived_at'] as String).toLocal(),
+        noShowAfterMinutes: json['no_show_after_minutes'] as int?,
         payment: json['payment'] == null
             ? null
             : Payment.fromJson(json['payment'] as Map<String, dynamic>),

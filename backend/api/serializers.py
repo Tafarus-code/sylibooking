@@ -13,6 +13,7 @@ from establishments.models import Establishment, MenuItem, OpeningHours, Space
 from payments.models import Payment
 from reservations.availability import is_space_available
 from reservations.models import Reservation
+from reservations.no_show import no_show_window
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -207,6 +208,7 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
     today = serializers.SerializerMethodField()
     hours = serializers.SerializerMethodField()
     menu = serializers.SerializerMethodField()
+    no_show_window_minutes = serializers.SerializerMethodField()
 
     # Computed, never stored: a denormalised average drifts the moment a
     # review is hidden, and hiding is the point of moderation.
@@ -234,8 +236,18 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'theme_preset',
             'opening_hours',
             'spaces',
+            'no_show_window_minutes',
             'created_at',
         ]
+
+    def get_no_show_window_minutes(self, establishment):
+        """What a booking taken here right now would be held for.
+
+        Sent so the customer can be told the grace period *before* they book.
+        A forfeited deposit is only defensible if this figure was on screen
+        beforehand, and it differs between a restaurant and a lounge.
+        """
+        return no_show_window(establishment)
 
     def get_spaces(self, establishment):
         """Only spaces still in service.
@@ -398,9 +410,17 @@ class ReservationSerializer(serializers.ModelSerializer):
             'payment_status',
             'is_paid',
             'payment',
+            'arrived_at',
+            'no_show_after_minutes',
             'created_at',
         ]
-        read_only_fields = ['status', 'reference', 'created_at']
+        read_only_fields = [
+            'status',
+            'reference',
+            'arrived_at',
+            'no_show_after_minutes',
+            'created_at',
+        ]
 
     def validate_party_size(self, value):
         if value < 1:

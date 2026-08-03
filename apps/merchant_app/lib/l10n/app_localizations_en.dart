@@ -924,4 +924,15 @@ class LEn extends L {
   String venueCreated(String name) {
     return '$name is yours. Add your tables next.';
   }
+
+  @override
+  String get markArrived => 'Mark arrived';
+
+  @override
+  String guestsArrived(String name) {
+    return '$name marked as arrived.';
+  }
+
+  @override
+  String get statusMissed => 'Missed';
 }

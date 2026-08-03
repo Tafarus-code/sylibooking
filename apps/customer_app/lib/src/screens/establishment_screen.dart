@@ -170,7 +170,11 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
         builder: (_) => BookingFormScreen(
           api: widget.api,
           store: widget.store,
-          establishment: widget.establishment,
+          // The detail payload, like everywhere else on this screen. The
+          // list one is a slimmer record — no hours, no menu, and no grace
+          // period — and the form has to state the grace period before
+          // anyone books against it.
+          establishment: _detail ?? widget.establishment,
           option: option,
           partySize: _partySize,
         ),

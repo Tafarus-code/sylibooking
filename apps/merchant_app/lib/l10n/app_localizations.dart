@@ -1686,6 +1686,24 @@ abstract class L {
   /// In en, this message translates to:
   /// **'{name} is yours. Add your tables next.'**
   String venueCreated(String name);
+
+  /// No description provided for @markArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark arrived'**
+  String get markArrived;
+
+  /// No description provided for @guestsArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} marked as arrived.'**
+  String guestsArrived(String name);
+
+  /// No description provided for @statusMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get statusMissed;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

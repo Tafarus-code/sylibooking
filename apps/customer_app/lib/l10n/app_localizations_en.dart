@@ -789,4 +789,16 @@ class LEn extends L {
 
   @override
   String get photoCouldNotLoad => 'This photo could not be loaded';
+
+  @override
+  String tableHeldFor(int minutes) {
+    return 'We will hold your table for $minutes minutes after your booking time.';
+  }
+
+  @override
+  String get bookingMissed => 'Missed';
+
+  @override
+  String get bookingMissedDetail =>
+      'Nobody arrived before the venue stopped holding the table.';
 }

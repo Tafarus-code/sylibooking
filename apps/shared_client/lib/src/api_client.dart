@@ -335,6 +335,16 @@ class SylibookingApi {
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Mark the guests as arrived, which closes the booking.
+  ///
+  /// The server refuses a booking that has not started, or one that is no
+  /// longer open — a table cannot be freed by declaring tomorrow's guests
+  /// already gone.
+  Future<Reservation> completeReservation(int id) async {
+    final json = await _post('/reservations/$id/complete/', const {});
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<Reservation> cancelReservation(int id) async {
     final json = await _post('/reservations/$id/cancel/');
     return Reservation.fromJson(json as Map<String, dynamic>);

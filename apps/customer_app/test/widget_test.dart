@@ -109,6 +109,22 @@ Map<String, dynamic> menuGroup(
       ],
     };
 
+/// Scroll the booking form's submit button into view, then tap it.
+///
+/// The form is taller than a 360dp phone — summary, name, phone, three
+/// payment choices — so Reserve sits below the fold and a lazy ListView has
+/// not built it. Tests that submit have to reach it the way a customer does.
+Future<void> tapReserve(WidgetTester tester, [String label = 'Reserve']) async {
+  final button = find.widgetWithText(FilledButton, label);
+  await tester.scrollUntilVisible(
+    button,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(button);
+}
+
 Map<String, dynamic> establishmentJson({
   int id = 7,
   String name = 'Le Petit Baobab',
@@ -146,8 +162,11 @@ Map<String, dynamic> establishmentDetailJson({
   bool hoursUnknown = false,
   List<Map<String, dynamic>>? hours,
   List<Map<String, dynamic>>? menu,
+  // Per venue type, so a restaurant and a lounge do not answer the same.
+  int? noShowWindowMinutes = 90,
 }) =>
     {
+      'no_show_window_minutes': noShowWindowMinutes,
       ...establishmentJson(
         type: type,
         isOpenNow: isOpenNow,
@@ -3790,7 +3809,7 @@ void main() {
     testWidgets('name and phone are required', (tester) async {
       final (:backend, :store) = await reachForm(tester);
 
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       expect(
@@ -3810,7 +3829,7 @@ void main() {
 
       await tester.enterText(find.byType(TextFormField).first, 'Mariama');
       await tester.enterText(find.byType(TextFormField).last, '123');
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       expect(find.text('That number looks too short'), findsOneWidget);
@@ -3828,7 +3847,7 @@ void main() {
         find.byType(TextFormField).last,
         '+224 620 00 00 00',
       );
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       expect(find.text('Request sent'), findsOneWidget);
@@ -3849,7 +3868,7 @@ void main() {
         find.byType(TextFormField).last,
         '+224 620 00 00 00',
       );
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       // The reference, not the sequential id — the id is no longer usable.
@@ -3891,7 +3910,7 @@ void main() {
         find.byType(TextFormField).last,
         '+224 620 00 00 00',
       );
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('already booked'), findsOneWidget);
@@ -3907,7 +3926,7 @@ void main() {
 
       await tester.enterText(find.byType(TextFormField).first, 'Mariama');
       await tester.enterText(find.byType(TextFormField).last, '620000000');
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       final body = jsonDecode(backend.lastRequest.body) as Map<String, dynamic>;
@@ -3967,7 +3986,7 @@ void main() {
       backend.on('POST', '/api/reservations/', reservationJson());
 
       await fillIn(tester);
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       final body = jsonDecode(backend.lastRequest.body) as Map<String, dynamic>;
@@ -3997,7 +4016,7 @@ void main() {
       await tester.tap(find.text('MTN Mobile Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
-      await tester.tap(find.text('Pay and reserve'));
+      await tapReserve(tester, 'Pay and reserve');
       await tester.pumpAndSettle();
 
       final posted = backend.requests
@@ -4019,7 +4038,7 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
-      await tester.tap(find.text('Pay and reserve'));
+      await tapReserve(tester, 'Pay and reserve');
       await tester.pumpAndSettle();
 
       final posted = backend.requests
@@ -4041,7 +4060,7 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
-      await tester.tap(find.text('Pay and reserve'));
+      await tapReserve(tester, 'Pay and reserve');
       await tester.pumpAndSettle();
 
       expect(find.text('Table confirmed'), findsOneWidget);
@@ -4054,7 +4073,7 @@ void main() {
       backend.on('POST', '/api/reservations/', reservationJson());
 
       await fillIn(tester);
-      await tester.tap(find.text('Reserve'));
+      await tapReserve(tester);
       await tester.pumpAndSettle();
 
       expect(find.text('Request sent'), findsOneWidget);
@@ -4074,7 +4093,7 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
-      await tester.tap(find.text('Pay and reserve'));
+      await tapReserve(tester, 'Pay and reserve');
       await tester.pumpAndSettle();
 
       expect(find.text('Payment did not go through'), findsOneWidget);
@@ -4102,7 +4121,7 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
-      await tester.tap(find.text('Pay and reserve'));
+      await tapReserve(tester, 'Pay and reserve');
 
       // Bounded pumps rather than pumpAndSettle: the waiting screen shows a
       // spinner, which never settles.
@@ -4132,7 +4151,7 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
       await fillIn(tester);
-      await tester.tap(find.text('Pay and reserve'));
+      await tapReserve(tester, 'Pay and reserve');
 
       // pumpAndSettle runs the clock forward past the poll interval, so the
       // spinner is replaced once the payment reports completed.
@@ -4326,6 +4345,119 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('already started'), findsOneWidget);
+    });
+  });
+
+  group('the grace period and missed bookings', () {
+    Future<({FakeBackend backend, InMemoryBookingStore store})> reachForm(
+      WidgetTester tester, {
+      String type = 'lounge',
+      int? window = 90,
+    }) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson(type: type)],
+      });
+      backend.on(
+        'GET',
+        '/api/establishments/7/',
+        establishmentDetailJson(type: type, noShowWindowMinutes: window),
+      );
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('19:00'));
+      await tester.pumpAndSettle();
+      return (backend: backend, store: store);
+    }
+
+    testWidgets('a lounge says it holds the table for 90 minutes',
+        (tester) async {
+      // Said before the booking is made. A deposit forfeited under a rule the
+      // customer never saw is a dispute, not a policy.
+      await reachForm(tester);
+
+      expect(
+        find.textContaining('hold your table for 90 minutes'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a restaurant says 30, because it is not the same venue',
+        (tester) async {
+      await reachForm(tester, type: 'restaurant', window: 30);
+
+      expect(
+        find.textContaining('hold your table for 30 minutes'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a venue that sent no window says nothing at all',
+        (tester) async {
+      // Better silent than inventing a number the server never gave.
+      await reachForm(tester, window: null);
+
+      expect(find.textContaining('hold your table'), findsNothing);
+      expect(find.text('Reserve'), findsOneWidget);
+    });
+
+    testWidgets('the sentence reads in French', (tester) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: InMemoryLocaleStore('fr'),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('19:00'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('gardons votre table pendant 90 minutes'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a missed booking says so rather than staying confirmed',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      await store.remember(testReference);
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(status: 'no_show'),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.receipt_long_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Missed'), findsOneWidget);
+      expect(find.text('Confirmed'), findsNothing);
     });
   });
 }

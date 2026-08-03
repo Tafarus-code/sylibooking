@@ -98,6 +98,36 @@ Map<String, dynamic> paymentJson({
       'created_at': '2026-08-01T18:00:00Z',
     };
 
+/// A booking whose time is still ahead, whatever hour the suite runs at.
+///
+/// The default fixture sits at today 19:00, which is in the past if the
+/// tests run in the evening — the same trap the kitchen queue fell into.
+Map<String, dynamic> futureBooking({
+  int id = 1,
+  String status = 'confirmed',
+}) {
+  final ahead = DateTime.now().add(const Duration(hours: 3));
+  return {
+    ...booking(id: id, status: status),
+    'datetime': ahead.toUtc().toIso8601String(),
+  };
+}
+
+/// A booking whose time has already passed, so it can be closed.
+///
+/// The desk only offers "Mark arrived" once the sitting has begun, so a
+/// fixture at the default 19:00 cannot exercise it before that hour.
+Map<String, dynamic> startedBooking({
+  int id = 1,
+  String status = 'confirmed',
+}) {
+  final started = DateTime.now().subtract(const Duration(hours: 1));
+  return {
+    ...booking(id: id, status: status),
+    'datetime': started.toUtc().toIso8601String(),
+  };
+}
+
 Map<String, dynamic> booking({
   int id = 1,
   String status = 'pending',
@@ -3308,6 +3338,123 @@ void main() {
         expect(rect.right, lessThanOrEqualTo(phoneSize.width));
       }
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('marking guests arrived', () {
+    /// The desk, with one booking whose time has already passed.
+    Future<FakeBackend> openDesk(
+      WidgetTester tester, {
+      Map<String, dynamic>? reservation,
+      String? language,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [reservation ?? startedBooking()],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a sitting that has begun can be closed', (tester) async {
+      await openDesk(tester);
+
+      expect(find.text('Mark arrived'), findsOneWidget);
+    });
+
+    testWidgets('one that has not begun cannot', (tester) async {
+      // Nobody has arrived for a table that is not due, and letting it
+      // through would free a slot by declaring tomorrow's guests gone.
+      await openDesk(tester, reservation: futureBooking());
+
+      expect(find.text('Mark arrived'), findsNothing);
+    });
+
+    testWidgets('marking arrived posts to the right place', (tester) async {
+      final backend = await openDesk(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/1/complete/',
+        startedBooking(status: 'completed'),
+      );
+
+      await tester.tap(find.text('Mark arrived'));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests.any(
+          (r) =>
+              r.method == 'POST' &&
+              r.url.path == '/api/reservations/1/complete/',
+        ),
+        isTrue,
+      );
+      expect(find.textContaining('marked as arrived'), findsOneWidget);
+    });
+
+    testWidgets('a closed booking offers nothing further', (tester) async {
+      await openDesk(tester, reservation: startedBooking(status: 'completed'));
+
+      expect(find.text('Mark arrived'), findsNothing);
+      expect(find.text('Cancel'), findsNothing);
+      expect(find.text('Completed'), findsOneWidget);
+    });
+
+    testWidgets('a missed booking reads as missed, not cancelled',
+        (tester) async {
+      // The two mean opposite things: one is a customer who told the venue,
+      // the other is a table held empty.
+      await openDesk(tester, reservation: startedBooking(status: 'no_show'));
+
+      expect(find.text('Missed'), findsOneWidget);
+      expect(find.text('Cancelled'), findsNothing);
+    });
+
+    testWidgets('a server refusal is surfaced', (tester) async {
+      final backend = await openDesk(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/1/complete/',
+        {'detail': 'That booking has not started yet.'},
+        status: 409,
+      );
+
+      await tester.tap(find.text('Mark arrived'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('has not started'), findsOneWidget);
+    });
+
+    testWidgets('the actions still fit a 360dp card', (tester) async {
+      // Cancel, Mark arrived and Confirm together are wider than a phone,
+      // which is why they wrap.
+      await openDesk(tester, reservation: startedBooking(status: 'pending'));
+
+      expect(find.text('Mark arrived'), findsOneWidget);
+      expect(find.text('Confirm'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+      for (final label in ['Cancel', 'Mark arrived', 'Confirm']) {
+        final rect = tester.getRect(find.text(label));
+        expect(rect.right, lessThanOrEqualTo(phoneSize.width), reason: label);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('it reads in French', (tester) async {
+      await openDesk(tester, language: 'fr');
+
+      expect(find.text('Marquer arrivé'), findsOneWidget);
     });
   });
 }

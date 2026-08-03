@@ -264,5 +264,8 @@
   "venueKindLounge": "Salon",
   "venueKindRestaurant": "Restaurant",
   "createVenueCta": "Créer l’établissement",
-  "venueCreated": "{name} est à vous. Ajoutez vos tables ensuite."
+  "venueCreated": "{name} est à vous. Ajoutez vos tables ensuite.",
+  "markArrived": "Marquer arrivé",
+  "guestsArrived": "{name} marqué comme arrivé.",
+  "statusMissed": "Absent"
 }

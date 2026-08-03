@@ -293,6 +293,11 @@ class _ReservationsViewState extends State<ReservationsView> {
                   l.reservationConfirmed,
                 ),
                 onCancel: () => _confirmCancel(reservation),
+                onComplete: () => _act(
+                  reservation,
+                  _api.completeReservation,
+                  l.guestsArrived(reservation.customerName),
+                ),
               ),
           ],
         );

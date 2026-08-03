@@ -3,6 +3,8 @@ from datetime import date as date_cls
 from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.utils.translation import gettext as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -266,6 +268,43 @@ class ReservationViewSet(
 
         reservation.status = Reservation.Status.CONFIRMED
         reservation.save(update_fields=['status'])
+        return Response(self.get_serializer(reservation).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def complete(self, request, pk=None):
+        """Merchant marks the guests as arrived.
+
+        This is what closes a booking. Without it a confirmed booking stays
+        confirmed for ever, its slot is held for ever, and "past bookings" are
+        past only by date.
+
+        A booking in the future cannot be completed — someone has not arrived
+        for a sitting that has not started, and allowing it would let a table
+        be freed by marking tomorrow's guests as already gone.
+        """
+        reservation = self.get_object()
+
+        if reservation.status not in Reservation.OPEN_STATUSES:
+            return Response(
+                {
+                    'detail': _(
+                        'Only a booking that is still open can be completed; '
+                        'this one is %(status)s.'
+                    )
+                    % {'status': reservation.get_status_display().lower()},
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if not reservation.has_started:
+            return Response(
+                {'detail': _('That booking has not started yet.')},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        reservation.status = Reservation.Status.COMPLETED
+        reservation.arrived_at = timezone.now()
+        reservation.save(update_fields=['status', 'arrived_at'])
         return Response(self.get_serializer(reservation).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])

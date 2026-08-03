@@ -147,6 +147,18 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       label: '${option.space.name} '
                           '(${option.space.typeDisplay})',
                     ),
+                    // Beside the time, because it qualifies the time: this is
+                    // how long the table is held if the guests are late.
+                    if (widget.establishment.noShowWindowMinutes
+                        case final held?) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l.tableHeldFor(held),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

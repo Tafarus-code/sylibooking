@@ -421,6 +421,11 @@ class _StatusChip extends StatelessWidget {
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
+      ReservationStatus.noShow => (
+          'Missed',
+          scheme.surfaceContainerHighest,
+          scheme.error,
+        ),
       ReservationStatus.unknown => (
           'Unknown',
           scheme.surfaceContainerHighest,

@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
@@ -6,6 +7,8 @@ from django.utils import timezone
 from django.utils.translation import pgettext_lazy
 
 from establishments.models import Space
+
+from .no_show import no_show_window
 
 
 class Reservation(models.Model):
@@ -20,6 +23,10 @@ class Reservation(models.Model):
         CONFIRMED = 'confirmed', pgettext_lazy('reservation status', 'Confirmed')
         CANCELLED = 'cancelled', pgettext_lazy('reservation status', 'Cancelled')
         COMPLETED = 'completed', pgettext_lazy('reservation status', 'Completed')
+        NO_SHOW = 'no_show', pgettext_lazy('reservation status', 'Missed')
+
+    #: Statuses a booking can still move on from.
+    OPEN_STATUSES = frozenset({Status.PENDING, Status.CONFIRMED})
 
     reference = models.UUIDField(
         default=uuid.uuid4,
@@ -68,7 +75,26 @@ class Reservation(models.Model):
         max_length=20,
         choices=Status.choices,
         default=Status.PENDING,
-        help_text='Merchant confirms or cancels; completed is set after the visit.',
+        help_text=(
+            'Merchant confirms or cancels; completed is set when the guests '
+            'arrive, and missed when the grace period passes without them.'
+        ),
+    )
+    arrived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the merchant marked the guests as arrived.',
+    )
+    no_show_after_minutes = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            'The grace period this booking was taken under, copied from the '
+            'venue when it was made. Deliberately not read live: the customer '
+            'is told this figure before they book, and shortening the venue’s '
+            'window afterwards must not retroactively make them a no-show — '
+            'or forfeit a deposit taken under longer terms.'
+        ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -80,6 +106,30 @@ class Reservation(models.Model):
             f'{self.customer_name} — {self.space.name} '
             f'@ {self.datetime:%Y-%m-%d %H:%M} ({self.get_status_display()})'
         )
+
+    def save(self, *args, **kwargs):
+        """Capture the grace period the first time this booking is written.
+
+        Done here rather than in the serializer so every path agrees — the
+        API, the admin, seed data and tests all take a booking under the terms
+        that were current when they took it.
+        """
+        if self._state.adding and self.no_show_after_minutes is None:
+            self.no_show_after_minutes = no_show_window(
+                self.space.establishment
+            )
+        super().save(*args, **kwargs)
+
+    @property
+    def no_show_deadline(self):
+        """When this booking stops being held. None if it was never captured.
+
+        Only bookings written before this field existed can be None; they are
+        left alone by the sweep rather than judged under today's rules.
+        """
+        if self.no_show_after_minutes is None:
+            return None
+        return self.datetime + timedelta(minutes=self.no_show_after_minutes)
 
     @property
     def has_started(self):

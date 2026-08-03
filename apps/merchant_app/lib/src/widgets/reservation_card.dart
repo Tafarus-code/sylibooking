@@ -13,6 +13,7 @@ class ReservationCard extends StatelessWidget {
     required this.reservation,
     required this.onConfirm,
     required this.onCancel,
+    required this.onComplete,
     this.onTap,
     this.busy = false,
   });
@@ -20,6 +21,9 @@ class ReservationCard extends StatelessWidget {
   final Reservation reservation;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
+
+  /// Marks the guests as arrived, which closes the booking.
+  final VoidCallback onComplete;
 
   /// Opens the detail view, where the reference and amount live.
   final VoidCallback? onTap;
@@ -37,6 +41,10 @@ class ReservationCard extends StatelessWidget {
     final canConfirm = isPending && reservation.canConfirm;
     final blockedByPayment = isPending && !reservation.canConfirm;
     final canCancel = reservation.status.isOpen;
+    // Offered only once the sitting has begun: nobody has arrived for a
+    // table that is not due yet, and the server refuses it anyway.
+    final canComplete = reservation.status.isOpen &&
+        reservation.dateTime.isBefore(DateTime.now());
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -108,8 +116,13 @@ class ReservationCard extends StatelessWidget {
             ],
             if (isPending || canCancel) ...[
               const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // Wrap, not a Row: "Cancel", "Mark arrived" and "Confirm" on
+              // one line is wider than a 360dp card, and a second line beats
+              // a clipped button.
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 4,
                 children: [
                   if (canCancel)
                     TextButton.icon(
@@ -120,14 +133,18 @@ class ReservationCard extends StatelessWidget {
                         foregroundColor: theme.colorScheme.error,
                       ),
                     ),
-                  if (isPending) ...[
-                    const SizedBox(width: 8),
+                  if (canComplete)
+                    FilledButton.tonalIcon(
+                      onPressed: busy ? null : onComplete,
+                      icon: const Icon(Icons.how_to_reg_outlined, size: 18),
+                      label: Text(l.markArrived),
+                    ),
+                  if (isPending)
                     FilledButton.icon(
                       onPressed: (busy || !canConfirm) ? null : onConfirm,
                       icon: const Icon(Icons.check, size: 18),
                       label: Text(l.confirm),
                     ),
-                  ],
                 ],
               ),
             ],
@@ -164,6 +181,13 @@ class _StatusChip extends StatelessWidget {
       ReservationStatus.completed => (
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
+        ),
+      // Neutral ground with error-coloured text: a missed booking did not
+      // happen, like a cancelled one, but nobody chose it — so it reads as
+      // distinct from the filled error a cancellation gets.
+      ReservationStatus.noShow => (
+          scheme.surfaceContainerHighest,
+          scheme.error,
         ),
       ReservationStatus.unknown => (
           scheme.surfaceContainerHighest,

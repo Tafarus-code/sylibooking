@@ -214,6 +214,13 @@ class _StatusChip extends StatelessWidget {
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
         ),
+      // Neutral ground with error-coloured text: a missed booking did not
+      // happen, like a cancelled one, but nobody chose it — so it reads as
+      // distinct from the filled error a cancellation gets.
+      ReservationStatus.noShow => (
+          scheme.surfaceContainerHighest,
+          scheme.error,
+        ),
       ReservationStatus.unknown => (
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,

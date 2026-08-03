@@ -263,6 +263,16 @@ RESERVATION_DEPOSIT_AMOUNT = Decimal(
     config('RESERVATION_DEPOSIT_AMOUNT', default='50000')
 )
 AVAILABILITY_SLOT_MINUTES = 30
+
+# How long a table is held for someone who has not arrived, per kind of venue.
+# A lounge table is not lost at minute 16; a restaurant table held through a
+# dinner service costs more in refused walk-ins than the deposit protects.
+# Read only through reservations.no_show.no_show_window(), and captured on a
+# booking when it is taken — never re-read live once the booking exists.
+NO_SHOW_WINDOW_MINUTES = {
+    'restaurant': config('NO_SHOW_WINDOW_RESTAURANT', default=30, cast=int),
+    'lounge': config('NO_SHOW_WINDOW_LOUNGE', default=90, cast=int),
+}
 AVAILABILITY_WINDOW_START = '12:00'
 AVAILABILITY_WINDOW_END = '23:00'
 

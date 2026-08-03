@@ -561,5 +561,15 @@
         "type": "String"
       }
     }
-  }
+  },
+  "markArrived": "Mark arrived",
+  "guestsArrived": "{name} marked as arrived.",
+  "@guestsArrived": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "statusMissed": "Missed"
 }

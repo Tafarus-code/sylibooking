@@ -275,5 +275,10 @@
   "depositRefunded": "Remboursé",
   "keptFromNoShows": "Conservé sur absences",
   "offsetAgainstBills": "Déduit des additions",
-  "depositCount": "{count, plural, =1{1 acompte} other{{count} acomptes}}"
+  "depositCount": "{count, plural, =1{1 acompte} other{{count} acomptes}}",
+  "refundDeposit": "Rendre l’acompte",
+  "refundDepositTitle": "Rendre {amount} GNF ?",
+  "refundDepositDetail": "La réservation reste marquée absente — la table a été gardée puis perdue, et le registre doit le dire. Seul l’argent est rendu.",
+  "depositRefundedNotice": "Acompte rendu.",
+  "returnedToCustomers": "Rendu"
 }

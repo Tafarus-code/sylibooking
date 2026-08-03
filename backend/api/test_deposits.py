@@ -26,6 +26,7 @@ from rest_framework.test import APITestCase
 from establishments.models import Establishment, MerchantMembership, Space
 from payments.models import Payment
 from payments.services import refund_deposit, settle_deposit
+from reservations.availability import is_space_available
 from reservations.models import Reservation
 
 
@@ -396,3 +397,181 @@ class DashboardTests(DepositTestBase):
             Decimal(response.data['payments']['forfeited']),
             Decimal('0.00'),
         )
+
+
+class RefundWithoutReversingTests(DepositTestBase):
+    """Giving a kept deposit back without pretending the no-show did not happen.
+
+    A customer who turns up three quarters of an hour late has still missed
+    their table: the venue held it and then lost it. But a merchant who seats
+    them anyway, or simply judges the charge harsh, needs a way to return the
+    money that does not require rewriting the record.
+    """
+
+    def missed_with_kept_deposit(self):
+        reservation = self.booking_with_deposit()
+        reservation.status = Reservation.Status.NO_SHOW
+        reservation.save(update_fields=['status'])
+        settle_deposit(reservation)
+        return reservation
+
+    def refund_url(self, reservation):
+        return reverse('reservation-refund-deposit', args=[reservation.pk])
+
+    def test_an_owner_can_give_a_kept_deposit_back(self):
+        reservation = self.missed_with_kept_deposit()
+        self.authenticate()
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            reservation.payments.first().outcome, Payment.Outcome.REFUNDED
+        )
+
+    def test_the_booking_is_still_missed_afterwards(self):
+        """**The point of this endpoint.**
+
+        The money goes back; the record does not change. A venue that held a
+        table and lost it should still see that in its own figures.
+        """
+        reservation = self.missed_with_kept_deposit()
+        self.authenticate()
+
+        self.client.post(self.refund_url(reservation))
+
+        reservation.refresh_from_db()
+        self.assertEqual(reservation.status, Reservation.Status.NO_SHOW)
+        self.assertIsNone(reservation.arrived_at)
+
+    def test_the_slot_stays_released(self):
+        """A missed booking freed its table; refunding must not take it back."""
+        reservation = self.missed_with_kept_deposit()
+        self.authenticate()
+
+        self.client.post(self.refund_url(reservation))
+
+        self.assertTrue(is_space_available(self.table, reservation.datetime))
+
+    def test_a_manager_can_too(self):
+        reservation = self.missed_with_kept_deposit()
+        manager = User.objects.create_user('ibrahima', password='pw-for-tests')
+        MerchantMembership.objects.create(
+            user=manager,
+            establishment=self.restaurant,
+            role=MerchantMembership.Role.MANAGER,
+        )
+        token, _ = Token.objects.get_or_create(user=manager)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_staff_cannot(self):
+        """Handing a customer their deposit back is a decision about the
+        venue's takings, not a floor call."""
+        reservation = self.missed_with_kept_deposit()
+        floor = User.objects.create_user('aissatou', password='pw-for-tests')
+        MerchantMembership.objects.create(
+            user=floor,
+            establishment=self.restaurant,
+            role=MerchantMembership.Role.STAFF,
+        )
+        token, _ = Token.objects.get_or_create(user=floor)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            reservation.payments.first().outcome, Payment.Outcome.FORFEITED
+        )
+
+    def test_a_signed_out_caller_cannot(self):
+        reservation = self.missed_with_kept_deposit()
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_a_deposit_taken_off_a_bill_cannot_be_refunded_here(self):
+        """That money already went back, as a discount at the till."""
+        reservation = self.booking_with_deposit()
+        reservation.status = Reservation.Status.COMPLETED
+        reservation.save(update_fields=['status'])
+        settle_deposit(reservation)
+        self.authenticate()
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            reservation.payments.first().outcome, Payment.Outcome.OFFSET
+        )
+
+    def test_an_unsettled_deposit_cannot_be_refunded_here(self):
+        """Nothing has been kept yet, so there is nothing to give back."""
+        reservation = self.booking_with_deposit()
+        self.authenticate()
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_a_cash_booking_has_nothing_to_refund(self):
+        reservation = self.cash_booking()
+        reservation.status = Reservation.Status.NO_SHOW
+        reservation.save(update_fields=['status'])
+        self.authenticate()
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_refunding_twice_is_refused_the_second_time(self):
+        reservation = self.missed_with_kept_deposit()
+        self.authenticate()
+        self.client.post(self.refund_url(reservation))
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    @override_settings(
+        PAYMENT_PROVIDERS={
+            'orange_money': 'payments.tests.UnreachablePaymentProvider'
+        }
+    )
+    def test_an_unreachable_provider_does_not_claim_the_money_went_back(self):
+        """We do not know whether it took it, so we must not say it did."""
+        reservation = self.missed_with_kept_deposit()
+        self.authenticate()
+
+        response = self.client.post(self.refund_url(reservation))
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(
+            reservation.payments.first().outcome, Payment.Outcome.FORFEITED
+        )
+
+    def test_the_takings_stop_counting_it_as_kept(self):
+        reservation = self.missed_with_kept_deposit()
+        self.authenticate()
+        self.client.post(self.refund_url(reservation))
+
+        today = timezone.now().date()
+        response = self.client.get(
+            reverse('payment-dashboard'),
+            {
+                'establishment': self.restaurant.pk,
+                'from': (today - timedelta(days=7)).isoformat(),
+                'to': today.isoformat(),
+            },
+        )
+
+        payments = response.data['payments']
+        self.assertEqual(Decimal(payments['forfeited']), Decimal('0.00'))
+        self.assertEqual(payments['forfeited_count'], 0)
+        # Accounted for rather than simply gone from the figure it was in.
+        self.assertEqual(Decimal(payments['refunded']), Decimal('50000.00'))

@@ -586,5 +586,17 @@
         "type": "int"
       }
     }
-  }
+  },
+  "refundDeposit": "Give the deposit back",
+  "refundDepositTitle": "Give back {amount} GNF?",
+  "@refundDepositTitle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "refundDepositDetail": "The booking stays missed — the table was held and lost, and the record should say so. Only the money goes back.",
+  "depositRefundedNotice": "Deposit given back.",
+  "returnedToCustomers": "Given back"
 }

@@ -3607,4 +3607,160 @@ void main() {
       expect(find.text('Kept from no-shows'), findsNothing);
     });
   });
+
+  group('giving a kept deposit back', () {
+    Map<String, dynamic> missedWithKeptDeposit({String outcome = 'forfeited'}) =>
+        booking(
+          id: 1,
+          status: 'no_show',
+          paymentProvider: 'orange_money',
+          isPaid: true,
+          payment: {
+            ...paymentJson(),
+            'outcome': outcome,
+            'outcome_display': outcome == 'forfeited'
+                ? 'Kept for a no-show'
+                : 'Refunded',
+          },
+        );
+
+    Future<FakeBackend> openDetail(
+      WidgetTester tester, {
+      Map<String, dynamic>? reservation,
+      String? language,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [reservation ?? missedWithKeptDeposit()],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ReservationCard).first);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a kept deposit can be given back', (tester) async {
+      await openDetail(tester);
+
+      expect(find.text('Give the deposit back'), findsOneWidget);
+    });
+
+    testWidgets('one already given back cannot be again', (tester) async {
+      await openDetail(
+        tester,
+        reservation: missedWithKeptDeposit(outcome: 'refunded'),
+      );
+
+      expect(find.text('Give the deposit back'), findsNothing);
+      expect(find.text('Refunded'), findsOneWidget);
+    });
+
+    testWidgets('a deposit taken off a bill offers nothing', (tester) async {
+      // That money already went back, as a discount at the till.
+      await openDetail(
+        tester,
+        reservation: booking(
+          id: 1,
+          status: 'completed',
+          paymentProvider: 'orange_money',
+          isPaid: true,
+          payment: {
+            ...paymentJson(),
+            'outcome': 'offset',
+            'outcome_display': 'Taken off the bill',
+          },
+        ),
+      );
+
+      expect(find.text('Give the deposit back'), findsNothing);
+    });
+
+    testWidgets('it says the booking stays missed before you tap',
+        (tester) async {
+      await openDetail(tester);
+
+      await tester.tap(find.text('Give the deposit back'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('stays missed'), findsOneWidget);
+      expect(find.textContaining('Only the money goes back'), findsOneWidget);
+    });
+
+    testWidgets('confirming posts and reports back', (tester) async {
+      final backend = await openDetail(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/1/refund-deposit/',
+        missedWithKeptDeposit(outcome: 'refunded'),
+      );
+
+      await tester.tap(find.text('Give the deposit back'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Give the deposit back'));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests.any(
+          (r) =>
+              r.method == 'POST' &&
+              r.url.path == '/api/reservations/1/refund-deposit/',
+        ),
+        isTrue,
+      );
+      expect(find.text('Deposit given back.'), findsOneWidget);
+      // And the screen now reflects it, without leaving the booking.
+      expect(find.text('Refunded'), findsOneWidget);
+      expect(find.text('Missed'), findsOneWidget);
+    });
+
+    testWidgets('backing out of the dialog sends nothing', (tester) async {
+      final backend = await openDetail(tester);
+
+      await tester.tap(find.text('Give the deposit back'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests.where((r) => r.method == 'POST'),
+        isEmpty,
+      );
+    });
+
+    testWidgets('a server refusal is surfaced', (tester) async {
+      final backend = await openDetail(tester);
+      backend.on(
+        'POST',
+        '/api/reservations/1/refund-deposit/',
+        {'detail': 'The provider could not be reached.'},
+        status: 502,
+      );
+
+      await tester.tap(find.text('Give the deposit back'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Give the deposit back'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('could not be reached'), findsOneWidget);
+      // Still kept, because we do not know the provider took it.
+      expect(find.text('Kept — nobody arrived'), findsOneWidget);
+    });
+
+    testWidgets('it reads in French', (tester) async {
+      await openDetail(tester, language: 'fr');
+
+      expect(find.text('Rendre l’acompte'), findsOneWidget);
+    });
+  });
 }

@@ -1752,6 +1752,36 @@ abstract class L {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 deposit} other{{count} deposits}}'**
   String depositCount(int count);
+
+  /// No description provided for @refundDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the deposit back'**
+  String get refundDeposit;
+
+  /// No description provided for @refundDepositTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Give back {amount} GNF?'**
+  String refundDepositTitle(String amount);
+
+  /// No description provided for @refundDepositDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The booking stays missed — the table was held and lost, and the record should say so. Only the money goes back.'**
+  String get refundDepositDetail;
+
+  /// No description provided for @depositRefundedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit given back.'**
+  String get depositRefundedNotice;
+
+  /// No description provided for @returnedToCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Given back'**
+  String get returnedToCustomers;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

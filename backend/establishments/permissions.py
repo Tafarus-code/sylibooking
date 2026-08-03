@@ -81,6 +81,21 @@ def require_staff_management(user, establishment):
     )
 
 
+def require_refund_access(user, establishment):
+    """Giving a deposit back. Owner and manager only.
+
+    Named separately from profile access even though the two currently
+    resolve to the same roles: they are different decisions, and the day one
+    of them moves the other should not move with it by accident.
+    """
+    return require_membership(
+        user,
+        establishment,
+        allowed_roles=MerchantMembership.REFUND_ROLES,
+        action='Refunding a deposit',
+    )
+
+
 def require_operations_access(user, establishment):
     """Running the floor. Any member, whatever their role."""
     return require_membership(

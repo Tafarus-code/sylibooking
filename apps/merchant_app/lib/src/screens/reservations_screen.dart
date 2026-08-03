@@ -283,8 +283,10 @@ class _ReservationsViewState extends State<ReservationsView> {
                 busy: _pendingActions.contains(reservation.id),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) =>
-                        ReservationDetailScreen(reservation: reservation),
+                    builder: (_) => ReservationDetailScreen(
+                      reservation: reservation,
+                      api: _api,
+                    ),
                   ),
                 ),
                 onConfirm: () => _act(

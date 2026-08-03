@@ -13,10 +13,79 @@ import '../widgets/payment_badge.dart';
 /// merchant cannot see it, the provider reference and amount are what settle
 /// the argument. Both are copyable, because they get read out over the phone
 /// or pasted into a provider's dashboard.
-class ReservationDetailScreen extends StatelessWidget {
-  const ReservationDetailScreen({super.key, required this.reservation});
+class ReservationDetailScreen extends StatefulWidget {
+  const ReservationDetailScreen({
+    super.key,
+    required this.reservation,
+    this.api,
+  });
 
   final Reservation reservation;
+
+  /// Needed only to give a deposit back. Null makes this a read-only view,
+  /// which is what it was before that action existed.
+  final SylibookingApi? api;
+
+  @override
+  State<ReservationDetailScreen> createState() =>
+      _ReservationDetailScreenState();
+}
+
+class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
+  late Reservation reservation = widget.reservation;
+  bool _busy = false;
+
+  Future<void> _refund() async {
+    final api = widget.api;
+    final payment = reservation.payment;
+    if (api == null || payment == null) return;
+
+    final l = L.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.refundDepositTitle(payment.amount)),
+        // Said before the tap: the booking is not being undone.
+        content: Text(l.refundDepositDetail),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.refundDeposit),
+          ),
+        ],
+      ),
+    );
+    if (!(confirmed ?? false)) return;
+
+    setState(() => _busy = true);
+    try {
+      final updated = await api.refundDeposit(reservation.id);
+      if (!mounted) return;
+      setState(() {
+        reservation = updated;
+        _busy = false;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(l.depositRefundedNotice)));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+    } on ApiUnreachableException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +156,18 @@ class ReservationDetailScreen extends StatelessWidget {
                   (l.rowProviderReference, ref, true),
               ],
             ),
+          // Offered only for a deposit actually being kept, and only where
+          // the caller can act on it. The booking stays missed either way.
+          if (payment != null &&
+              payment.outcome == DepositOutcome.forfeited &&
+              widget.api != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _refund,
+              icon: const Icon(Icons.undo, size: 18),
+              label: Text(l.refundDeposit),
+            ),
+          ],
           if (reservation.isAwaitingPayment) ...[
             const SizedBox(height: 16),
             Container(

@@ -17,7 +17,7 @@ from establishments.permissions import (
     require_operations_access,
 )
 from payments.models import Payment
-from payments.services import start_payment
+from payments.services import settle_deposit, start_payment
 from reservations.availability import availability_for_establishment, is_space_available
 from reservations.models import Reservation
 
@@ -305,6 +305,11 @@ class ReservationViewSet(
         reservation.status = Reservation.Status.COMPLETED
         reservation.arrived_at = timezone.now()
         reservation.save(update_fields=['status', 'arrived_at'])
+
+        # The guests arrived, so any deposit comes off their bill.
+        settle_deposit(reservation)
+
+        reservation.refresh_from_db()
         return Response(self.get_serializer(reservation).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])

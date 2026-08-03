@@ -801,4 +801,9 @@ class LEn extends L {
   @override
   String get bookingMissedDetail =>
       'Nobody arrived before the venue stopped holding the table.';
+
+  @override
+  String depositTerms(String amount) {
+    return 'Your $amount GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.';
+  }
 }

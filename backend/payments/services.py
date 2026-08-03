@@ -159,6 +159,77 @@ def confirm_reservation_for(payment):
         return reservation
 
 
+def settle_deposit(reservation):
+    """Decide what became of a booking's deposit, now that the booking ended.
+
+    D1: a deposit is taken off the bill when the guests arrive, and kept when
+    they do not. The customer is told both before they book — a forfeiture the
+    customer did not see coming is a dispute, not a policy.
+
+    Which of the two applies is read off the booking's own status, and that
+    status was reached using the grace period captured *on the booking* when
+    it was taken. So a venue that shortens its window on Tuesday cannot
+    thereby keep money taken on Monday under longer terms; the question was
+    already settled by the time this runs.
+
+    Idempotent: a deposit that already has an outcome keeps it. The lapse
+    sweep will run constantly once it is on a scheduler, and settling twice
+    must not turn one no-show into two forfeits in the takings.
+
+    Returns the Payment it settled, or None when there was nothing to settle —
+    a cash booking, or one whose payment never completed.
+    """
+    payment = (
+        reservation.payments.filter(status=Payment.Status.COMPLETED)
+        .order_by('-created_at')
+        .first()
+    )
+    if payment is None:
+        # Cash on arrival, or money that never arrived. Nothing was taken, so
+        # there is nothing to keep or give back.
+        return None
+
+    if payment.outcome != Payment.Outcome.NONE:
+        return payment
+
+    if reservation.status == Reservation.Status.COMPLETED:
+        payment.outcome = Payment.Outcome.OFFSET
+    elif reservation.status == Reservation.Status.NO_SHOW:
+        payment.outcome = Payment.Outcome.FORFEITED
+    else:
+        # Still open, or cancelled. Cancellation has its own rules and is not
+        # this function's to invent.
+        return payment
+
+    payment.save(update_fields=['outcome'])
+    logger.info(
+        'Deposit %s on reservation %s settled as %s',
+        payment.provider_reference,
+        reservation.pk,
+        payment.outcome,
+    )
+    return payment
+
+
+def refund_deposit(payment):
+    """Give a deposit back through the provider that took it.
+
+    Nothing calls this yet — the mock is the only implementation until the
+    Orange Money slice. It exists now so that slice is an adapter and not an
+    interface change, and so the outcome it writes is already understood by
+    the dashboard.
+    """
+    if payment.outcome == Payment.Outcome.REFUNDED:
+        return payment
+
+    provider = get_payment_provider(payment.provider)
+    provider.refund(payment.provider_reference, payment.amount)
+
+    payment.outcome = Payment.Outcome.REFUNDED
+    payment.save(update_fields=['outcome'])
+    return payment
+
+
 def latest_payment_for(subject):
     """The payment a customer would be asking about — the most recent one.
 

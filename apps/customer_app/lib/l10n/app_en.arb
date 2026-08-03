@@ -429,5 +429,13 @@
     }
   },
   "bookingMissed": "Missed",
-  "bookingMissedDetail": "Nobody arrived before the venue stopped holding the table."
+  "bookingMissedDetail": "Nobody arrived before the venue stopped holding the table.",
+  "depositTerms": "Your {amount} GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.",
+  "@depositTerms": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
 }

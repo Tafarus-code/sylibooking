@@ -32,6 +32,9 @@ class FailingPaymentProvider(PaymentProvider):
     def check_status(self, provider_reference):
         return Payment.Status.FAILED
 
+    def refund(self, provider_reference, amount):
+        return True
+
 
 class PendingPaymentProvider(PaymentProvider):
     """Never settles — the customer has not approved it on their handset."""
@@ -42,6 +45,9 @@ class PendingPaymentProvider(PaymentProvider):
     def check_status(self, provider_reference):
         return Payment.Status.PENDING
 
+    def refund(self, provider_reference, amount):
+        return True
+
 
 class UnreachablePaymentProvider(PaymentProvider):
     """The provider's API is down."""
@@ -50,6 +56,9 @@ class UnreachablePaymentProvider(PaymentProvider):
         raise PaymentError('gateway timeout')
 
     def check_status(self, provider_reference):
+        raise PaymentError('gateway timeout')
+
+    def refund(self, provider_reference, amount):
         raise PaymentError('gateway timeout')
 
 

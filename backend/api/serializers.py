@@ -11,6 +11,7 @@ from establishments.hours import (
 )
 from establishments.models import Establishment, MenuItem, OpeningHours, Space
 from payments.models import Payment
+from payments.services import deposit_amount
 from reservations.availability import is_space_available
 from reservations.models import Reservation
 from reservations.no_show import no_show_window
@@ -25,6 +26,9 @@ class PaymentSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(
         source='get_status_display', read_only=True
     )
+    outcome_display = serializers.CharField(
+        source='get_outcome_display', read_only=True
+    )
 
     class Meta:
         model = Payment
@@ -35,6 +39,8 @@ class PaymentSerializer(serializers.ModelSerializer):
             'amount',
             'status',
             'status_display',
+            'outcome',
+            'outcome_display',
             'provider_reference',
             'created_at',
         ]
@@ -209,6 +215,7 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
     hours = serializers.SerializerMethodField()
     menu = serializers.SerializerMethodField()
     no_show_window_minutes = serializers.SerializerMethodField()
+    deposit_amount = serializers.SerializerMethodField()
 
     # Computed, never stored: a denormalised average drifts the moment a
     # review is hidden, and hiding is the point of moderation.
@@ -237,8 +244,17 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'opening_hours',
             'spaces',
             'no_show_window_minutes',
+            'deposit_amount',
             'created_at',
         ]
+
+    def get_deposit_amount(self, establishment):
+        """What a mobile money booking here pays up front.
+
+        Sent for the same reason as the grace period: the customer has to be
+        told what is being taken, and what happens to it, before it is taken.
+        """
+        return str(deposit_amount())
 
     def get_no_show_window_minutes(self, establishment):
         """What a booking taken here right now would be held for.

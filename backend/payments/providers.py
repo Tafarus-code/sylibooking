@@ -41,6 +41,18 @@ class PaymentProvider(ABC):
     def check_status(self, provider_reference):
         """Return one of `Payment.Status` for an existing transaction."""
 
+    @abstractmethod
+    def refund(self, provider_reference, amount):
+        """Give a completed payment back.
+
+        On the interface before there is a real provider to implement it, so
+        that adding one is an adapter rather than an interface change — and
+        so the deposit rules can be written against a complete picture of
+        what can happen to money.
+
+        Raise `PaymentError` if the request could not be placed at all.
+        """
+
 
 class MockPaymentProvider(PaymentProvider):
     """Always succeeds, immediately.
@@ -66,6 +78,12 @@ class MockPaymentProvider(PaymentProvider):
     def check_status(self, provider_reference):
         logger.info('Mock payment %s reported completed', provider_reference)
         return Payment.Status.COMPLETED
+
+    def refund(self, provider_reference, amount):
+        logger.info(
+            'Mock refund of %s against payment %s', amount, provider_reference
+        )
+        return True
 
 
 def get_payment_provider(provider_name):

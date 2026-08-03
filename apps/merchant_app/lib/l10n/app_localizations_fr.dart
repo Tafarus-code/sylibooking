@@ -943,4 +943,36 @@ class LFr extends L {
 
   @override
   String get statusMissed => 'Absent';
+
+  @override
+  String get rowDepositOutcome => 'Acompte';
+
+  @override
+  String get depositNotSettled => 'Pas encore réglé';
+
+  @override
+  String get depositOffset => 'Déduit de l’addition';
+
+  @override
+  String get depositForfeited => 'Conservé — personne ne s’est présenté';
+
+  @override
+  String get depositRefunded => 'Remboursé';
+
+  @override
+  String get keptFromNoShows => 'Conservé sur absences';
+
+  @override
+  String get offsetAgainstBills => 'Déduit des additions';
+
+  @override
+  String depositCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count acomptes',
+      one: '1 acompte',
+    );
+    return '$_temp0';
+  }
 }

@@ -45,6 +45,16 @@ extension OrderStatusLabel on OrderStatus {
 /// in — switching to French left "vous y êtes owner" on the Manage screen
 /// until the next sign-in. The set is closed and known, so there is nothing
 /// to gain by asking.
+/// What became of a deposit, in words a merchant counting cash can use.
+extension DepositOutcomeLabel on DepositOutcome {
+  String label(L l) => switch (this) {
+        DepositOutcome.none => l.depositNotSettled,
+        DepositOutcome.offset => l.depositOffset,
+        DepositOutcome.forfeited => l.depositForfeited,
+        DepositOutcome.refunded => l.depositRefunded,
+      };
+}
+
 extension MerchantRoleLabel on MerchantRole {
   /// Lowercase, because it is read inside a sentence rather than on its own.
   String label(L l) => switch (this) {

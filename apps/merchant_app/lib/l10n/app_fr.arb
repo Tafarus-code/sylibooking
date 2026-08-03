@@ -267,5 +267,13 @@
   "venueCreated": "{name} est à vous. Ajoutez vos tables ensuite.",
   "markArrived": "Marquer arrivé",
   "guestsArrived": "{name} marqué comme arrivé.",
-  "statusMissed": "Absent"
+  "statusMissed": "Absent",
+  "rowDepositOutcome": "Acompte",
+  "depositNotSettled": "Pas encore réglé",
+  "depositOffset": "Déduit de l’addition",
+  "depositForfeited": "Conservé — personne ne s’est présenté",
+  "depositRefunded": "Remboursé",
+  "keptFromNoShows": "Conservé sur absences",
+  "offsetAgainstBills": "Déduit des additions",
+  "depositCount": "{count, plural, =1{1 acompte} other{{count} acomptes}}"
 }

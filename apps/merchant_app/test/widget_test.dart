@@ -3457,4 +3457,154 @@ void main() {
       expect(find.text('Marquer arrivé'), findsOneWidget);
     });
   });
+
+  group('what became of a deposit', () {
+    Map<String, dynamic> paidBookingWithOutcome(String outcome) => booking(
+          id: 1,
+          status: outcome == 'forfeited' ? 'no_show' : 'completed',
+          paymentProvider: 'orange_money',
+          isPaid: true,
+          payment: {
+            ...paymentJson(),
+            'outcome': outcome,
+            'outcome_display': switch (outcome) {
+              'offset' => 'Taken off the bill',
+              'forfeited' => 'Kept for a no-show',
+              _ => 'Not settled yet',
+            },
+          },
+        );
+
+    Future<void> openDetail(WidgetTester tester, String outcome) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [paidBookingWithOutcome(outcome)],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ReservationCard).first);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a deposit taken off the bill says so', (tester) async {
+      await openDetail(tester, 'offset');
+
+      expect(find.text('Taken off the bill'), findsOneWidget);
+    });
+
+    testWidgets('a kept deposit says why it was kept', (tester) async {
+      await openDetail(tester, 'forfeited');
+
+      expect(find.text('Kept — nobody arrived'), findsOneWidget);
+    });
+
+    testWidgets('an unsettled one says it is not settled yet',
+        (tester) async {
+      await openDetail(tester, 'none');
+
+      expect(find.text('Not settled yet'), findsOneWidget);
+    });
+
+    testWidgets('the payment itself still reads as completed', (tester) async {
+      // Outcome is a separate axis: the money arrived either way, and a
+      // merchant reconciling needs both answered.
+      await openDetail(tester, 'forfeited');
+
+      expect(find.text('Completed'), findsWidgets);
+    });
+
+    testWidgets('the dashboard separates kept from taken off the bill',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/dashboard/payments/', {
+        'period': {'from': '2026-07-01', 'to': '2026-08-01'},
+        'establishments': [
+          {'id': 7, 'name': 'Le Petit Baobab'},
+        ],
+        'reservations': {'total': 2},
+        'payments': {
+          'collected': '100000.00',
+          'awaiting': '0.00',
+          'failed': '0.00',
+          'forfeited': '50000.00',
+          'offset': '50000.00',
+          'completed_count': 2,
+          'pending_count': 0,
+          'failed_count': 0,
+          'forfeited_count': 1,
+        },
+        'by_provider': [],
+        'needs_attention': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.payments_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kept from no-shows'), findsOneWidget);
+      expect(find.text('Taken off bills'), findsOneWidget);
+      expect(find.text('1 deposit'), findsOneWidget);
+      // Collected still counts everything that arrived; splitting it would
+      // understate what the venue actually took.
+      expect(find.text('100000.00 GNF'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no settled deposits is not shown the split',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/dashboard/payments/', {
+        'period': {'from': '2026-07-01', 'to': '2026-08-01'},
+        'establishments': [
+          {'id': 7, 'name': 'Le Petit Baobab'},
+        ],
+        'reservations': {'total': 0},
+        'payments': {
+          'collected': '0.00',
+          'awaiting': '0.00',
+          'failed': '0.00',
+          'forfeited': '0.00',
+          'offset': '0.00',
+          'completed_count': 0,
+          'pending_count': 0,
+          'failed_count': 0,
+          'forfeited_count': 0,
+        },
+        'by_provider': [],
+        'needs_attention': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.payments_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kept from no-shows'), findsNothing);
+    });
+  });
 }

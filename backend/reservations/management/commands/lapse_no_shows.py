@@ -82,4 +82,20 @@ class Command(BaseCommand):
             pk__in=[r.pk for r in lapsed]
         ).update(status=Reservation.Status.NO_SHOW)
 
+        # Imported here rather than at module scope: payments imports
+        # reservations, and this command is the only thing in reservations
+        # that needs to reach back the other way.
+        from payments.services import settle_deposit
+
+        forfeited = 0
+        for reservation in lapsed:
+            reservation.refresh_from_db()
+            payment = settle_deposit(reservation)
+            if payment is not None and payment.outcome == 'forfeited':
+                forfeited += 1
+
         self.stdout.write(self.style.SUCCESS(f'{updated} marked missed.'))
+        if forfeited:
+            self.stdout.write(
+                self.style.SUCCESS(f'{forfeited} deposit(s) kept.')
+            )

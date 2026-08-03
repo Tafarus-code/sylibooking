@@ -471,6 +471,9 @@ class AttentionItem {
 /// What the merchant took, what is still owed, and what to chase.
 class PaymentDashboard {
   const PaymentDashboard({
+    this.forfeited = '0.00',
+    this.offset = '0.00',
+    this.forfeitedCount = 0,
     required this.from,
     required this.to,
     required this.collected,
@@ -489,6 +492,13 @@ class PaymentDashboard {
 
   /// Amounts as strings: nothing on the client rounds money.
   final String collected;
+
+  /// Of what was collected, how much was kept because nobody came, and how
+  /// much came off a bill at the counter. Only the first leaves the venue
+  /// better off; the second it handed back as a discount at the till.
+  final String forfeited;
+  final String offset;
+  final int forfeitedCount;
   final String awaiting;
   final String failed;
 
@@ -512,6 +522,9 @@ class PaymentDashboard {
       from: DateTime.parse(period['from'] as String),
       to: DateTime.parse(period['to'] as String),
       collected: '${payments['collected'] ?? '0.00'}',
+      forfeited: '${payments['forfeited'] ?? '0.00'}',
+      offset: '${payments['offset'] ?? '0.00'}',
+      forfeitedCount: payments['forfeited_count'] as int? ?? 0,
       awaiting: '${payments['awaiting'] ?? '0.00'}',
       failed: '${payments['failed'] ?? '0.00'}',
       completedCount: payments['completed_count'] as int? ?? 0,
@@ -555,6 +568,7 @@ class Establishment {
     this.longitude,
     this.themePreset = 'ember',
     this.noShowWindowMinutes,
+    this.depositAmount,
   });
 
   final int id;
@@ -614,6 +628,10 @@ class Establishment {
   /// venue's own figure rather than a constant baked into the app. Detail
   /// endpoint only.
   final int? noShowWindowMinutes;
+
+  /// What a mobile money booking here pays up front, in Guinean francs.
+  /// Detail endpoint only.
+  final String? depositAmount;
 
   bool get hasMenu => menu.isNotEmpty;
   bool get hasHours => hours.isNotEmpty;
@@ -678,6 +696,7 @@ class Establishment {
         longitude: _toDouble(json['longitude']),
         themePreset: json['theme_preset'] as String? ?? 'ember',
         noShowWindowMinutes: json['no_show_window_minutes'] as int?,
+        depositAmount: json['deposit_amount'] as String?,
       );
 }
 
@@ -842,6 +861,27 @@ enum PaymentStatus {
       this == PaymentStatus.completed || this == PaymentStatus.failed;
 }
 
+/// What became of a deposit once its booking ended.
+///
+/// A separate axis from [PaymentStatus]: the payment stays completed either
+/// way. "Did the money arrive" and "what did we do with it" are different
+/// questions.
+enum DepositOutcome {
+  none,
+  offset,
+  forfeited,
+  refunded;
+
+  static DepositOutcome parse(String? value) => switch (value) {
+        'offset' => DepositOutcome.offset,
+        'forfeited' => DepositOutcome.forfeited,
+        'refunded' => DepositOutcome.refunded,
+        _ => DepositOutcome.none,
+      };
+
+  bool get isSettled => this != DepositOutcome.none;
+}
+
 class Payment {
   const Payment({
     required this.id,
@@ -851,6 +891,8 @@ class Payment {
     required this.status,
     required this.statusDisplay,
     this.providerReference,
+    this.outcome = DepositOutcome.none,
+    this.outcomeDisplay = '',
   });
 
   final int id;
@@ -863,6 +905,11 @@ class Payment {
   final String statusDisplay;
   final String? providerReference;
 
+  /// What became of the deposit once its booking ended. Independent of
+  /// [status]: the money arrived either way.
+  final DepositOutcome outcome;
+  final String outcomeDisplay;
+
   factory Payment.fromJson(Map<String, dynamic> json) => Payment(
         id: json['id'] as int,
         provider: PaymentProvider.parse(json['provider'] as String?),
@@ -871,6 +918,8 @@ class Payment {
         status: PaymentStatus.parse(json['status'] as String?),
         statusDisplay: json['status_display'] as String? ?? '',
         providerReference: json['provider_reference'] as String?,
+        outcome: DepositOutcome.parse(json['outcome'] as String?),
+        outcomeDisplay: json['outcome_display'] as String? ?? '',
       );
 }
 

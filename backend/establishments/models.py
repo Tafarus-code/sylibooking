@@ -295,6 +295,10 @@ class MerchantMembership(models.Model):
     PROFILE_ROLES = frozenset({Role.OWNER, Role.MANAGER})
     #: May add, remove and re-role other members. Deliberately owner alone.
     MEMBERSHIP_ROLES = frozenset({Role.OWNER})
+    #: May give money back. Owner and manager: staff run the floor, but
+    #: handing a customer their deposit is a decision about the venue's
+    #: takings, not a floor call.
+    REFUND_ROLES = frozenset({Role.OWNER, Role.MANAGER})
     #: May run the floor: reservations, confirmations, payment status.
     OPERATIONS_ROLES = frozenset({Role.OWNER, Role.MANAGER, Role.STAFF})
 

@@ -975,4 +975,22 @@ class LFr extends L {
     );
     return '$_temp0';
   }
+
+  @override
+  String get refundDeposit => 'Rendre l’acompte';
+
+  @override
+  String refundDepositTitle(String amount) {
+    return 'Rendre $amount GNF ?';
+  }
+
+  @override
+  String get refundDepositDetail =>
+      'La réservation reste marquée absente — la table a été gardée puis perdue, et le registre doit le dire. Seul l’argent est rendu.';
+
+  @override
+  String get depositRefundedNotice => 'Acompte rendu.';
+
+  @override
+  String get returnedToCustomers => 'Rendu';
 }

@@ -345,6 +345,15 @@ class SylibookingApi {
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Give back a deposit kept for a no-show, leaving the booking missed.
+  ///
+  /// The venue held the table and lost it; that stays in the record. Only
+  /// the money moves.
+  Future<Reservation> refundDeposit(int id) async {
+    final json = await _post('/reservations/$id/refund-deposit/', const {});
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<Reservation> cancelReservation(int id) async {
     final json = await _post('/reservations/$id/cancel/');
     return Reservation.fromJson(json as Map<String, dynamic>);

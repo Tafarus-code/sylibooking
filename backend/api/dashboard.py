@@ -114,6 +114,11 @@ class PaymentDashboardView(APIView):
         discount on the bill, and how much was kept because nobody came. Only
         the second is money the venue is better off by, and a merchant
         counting cash needs to see which is which rather than inferring it.
+
+        A deposit given back after the fact drops out of `forfeited`, which
+        counts only what is still kept, and turns up under `refunded` — so
+        returned money is accounted for rather than simply disappearing from
+        the figure it used to be in.
         """
         completed = Q(status=Payment.Status.COMPLETED)
         totals = payments.aggregate(
@@ -127,6 +132,10 @@ class PaymentDashboardView(APIView):
             offset=Sum(
                 'amount',
                 filter=completed & Q(outcome=Payment.Outcome.OFFSET),
+            ),
+            refunded=Sum(
+                'amount',
+                filter=completed & Q(outcome=Payment.Outcome.REFUNDED),
             ),
             completed_count=Count('id', filter=completed),
             pending_count=Count('id', filter=Q(status=Payment.Status.PENDING)),
@@ -142,6 +151,7 @@ class PaymentDashboardView(APIView):
             'failed': str(totals['failed'] or ZERO),
             'forfeited': str(totals['forfeited'] or ZERO),
             'offset': str(totals['offset'] or ZERO),
+            'refunded': str(totals['refunded'] or ZERO),
             'completed_count': totals['completed_count'],
             'pending_count': totals['pending_count'],
             'failed_count': totals['failed_count'],

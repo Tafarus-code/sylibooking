@@ -967,4 +967,22 @@ class LEn extends L {
     );
     return '$_temp0';
   }
+
+  @override
+  String get refundDeposit => 'Give the deposit back';
+
+  @override
+  String refundDepositTitle(String amount) {
+    return 'Give back $amount GNF?';
+  }
+
+  @override
+  String get refundDepositDetail =>
+      'The booking stays missed — the table was held and lost, and the record should say so. Only the money goes back.';
+
+  @override
+  String get depositRefundedNotice => 'Deposit given back.';
+
+  @override
+  String get returnedToCustomers => 'Given back';
 }

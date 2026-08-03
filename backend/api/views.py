@@ -15,9 +15,11 @@ from establishments.models import Establishment, Space
 from establishments.permissions import (
     get_establishment_or_404,
     require_operations_access,
+    require_refund_access,
 )
 from payments.models import Payment
-from payments.services import settle_deposit, start_payment
+from payments.providers import PaymentError
+from payments.services import refund_deposit, settle_deposit, start_payment
 from reservations.availability import availability_for_establishment, is_space_available
 from reservations.models import Reservation
 
@@ -308,6 +310,61 @@ class ReservationViewSet(
 
         # The guests arrived, so any deposit comes off their bill.
         settle_deposit(reservation)
+
+        reservation.refresh_from_db()
+        return Response(self.get_serializer(reservation).data)
+
+    @action(
+        detail=True,
+        methods=['post'],
+        permission_classes=[IsAuthenticated],
+        url_path='refund-deposit',
+        # Without this the route is named after the method and the two
+        # drift apart.
+        url_name='refund-deposit',
+    )
+    def refund(self, request, pk=None):
+        """Give back a deposit kept for a no-show, without undoing the no-show.
+
+        A customer who turns up three quarters of an hour late has still
+        missed their table — the venue held it and then lost it, and the
+        record should say so. But a merchant who decides to seat them anyway,
+        or simply judges the charge harsh, needs a way to return the money
+        that does not require rewriting what happened.
+
+        So this moves the deposit and nothing else. The booking stays missed,
+        the venue's no-show count stays honest, and the takings stop counting
+        money that went back.
+        """
+        reservation = self.get_object()
+        require_refund_access(request.user, reservation.space.establishment)
+
+        payment = reservation.latest_payment
+        if payment is None or payment.outcome != Payment.Outcome.FORFEITED:
+            return Response(
+                {
+                    'detail': _(
+                        'There is no kept deposit on this booking to '
+                        'give back.'
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            refund_deposit(payment)
+        except PaymentError:
+            # We do not know whether the provider took it. Saying "refunded"
+            # would be a claim we cannot support.
+            return Response(
+                {
+                    'detail': _(
+                        'The provider could not be reached. The deposit has '
+                        'not been given back — try again shortly.'
+                    )
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         reservation.refresh_from_db()
         return Response(self.get_serializer(reservation).data)

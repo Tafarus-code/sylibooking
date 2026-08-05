@@ -10,6 +10,7 @@ import 'branding_screen.dart';
 import 'hours_screen.dart';
 import 'menu_screen.dart';
 import 'photos_screen.dart';
+import 'reviews_screen.dart';
 import 'spaces_screen.dart';
 import 'profile_screen.dart';
 import 'staff_screen.dart';
@@ -101,6 +102,15 @@ class ManageScreen extends StatelessWidget {
               context,
               PhotosScreen(auth: auth, imageSource: imageSource),
             ),
+          ),
+
+          // Everyone may read them. A merchant who cannot see their
+          // reviews here reads them on Facebook instead.
+          _Entry(
+            icon: Icons.reviews_outlined,
+            title: l.reviews,
+            subtitle: l.reviewsSubtitle,
+            onTap: () => _open(context, ReviewsScreen(auth: auth)),
           ),
 
           if (role.canEditProfile) ...[

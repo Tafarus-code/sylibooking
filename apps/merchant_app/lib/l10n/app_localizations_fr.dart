@@ -1011,4 +1011,59 @@ class LFr extends L {
   @override
   String get tooManyAttempts =>
       'Trop de tentatives. Patientez un instant et réessayez.';
+
+  @override
+  String get reviews => 'Avis';
+
+  @override
+  String get reviewsSubtitle => 'Ce que les clients ont dit de vous';
+
+  @override
+  String get noReviewsYet => 'Aucun avis';
+
+  @override
+  String get noReviewsDetail =>
+      'Les clients peuvent laisser un avis après leur visite. Ils apparaîtront ici.';
+
+  @override
+  String reviewCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avis',
+      one: '1 avis',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reviewTakenDown => 'Retiré';
+
+  @override
+  String get reviewFlagged => 'Signalé — en attente d’examen';
+
+  @override
+  String get reportReview => 'Signaler cet avis';
+
+  @override
+  String get reportReviewTitle => 'Signaler cet avis ?';
+
+  @override
+  String get reportReviewDetail =>
+      'Il reste visible pour les clients et continue de compter dans votre note. Le signaler nous demande de l’examiner — un établissement ne peut pas retirer ses propres avis.';
+
+  @override
+  String get reportReason => 'Qu’est-ce qui ne va pas ?';
+
+  @override
+  String get reportReasonHint => 'ex. ce client n’est jamais venu';
+
+  @override
+  String get reportReasonRequired => 'Dites ce qui ne va pas.';
+
+  @override
+  String get reviewReported => 'Signalé. Nous allons l’examiner.';
+
+  @override
+  String get send => 'Envoyer';
 }

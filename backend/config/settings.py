@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'payments',
     'orders',
     'accounts',
+    'notifications',
     'api',
 ]
 
@@ -298,3 +299,35 @@ EMAIL_BACKEND = config(
     default='django.core.mail.backends.console.EmailBackend',
 )
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@sylibooking.gn')
+
+
+# --- Task queue -----------------------------------------------------------
+# Work that is not a request: reminders, the no-show sweep, payment polling.
+# Introduced empty on purpose — see config/celery.py.
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='')
+
+# Run tasks in-process during tests rather than needing a broker: the suite
+# tests what a task *does*, and a queue in the middle of that only adds a way
+# for it to be flaky. The tests that care about queueing say so explicitly.
+CELERY_TASK_ALWAYS_EAGER = config(
+    'CELERY_TASK_ALWAYS_EAGER', default=False, cast=bool
+)
+# Eager mode swallows exceptions by default, which would let a broken task
+# pass its own test.
+CELERY_TASK_EAGER_PROPAGATES = True
+
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = TIME_ZONE
+
+# A worker that never gives up holds a slot for ever. Nothing here is so
+# important that it should outlive the shift it belongs to.
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+
+# Losing a queued reminder because a worker restarted is worse than sending
+# one twice — and every task here is written to be safe to run twice.
+CELERY_TASK_ACKS_LATE = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True

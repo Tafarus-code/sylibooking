@@ -999,4 +999,8 @@ class LEn extends L {
 
   @override
   String get showNewWork => 'Show';
+
+  @override
+  String get tooManyAttempts =>
+      'Too many attempts. Wait a moment and try again.';
 }

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
 from decimal import Decimal
 from pathlib import Path
 
@@ -215,7 +216,27 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    # Ceilings on the paths anyone can reach without signing in. Applied per
+    # view rather than globally: a blanket rate needs real traffic to size,
+    # and guessing one now risks throttling the first pilot. See
+    # api/throttling.py for why each of these is keyed the way it is.
+    'DEFAULT_THROTTLE_RATES': {
+        'login_ip': '10/min',
+        'login_username': '5/min',
+        'register': '5/hour',
+        'password_reset': '5/hour',
+        'password_reset_identifier': '3/hour',
+        'booking_ip': '30/hour',
+        'booking_phone': '5/hour',
+    },
 }
+
+# Off during tests: turning it on for the suite would mean every test that
+# signs in twice fighting a counter that outlives it. The tests that actually
+# care about throttling switch it back on explicitly.
+THROTTLING_ENABLED = config(
+    'THROTTLING_ENABLED', default='test' not in sys.argv, cast=bool
+)
 
 
 # CORS

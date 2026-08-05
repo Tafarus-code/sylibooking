@@ -282,5 +282,6 @@
   "depositRefundedNotice": "Acompte rendu.",
   "returnedToCustomers": "Rendu",
   "newSinceYouLooked": "{count, plural, =1{1 nouveau depuis votre dernier coup d’œil} other{{count} nouveaux depuis votre dernier coup d’œil}}",
-  "showNewWork": "Afficher"
+  "showNewWork": "Afficher",
+  "tooManyAttempts": "Trop de tentatives. Patientez un instant et réessayez."
 }

@@ -27,6 +27,11 @@ class AuthController extends ChangeNotifier {
   /// The wording belongs to the screen, which has a BuildContext; this
   /// only says which case it was.
   bool badCredentials = false;
+
+  /// Refused for asking too often rather than for being wrong. Its own flag
+  /// for the same reason as [badCredentials]: the wording belongs to the
+  /// screen, and "wrong password" would be a lie.
+  bool throttled = false;
   bool busy = false;
 
   /// Venues this account may work in, with the role at each.
@@ -136,6 +141,7 @@ class AuthController extends ChangeNotifier {
     busy = true;
     errorMessage = null;
     badCredentials = false;
+    throttled = false;
     notifyListeners();
 
     try {
@@ -145,8 +151,9 @@ class AuthController extends ChangeNotifier {
       await _loadVenues();
       return true;
     } on ApiException catch (e) {
+      throttled = e.isThrottled;
       badCredentials = e.statusCode == 400;
-      errorMessage = badCredentials ? null : e.message;
+      errorMessage = (badCredentials || throttled) ? null : e.message;
       return false;
     } on ApiUnreachableException catch (e) {
       errorMessage = e.message;

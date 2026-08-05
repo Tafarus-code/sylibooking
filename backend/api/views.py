@@ -29,6 +29,7 @@ from .serializers import (
     ReservationSerializer,
     SpaceAvailabilitySerializer,
 )
+from .throttling import BookingIpThrottle, BookingPhoneThrottle
 
 
 class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -204,6 +205,16 @@ class ReservationViewSet(
                 ) from None
 
         return queryset
+
+    def get_throttles(self):
+        """Only creating is throttled.
+
+        Browsing a booking by reference, or a merchant working their own
+        list, is not the path an abuser uses to make somebody's phone ring.
+        """
+        if self.action == 'create':
+            return [BookingIpThrottle(), BookingPhoneThrottle()]
+        return super().get_throttles()
 
     def perform_create(self, serializer):
         """Re-check availability under a row lock, then open any payment.

@@ -3913,4 +3913,76 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('being asked to slow down', () {
+    testWidgets('a throttled sign-in says so rather than "wrong password"',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester);
+      backend.on(
+        'POST',
+        '/api/auth/login/',
+        {'detail': 'Request was throttled. Expected available in 42 seconds.'},
+        status: 429,
+      );
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'amadou');
+      await tester.enterText(find.byType(TextFormField).last, 'correct');
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Too many attempts. Wait a moment and try again.'),
+          findsOneWidget);
+      // Telling somebody their password is wrong when it is not sends them
+      // to reset an account that was fine.
+      expect(find.text('Wrong username or password.'), findsNothing);
+      // And never the server's own English second-count.
+      expect(find.textContaining('Expected available'), findsNothing);
+    });
+
+    testWidgets('it reads in French too', (tester) async {
+      final (:auth, :backend) = buildAuth(tester);
+      backend.on(
+        'POST',
+        '/api/auth/login/',
+        {'detail': 'Request was throttled.'},
+        status: 429,
+      );
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore('fr')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'amadou');
+      await tester.enterText(find.byType(TextFormField).last, 'correct');
+      await tester.tap(find.text('Se connecter'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Trop de tentatives'), findsOneWidget);
+    });
+
+    testWidgets('a genuinely wrong password still says that', (tester) async {
+      final (:auth, :backend) = buildAuth(tester);
+      backend.on(
+        'POST',
+        '/api/auth/login/',
+        {'detail': 'Invalid credentials.'},
+        status: 400,
+      );
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'amadou');
+      await tester.enterText(find.byType(TextFormField).last, 'wrong');
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Wrong username or password.'), findsOneWidget);
+    });
+  });
 }

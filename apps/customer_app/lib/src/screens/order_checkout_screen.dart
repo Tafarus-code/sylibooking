@@ -28,6 +28,11 @@ class OrderCheckoutScreen extends StatefulWidget {
 }
 
 class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
+
+  /// Read here rather than passed in: these are async paths that already
+  /// guard `mounted`, and threading a localisation object through each of
+  /// them would be noise.
+  String get _throttledText => L.of(context).tooManyAttempts;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -120,7 +125,7 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
+          _error = e.messageOr(whenThrottled: _throttledText);
           _submitting = false;
         });
       }

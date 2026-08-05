@@ -28,6 +28,11 @@ class BookingFormScreen extends StatefulWidget {
 }
 
 class _BookingFormScreenState extends State<BookingFormScreen> {
+
+  /// Read here rather than passed in: these are async paths that already
+  /// guard `mounted`, and threading a localisation object through each of
+  /// them would be noise.
+  String get _throttledText => L.of(context).tooManyAttempts;
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _phone = TextEditingController();
@@ -93,7 +98,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       if (!mounted) return;
       setState(() {
         // The usual failure here is someone else taking the slot first.
-        _error = e.message;
+        _error = e.messageOr(whenThrottled: _throttledText);
         _submitting = false;
       });
     } on ApiUnreachableException catch (e) {

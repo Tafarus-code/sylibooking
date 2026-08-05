@@ -23,6 +23,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .throttling import (
+    PasswordResetIdentifierThrottle,
+    PasswordResetIpThrottle,
+)
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -88,6 +93,11 @@ class RequestResetView(APIView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    # The per-code attempt cap does nothing about how many codes may be
+    # asked for. Unthrottled that is unlimited attempts wearing a fresh code
+    # each time — and, once SMS leaves the machine, unlimited messages billed
+    # to us and sent at somebody who never asked.
+    throttle_classes = [PasswordResetIpThrottle, PasswordResetIdentifierThrottle]
 
     def post(self, request):
         form = RequestResetSerializer(data=request.data)
@@ -168,6 +178,7 @@ class ConfirmResetView(APIView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetIpThrottle]
 
     def post(self, request):
         form = ConfirmResetSerializer(data=request.data)

@@ -4578,4 +4578,55 @@ void main() {
       );
     });
   });
+
+  group('being asked to slow down', () {
+    testWidgets('a throttled booking says so in plain words', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+      backend.on(
+        'POST',
+        '/api/reservations/',
+        {'detail': 'Request was throttled. Expected available in 51 seconds.'},
+        status: 429,
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('19:00'));
+      await tester.pumpAndSettle();
+      // Inlined rather than reaching for the helper in the booking group:
+      // it is scoped there, and hoisting it would move a fixture several
+      // other tests rely on.
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'Mariama Diallo',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        '+224 620 00 00 00',
+      );
+      await tapReserve(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Too many attempts. Wait a moment and try again.'),
+        findsOneWidget,
+      );
+      // The server's own reply counts seconds in English; neither belongs on
+      // a customer's screen.
+      expect(find.textContaining('Expected available'), findsNothing);
+    });
+  });
 }

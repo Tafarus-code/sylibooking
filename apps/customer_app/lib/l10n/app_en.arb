@@ -437,5 +437,6 @@
         "type": "String"
       }
     }
-  }
+  },
+  "tooManyAttempts": "Too many attempts. Wait a moment and try again."
 }

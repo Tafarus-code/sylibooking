@@ -811,4 +811,8 @@ class LFr extends L {
   String depositTerms(String amount) {
     return 'Votre acompte de $amount GNF est déduit de l’addition à votre arrivée. Si personne ne se présente dans ce délai, l’établissement le conserve.';
   }
+
+  @override
+  String get tooManyAttempts =>
+      'Trop de tentatives. Patientez un instant et réessayez.';
 }

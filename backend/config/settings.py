@@ -354,6 +354,13 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'notifications.tasks.sweep_no_shows',
         'schedule': 600.0,
     },
+    # Often, because the task itself decides which payments are actually due
+    # — a tight beat with a decaying per-payment interval chases a fresh
+    # payment hard without hammering the provider for a stale one.
+    'poll-pending-payments': {
+        'task': 'notifications.tasks.poll_pending_payments',
+        'schedule': 30.0,
+    },
 }
 
 
@@ -366,3 +373,9 @@ REMINDER_LEAD_HOURS = config('REMINDER_LEAD_HOURS', default=3, cast=int)
 #: A reminder that wakes somebody is worse than no reminder at all.
 REMINDER_QUIET_START = config('REMINDER_QUIET_START', default='22:00')
 REMINDER_QUIET_END = config('REMINDER_QUIET_END', default='07:00')
+
+#: How long a payment may sit pending before it is written off. Nobody
+#: approves a mobile money prompt half an hour later.
+PAYMENT_ABANDON_AFTER_MINUTES = config(
+    'PAYMENT_ABANDON_AFTER_MINUTES', default=30, cast=int
+)

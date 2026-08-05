@@ -20,6 +20,7 @@ import logging
 from accounts.notifications import NotificationError, get_notifier
 from celery import shared_task
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from .models import Notification
 
@@ -189,6 +190,40 @@ def queue_due_reminders():
     for reservation in due:
         send_booking_reminder.delay(reservation.pk)
     return len(due)
+
+
+@shared_task
+def poll_pending_payments():
+    """Ask the provider about payments nobody is watching.
+
+    The customer's screen still asks too, and should: somebody staring at it
+    wants an answer now, not in thirty seconds. The difference is that
+    correctness no longer depends on them staying there.
+
+    Errors are per payment. One provider timeout must not stop the others
+    being chased — `refresh_payment` already swallows an unreachable provider
+    and leaves the payment pending for the next pass.
+    """
+    from payments.models import Payment
+    from payments.polling import abandoned, due_for_poll
+    from payments.services import refresh_payment
+
+    polled = 0
+    for payment in due_for_poll():
+        refresh_payment(payment)
+        Payment.objects.filter(pk=payment.pk).update(
+            last_polled_at=timezone.now()
+        )
+        polled += 1
+
+    # Anything this old was never going to complete. Failing it stops a
+    # booking sitting pending for ever against money that never arrived, and
+    # gives the merchant a reason to act on it.
+    gave_up = abandoned().update(status=Payment.Status.FAILED)
+    if gave_up:
+        logger.info('Gave up on %s unsettled payment(s)', gave_up)
+
+    return {'polled': polled, 'abandoned': gave_up}
 
 
 @shared_task

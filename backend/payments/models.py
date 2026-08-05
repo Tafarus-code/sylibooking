@@ -107,6 +107,15 @@ class Payment(models.Model):
             'later. Null until initiate_payment returns.'
         ),
     )
+    last_polled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            'When the provider was last asked about this payment. Drives the '
+            'decaying poll interval — a payment opened a minute ago is worth '
+            'asking about often, one opened twenty minutes ago is not.'
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

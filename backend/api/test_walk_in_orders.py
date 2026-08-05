@@ -354,3 +354,86 @@ class ValidationTests(WalkInTestBase):
         self.ring_up(reservation_reference=str(booking.reference))
 
         self.assertIsNone(Order.objects.get().reservation)
+
+
+class QueuePaginationTests(WalkInTestBase):
+    """The kitchen queue at real volume.
+
+    It used to return every ticket for the day in one response. Fine at
+    twenty; a busy Saturday is not twenty.
+    """
+
+    def orders(self, howMany):
+        pickup = timezone.now() + timedelta(minutes=30)
+        Order.objects.bulk_create(
+            [
+                Order(
+                    establishment=self.venue,
+                    customer_name=f'Customer {i}',
+                    customer_phone='',
+                    pickup_time=pickup,
+                )
+                for i in range(howMany)
+            ]
+        )
+
+    def ask(self, **params):
+        return self.client.get(
+            reverse('merchant-orders'),
+            {'establishment': self.venue.pk, **params},
+        )
+
+    def test_the_queue_comes_back_paged(self):
+        self.orders(120)
+        self.authenticate(self.floor)
+
+        response = self.ask()
+
+        self.assertEqual(response.data['count'], 120)
+        self.assertEqual(len(response.data['results']), 50)
+        self.assertIsNotNone(response.data['next'])
+
+    def test_the_next_page_carries_on(self):
+        self.orders(120)
+        self.authenticate(self.floor)
+
+        response = self.ask(page=2)
+
+        self.assertEqual(len(response.data['results']), 50)
+
+    def test_the_last_page_says_it_is_the_last(self):
+        self.orders(120)
+        self.authenticate(self.floor)
+
+        response = self.ask(page=3)
+
+        self.assertEqual(len(response.data['results']), 20)
+        self.assertIsNone(response.data['next'])
+
+    def test_a_quiet_venue_still_gets_one_page(self):
+        """A change that only shows up under load must not change the quiet
+        case."""
+        self.orders(3)
+        self.authenticate(self.floor)
+
+        response = self.ask()
+
+        self.assertEqual(len(response.data['results']), 3)
+        self.assertIsNone(response.data['next'])
+
+    def test_a_page_size_can_be_asked_for(self):
+        self.orders(30)
+        self.authenticate(self.floor)
+
+        response = self.ask(page_size=10)
+
+        self.assertEqual(len(response.data['results']), 10)
+
+    def test_an_absurd_page_size_is_capped(self):
+        """Otherwise page_size=100000 is a way to ask for the whole table."""
+        self.orders(60)
+        self.authenticate(self.floor)
+
+        response = self.ask(page_size=100000)
+
+        self.assertLessEqual(len(response.data['results']), 200)

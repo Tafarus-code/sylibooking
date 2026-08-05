@@ -27,15 +27,21 @@ class OrdersView extends StatefulWidget {
 class _OrdersViewState extends State<OrdersView> {
   List<Order> _orders = const [];
   bool _loading = true;
+
+  /// A busy Saturday is not twenty tickets. The pass sees the first page
+  /// straight away and the rest as it scrolls.
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  int _page = 1;
   String? _error;
   int? _busyId;
 
   /// The stages a ticket passes through, in the order the pass reads them.
   List<(OrderStatus, String)> _stages(L l) => [
-        (OrderStatus.ready, l.stageReadyToCollect),
-        (OrderStatus.preparing, l.stageBeingPrepared),
-        (OrderStatus.placed, l.stageNewOrders),
-      ];
+    (OrderStatus.ready, l.stageReadyToCollect),
+    (OrderStatus.preparing, l.stageBeingPrepared),
+    (OrderStatus.placed, l.stageNewOrders),
+  ];
 
   @override
   void initState() {
@@ -67,12 +73,15 @@ class _OrdersViewState extends State<OrdersView> {
     });
 
     try {
-      final orders = await widget.auth.api.merchantOrders(
+      final page = await widget.auth.api.merchantOrders(
         establishmentId: venueId,
+        page: 1,
       );
       if (!mounted) return;
       setState(() {
-        _orders = orders;
+        _orders = page.results;
+        _page = 1;
+        _hasMore = page.next != null;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -87,6 +96,35 @@ class _OrdersViewState extends State<OrdersView> {
         _error = e.message;
         _loading = false;
       });
+    }
+  }
+
+  /// Fetch the page after the one on screen, and append it.
+  ///
+  /// Appended rather than replacing: the pass is reading this list while
+  /// working, and one that empties and refills loses their place mid-service.
+  Future<void> _loadMore() async {
+    final venueId = _venueId;
+    if (_loadingMore || !_hasMore || venueId == null) return;
+    setState(() => _loadingMore = true);
+
+    try {
+      final page = await widget.auth.api.merchantOrders(
+        establishmentId: venueId,
+        page: _page + 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _orders = [..._orders, ...page.results];
+        _page += 1;
+        _hasMore = page.next != null;
+        _loadingMore = false;
+      });
+    } on ApiException {
+      // Nothing appended; scrolling again asks again.
+      if (mounted) setState(() => _loadingMore = false);
+    } on ApiUnreachableException {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -197,41 +235,72 @@ class _OrdersViewState extends State<OrdersView> {
       );
     }
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: contentInsets(
-        context,
-        maxWidth: ContentWidth.list,
-      ).copyWith(bottom: 24),
-      children: [
-        for (final (stageStatus, label) in _stages(l))
-          ..._stage(
-            label,
-            open.where((order) => order.status == stageStatus).toList(),
-          ),
-      ],
+    // One flat list of rows rather than a ListView with every ticket as a
+    // child. A plain ListView builds all of them; a busy pass would lay out
+    // the whole night before showing the first ticket.
+    final rows = _rows(l, open);
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        final metrics = notification.metrics;
+        if (metrics.axis == Axis.vertical &&
+            metrics.pixels >= metrics.maxScrollExtent - 400) {
+          _loadMore();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: contentInsets(
+          context,
+          maxWidth: ContentWidth.list,
+        ).copyWith(bottom: 24),
+        itemCount: rows.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= rows.length) {
+            // Just the spinner; the scroll notification below asks for more.
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final row = rows[index];
+          if (row is String) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(row, style: Theme.of(context).textTheme.titleSmall),
+            );
+          }
+
+          final order = row as Order;
+          return OrderTicket(
+            order: order,
+            busy: _busyId == order.id,
+            onAdvance: () => _advance(order, order.nextStatus),
+            onCancel: () => _cancel(order),
+          );
+        },
+      ),
     );
   }
 
-  List<Widget> _stage(String label, List<Order> orders) {
-    if (orders.isEmpty) return const [];
-
-    return [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Text(
-          L.of(context).stageHeading(label, orders.length),
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-      ),
-      for (final order in orders)
-        OrderTicket(
-          order: order,
-          busy: _busyId == order.id,
-          onAdvance: () => _advance(order, order.nextStatus),
-          onCancel: () => _cancel(order),
-        ),
-    ];
+  /// Stage headings and tickets in one flat list.
+  ///
+  /// A `String` is a heading, an `Order` is a ticket. Grouped by stage, in
+  /// the order the pass reads them, exactly as before — only the shape the
+  /// list is built from has changed.
+  List<Object> _rows(L l, List<Order> open) {
+    final rows = <Object>[];
+    for (final (stageStatus, label) in _stages(l)) {
+      final forStage = open
+          .where((order) => order.status == stageStatus)
+          .toList();
+      if (forStage.isEmpty) continue;
+      rows.add(l.stageHeading(label, forStage.length));
+      rows.addAll(forStage);
+    }
+    return rows;
   }
 }
 
@@ -404,35 +473,35 @@ class OrderStatusBadge extends StatelessWidget {
     // Neutral for waiting, warm for cooking, the accent for done.
     final (icon, background, foreground) = switch (status) {
       OrderStatus.placed => (
-          Icons.fiber_new,
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-        ),
+        Icons.fiber_new,
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+      ),
       OrderStatus.preparing => (
-          Icons.local_fire_department,
-          scheme.tertiaryContainer,
-          scheme.onTertiaryContainer,
-        ),
+        Icons.local_fire_department,
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
       OrderStatus.ready => (
-          Icons.check_circle,
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-        ),
+        Icons.check_circle,
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+      ),
       OrderStatus.completed => (
-          Icons.done_all,
-          scheme.secondaryContainer,
-          scheme.onSecondaryContainer,
-        ),
+        Icons.done_all,
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
+      ),
       OrderStatus.cancelled => (
-          Icons.cancel,
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-        ),
+        Icons.cancel,
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+      ),
       OrderStatus.unknown => (
-          Icons.help_outline,
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-        ),
+        Icons.help_outline,
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+      ),
     };
     final label = status.label(L.of(context));
 
@@ -450,9 +519,9 @@ class OrderStatusBadge extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -474,23 +543,23 @@ class _PaymentChip extends StatelessWidget {
 
     final (label, icon, background, foreground) = switch (order) {
       _ when order.isPaid => (
-          l.paidWith(order.paymentProviderDisplay),
-          Icons.check_circle,
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-        ),
+        l.paidWith(order.paymentProviderDisplay),
+        Icons.check_circle,
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+      ),
       _ when order.isAwaitingPayment => (
-          l.unpaid,
-          Icons.hourglass_top,
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-        ),
+        l.unpaid,
+        Icons.hourglass_top,
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+      ),
       _ => (
-          l.cashOnPickup,
-          Icons.local_atm,
-          Colors.transparent,
-          scheme.onSurfaceVariant,
-        ),
+        l.cashOnPickup,
+        Icons.local_atm,
+        Colors.transparent,
+        scheme.onSurfaceVariant,
+      ),
     };
 
     return Container(
@@ -512,9 +581,9 @@ class _PaymentChip extends StatelessWidget {
               label,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: foreground,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: foreground,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -543,10 +612,10 @@ class _EmptyState extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Padding(
-          padding: contentInsets(context, minHorizontal: 32).copyWith(
-            top: 72,
-            bottom: 32,
-          ),
+          padding: contentInsets(
+            context,
+            minHorizontal: 32,
+          ).copyWith(top: 72, bottom: 32),
           child: Column(
             children: [
               Icon(icon, size: 56, color: theme.colorScheme.onSurfaceVariant),

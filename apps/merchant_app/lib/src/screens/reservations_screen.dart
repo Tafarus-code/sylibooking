@@ -20,11 +20,7 @@ enum DateRange {
 /// A body rather than a screen: the venue desk owns the bar above it, so this
 /// and the orders queue share one venue name, one switcher and one refresh.
 class ReservationsView extends StatefulWidget {
-  const ReservationsView({
-    super.key,
-    required this.auth,
-    this.reloadToken = 0,
-  });
+  const ReservationsView({super.key, required this.auth, this.reloadToken = 0});
 
   final AuthController auth;
 
@@ -39,6 +35,13 @@ class _ReservationsViewState extends State<ReservationsView> {
   DateRange _range = DateRange.today;
   List<Reservation> _reservations = const [];
   bool _loading = true;
+
+  /// Whether there is another page behind this one, and whether it is on its
+  /// way. A venue with four hundred bookings in a week should see the first
+  /// of them immediately, not wait for the four hundredth.
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  int _page = 1;
   String? _error;
 
   /// Ids currently being confirmed/cancelled, so their buttons disable.
@@ -68,18 +71,22 @@ class _ReservationsViewState extends State<ReservationsView> {
     final today = DateTime(now.year, now.month, now.day);
 
     try {
-      final results = await _api.allReservations(
+      final page = await _api.reservations(
         // One venue, the selected one. The server refuses any other.
         establishmentId: widget.auth.selectedVenueId!,
         from: today,
         to: _range == DateRange.today
             ? today
             : today.add(const Duration(days: 6)),
+        page: 1,
       );
-      results.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      final results = [...page.results]
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
       if (!mounted) return;
       setState(() {
         _reservations = results;
+        _page = 1;
+        _hasMore = page.next != null;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -99,6 +106,43 @@ class _ReservationsViewState extends State<ReservationsView> {
         _error = e.message;
         _loading = false;
       });
+    }
+  }
+
+  /// Fetch the page after the one on screen, and append it.
+  ///
+  /// Appended rather than replacing: the merchant is already reading this
+  /// list, and a list that empties and refills under them loses their place.
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    try {
+      final page = await _api.reservations(
+        establishmentId: widget.auth.selectedVenueId!,
+        from: today,
+        to: _range == DateRange.today
+            ? today
+            : today.add(const Duration(days: 6)),
+        page: _page + 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        _reservations = [..._reservations, ...page.results]
+          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+        _page += 1;
+        _hasMore = page.next != null;
+        _loadingMore = false;
+      });
+    } on ApiException {
+      // Nothing was appended; the trigger will come round again on the next
+      // scroll rather than the merchant being told off for scrolling.
+      if (mounted) setState(() => _loadingMore = false);
+    } on ApiUnreachableException {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -193,8 +237,7 @@ class _ReservationsViewState extends State<ReservationsView> {
                   value: range,
                   // No wrapping: a segment is a fixed-height pill, so a label
                   // that runs to two lines has its second one clipped off.
-                  label:
-                      Text(range.label(l), maxLines: 1, softWrap: false),
+                  label: Text(range.label(l), maxLines: 1, softWrap: false),
                 ),
             ],
             selected: {_range},
@@ -246,65 +289,101 @@ class _ReservationsViewState extends State<ReservationsView> {
       );
     }
 
-    // Grouped by day so the week view reads as a calendar, not a flat list.
-    final byDay = <DateTime, List<Reservation>>{};
+    // Flattened into one list of rows — day headings and cards together —
+    // rather than a builder over days that each build a Column of their own.
+    // A Column builds every child at once, so five hundred bookings on one
+    // Saturday used to mean five hundred cards laid out before the first was
+    // on screen.
+    final rows = _rows();
+
+    return NotificationListener<ScrollNotification>(
+      // Reaching the end is the request for more. No button, because a
+      // merchant scrolling a list is already telling us what they want.
+      onNotification: (notification) {
+        final metrics = notification.metrics;
+        if (metrics.axis == Axis.vertical &&
+            metrics.pixels >= metrics.maxScrollExtent - 400) {
+          _loadMore();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        padding: contentInsets(context, maxWidth: ContentWidth.list),
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: rows.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= rows.length) {
+            // Just the spinner. Asking for the next page from inside a builder
+            // would mean calling setState during a build, which Flutter
+            // refuses — the scroll notification below is what triggers it.
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final row = rows[index];
+          if (row is DateTime) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                _dayLabel(row, l),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            );
+          }
+
+          final reservation = row as Reservation;
+          return ReservationCard(
+            reservation: reservation,
+            busy: _pendingActions.contains(reservation.id),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ReservationDetailScreen(
+                  reservation: reservation,
+                  api: _api,
+                ),
+              ),
+            ),
+            onConfirm: () => _act(
+              reservation,
+              _api.confirmReservation,
+              l.reservationConfirmed,
+            ),
+            onCancel: () => _confirmCancel(reservation),
+            onComplete: () => _act(
+              reservation,
+              _api.completeReservation,
+              l.guestsArrived(reservation.customerName),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Day headings and bookings in one flat list.
+  ///
+  /// A `DateTime` is a heading; a `Reservation` is a card. Grouped by day so
+  /// the week view still reads as a calendar rather than a flat run of rows.
+  List<Object> _rows() {
+    final rows = <Object>[];
+    DateTime? currentDay;
     for (final reservation in _reservations) {
       final day = DateTime(
         reservation.dateTime.year,
         reservation.dateTime.month,
         reservation.dateTime.day,
       );
-      byDay.putIfAbsent(day, () => []).add(reservation);
+      if (currentDay == null || day != currentDay) {
+        rows.add(day);
+        currentDay = day;
+      }
+      rows.add(reservation);
     }
-    final days = byDay.keys.toList()..sort();
-
-    return ListView.builder(
-      padding: contentInsets(context, maxWidth: ContentWidth.list),
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: days.length,
-      itemBuilder: (context, index) {
-        final day = days[index];
-        final forDay = byDay[day]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text(
-                _dayLabel(day, l),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-              ),
-            ),
-            for (final reservation in forDay)
-              ReservationCard(
-                reservation: reservation,
-                busy: _pendingActions.contains(reservation.id),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ReservationDetailScreen(
-                      reservation: reservation,
-                      api: _api,
-                    ),
-                  ),
-                ),
-                onConfirm: () => _act(
-                  reservation,
-                  _api.confirmReservation,
-                  l.reservationConfirmed,
-                ),
-                onCancel: () => _confirmCancel(reservation),
-                onComplete: () => _act(
-                  reservation,
-                  _api.completeReservation,
-                  l.guestsArrived(reservation.customerName),
-                ),
-              ),
-          ],
-        );
-      },
-    );
+    return rows;
   }
 
   String _dayLabel(DateTime day, L l) {
@@ -339,7 +418,10 @@ class _Message extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Padding(
-          padding: contentInsets(context, minHorizontal: 32).copyWith(top: 80, bottom: 32),
+          padding: contentInsets(
+            context,
+            minHorizontal: 32,
+          ).copyWith(top: 80, bottom: 32),
           child: Column(
             children: [
               Icon(icon, size: 56, color: theme.colorScheme.onSurfaceVariant),

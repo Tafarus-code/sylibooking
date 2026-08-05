@@ -993,4 +993,18 @@ class LFr extends L {
 
   @override
   String get returnedToCustomers => 'Rendu';
+
+  @override
+  String newSinceYouLooked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count nouveaux depuis votre dernier coup d’œil',
+      one: '1 nouveau depuis votre dernier coup d’œil',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showNewWork => 'Afficher';
 }

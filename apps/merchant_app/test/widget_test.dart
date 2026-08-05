@@ -3763,4 +3763,154 @@ void main() {
       expect(find.text('Rendre l’acompte'), findsOneWidget);
     });
   });
+
+  group('learning that new work arrived', () {
+    Future<FakeBackend> openDesk(
+      WidgetTester tester, {
+      int newReservations = 0,
+      int newOrders = 0,
+      String? language,
+      bool activityFails = false,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      if (activityFails) {
+        backend.on(
+          'GET',
+          '/api/merchant/activity/',
+          {'detail': 'nope'},
+          status: 500,
+        );
+      } else {
+        backend.on('GET', '/api/merchant/activity/', {
+          'reservations': newReservations,
+          'orders': newOrders,
+          'total': newReservations + newOrders,
+          'since': '2026-08-05T10:00:00Z',
+        });
+      }
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a quiet desk says nothing', (tester) async {
+      await openDesk(tester);
+      // Past the first poll.
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('since you looked'), findsNothing);
+    });
+
+    testWidgets('new work is announced without moving the list',
+        (tester) async {
+      await openDesk(tester, newReservations: 2, newOrders: 1);
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      expect(find.text('3 new since you looked'), findsOneWidget);
+      expect(find.text('Show'), findsOneWidget);
+    });
+
+    testWidgets('one is singular', (tester) async {
+      await openDesk(tester, newReservations: 1);
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 new since you looked'), findsOneWidget);
+    });
+
+    testWidgets('the refresh button carries the count too', (tester) async {
+      // Hands full mid-service: the banner is the loud one, the badge is for
+      // anyone already looking at the bar.
+      await openDesk(tester, newOrders: 4);
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Badge), findsWidgets);
+      expect(find.text('4'), findsWidgets);
+    });
+
+    testWidgets('showing it clears the marker and reloads', (tester) async {
+      final backend = await openDesk(tester, newReservations: 2);
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      final before =
+          backend.requests.where((r) => r.url.path == '/api/reservations/').length;
+
+      await tester.tap(find.text('Show'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('since you looked'), findsNothing);
+      final after =
+          backend.requests.where((r) => r.url.path == '/api/reservations/').length;
+      expect(after, greaterThan(before));
+    });
+
+    testWidgets('the check asks about the venue being worked', (tester) async {
+      final backend = await openDesk(tester, newReservations: 1);
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      final asked = backend.requests.firstWhere(
+        (r) => r.url.path == '/api/merchant/activity/',
+      );
+      expect(asked.url.queryParameters['establishment'], '7');
+      expect(asked.url.queryParameters['since'], isNotNull);
+    });
+
+    testWidgets('a failed check is not shown to the merchant', (tester) async {
+      // The next one is a minute away; a toast every minute on a bad
+      // connection would be worse than silence.
+      await openDesk(tester, activityFails: true);
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('since you looked'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('it reads in French', (tester) async {
+      await openDesk(tester, newReservations: 2, language: 'fr');
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('depuis votre dernier coup d’œil'),
+        findsOneWidget,
+      );
+      expect(find.text('Afficher'), findsOneWidget);
+    });
+
+    testWidgets('the banner fits a 360dp phone', (tester) async {
+      await openDesk(tester, newReservations: 12, newOrders: 7);
+
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+
+      final rect = tester.getRect(find.text('Show'));
+      expect(rect.right, lessThanOrEqualTo(phoneSize.width));
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

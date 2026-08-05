@@ -1782,6 +1782,18 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Given back'**
   String get returnedToCustomers;
+
+  /// No description provided for @newSinceYouLooked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 new since you looked} other{{count} new since you looked}}'**
+  String newSinceYouLooked(int count);
+
+  /// No description provided for @showNewWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get showNewWork;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

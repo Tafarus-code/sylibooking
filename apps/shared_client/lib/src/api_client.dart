@@ -679,6 +679,24 @@ class SylibookingApi {
         .toList();
   }
 
+  // --- Merchant activity --------------------------------------------------
+
+  /// How much has arrived at this venue since [since].
+  ///
+  /// Counts only. The app already knows how to fetch the lists; what it
+  /// lacks is a reason to, and asking for the rows here would mean the same
+  /// data twice and a question about which copy is right.
+  Future<MerchantActivity> merchantActivity({
+    required int establishmentId,
+    required DateTime since,
+  }) async {
+    final json = await _get('/merchant/activity/', {
+      'establishment': '$establishmentId',
+      'since': since.toUtc().toIso8601String(),
+    });
+    return MerchantActivity.fromJson(json as Map<String, dynamic>);
+  }
+
   // --- Merchant spaces ----------------------------------------------------
 
   /// Every space including retired ones. Any member may read it.

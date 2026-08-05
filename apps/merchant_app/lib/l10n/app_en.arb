@@ -598,5 +598,14 @@
   },
   "refundDepositDetail": "The booking stays missed — the table was held and lost, and the record should say so. Only the money goes back.",
   "depositRefundedNotice": "Deposit given back.",
-  "returnedToCustomers": "Given back"
+  "returnedToCustomers": "Given back",
+  "newSinceYouLooked": "{count, plural, =1{1 new since you looked} other{{count} new since you looked}}",
+  "@newSinceYouLooked": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showNewWork": "Show"
 }

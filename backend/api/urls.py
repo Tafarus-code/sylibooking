@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .activity import MerchantActivityView
 from .auth import LoginView, LogoutView, MeView
 from .customer_accounts import (
     ClaimView,
@@ -71,6 +72,11 @@ urlpatterns = [
         'orders/ref/<uuid:reference>/',
         CustomerOrderView.as_view(),
         name='order-by-reference',
+    ),
+    path(
+        'merchant/activity/',
+        MerchantActivityView.as_view(),
+        name='merchant-activity',
     ),
     path(
         'merchant/orders/',

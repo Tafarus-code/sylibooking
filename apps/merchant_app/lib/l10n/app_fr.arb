@@ -280,5 +280,7 @@
   "refundDepositTitle": "Rendre {amount} GNF ?",
   "refundDepositDetail": "La réservation reste marquée absente — la table a été gardée puis perdue, et le registre doit le dire. Seul l’argent est rendu.",
   "depositRefundedNotice": "Acompte rendu.",
-  "returnedToCustomers": "Rendu"
+  "returnedToCustomers": "Rendu",
+  "newSinceYouLooked": "{count, plural, =1{1 nouveau depuis votre dernier coup d’œil} other{{count} nouveaux depuis votre dernier coup d’œil}}",
+  "showNewWork": "Afficher"
 }

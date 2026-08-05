@@ -985,4 +985,18 @@ class LEn extends L {
 
   @override
   String get returnedToCustomers => 'Given back';
+
+  @override
+  String newSinceYouLooked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count new since you looked',
+      one: '1 new since you looked',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showNewWork => 'Show';
 }

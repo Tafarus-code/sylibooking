@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -40,6 +42,61 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
   /// button in the bar serves whichever queue is on screen.
   int _reloadToken = 0;
 
+  /// When the queues on screen were last fetched. Everything created after
+  /// this is work the merchant has not seen.
+  DateTime _loadedAt = DateTime.now();
+
+  /// What has landed since. Shown as a quiet marker rather than dropped into
+  /// the list: a list that reorders under someone's finger mid-service is
+  /// worse than one that is a minute stale.
+  MerchantActivity _waiting = const MerchantActivity();
+
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    // Until push notifications exist — they need Firebase and a signing
+    // story — asking now and then is how the desk finds out at all.
+    _poll = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _checkForNewWork(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkForNewWork() async {
+    final venueId = widget.auth.selectedVenueId;
+    if (venueId == null) return;
+
+    try {
+      final activity = await widget.auth.api.merchantActivity(
+        establishmentId: venueId,
+        since: _loadedAt,
+      );
+      if (!mounted) return;
+      setState(() => _waiting = activity);
+    } on ApiException {
+      // A failed check is not worth telling the merchant about; the next
+      // one is a minute away.
+    } on ApiUnreachableException {
+      // Likewise.
+    }
+  }
+
+  void _reload() {
+    setState(() {
+      _reloadToken++;
+      _loadedAt = DateTime.now();
+      _waiting = const MerchantActivity();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = widget.auth;
@@ -70,8 +127,14 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
               tooltip: l.switchVenue,
             ),
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => setState(() => _reloadToken++),
+            // Badged rather than replaced: the merchant decides when the
+            // list moves.
+            icon: Badge(
+              isLabelVisible: _waiting.isAnything,
+              label: Text('${_waiting.total}'),
+              child: const Icon(Icons.refresh),
+            ),
+            onPressed: _reload,
             tooltip: l.refresh,
           ),
           IconButton(
@@ -105,7 +168,63 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
       // The venue's own branding, on the venue's own screens. The bar above
       // and the navigation below stay on the app theme, so switching venues
       // recolours the work without recolouring the app around it.
-      body: EstablishmentThemeScope(
+      body: Column(
+        children: [
+          // A badge on an icon is easy to miss with your hands full. This is
+          // one line, and it does not move anything until it is tapped.
+          if (_waiting.isAnything)
+            Material(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: InkWell(
+                onTap: _reload,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.notifications_active_outlined,
+                        size: 18,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l.newSinceYouLooked(_waiting.total),
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        l.showNewWork,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSecondaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Expanded(child: _queues(venue)),
+        ],
+      ),
+    );
+  }
+
+  Widget _queues(MerchantVenue? venue) {
+    final auth = widget.auth;
+    return EstablishmentThemeScope(
         presetKey: venue?.themePreset,
         // IndexedStack: flipping between the two queues must not throw either
         // of them away and refetch, nor lose the date range on the other side.
@@ -116,7 +235,6 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
             OrdersView(auth: auth, reloadToken: _reloadToken),
           ],
         ),
-      ),
     );
   }
 }

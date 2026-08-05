@@ -274,6 +274,26 @@ class MerchantVenue {
 }
 
 /// A menu item as the merchant sees it — unavailable ones included.
+/// How much has landed at a venue since the desk last looked.
+class MerchantActivity {
+  const MerchantActivity({
+    this.reservations = 0,
+    this.orders = 0,
+  });
+
+  final int reservations;
+  final int orders;
+
+  int get total => reservations + orders;
+  bool get isAnything => total > 0;
+
+  factory MerchantActivity.fromJson(Map<String, dynamic> json) =>
+      MerchantActivity(
+        reservations: json['reservations'] as int? ?? 0,
+        orders: json['orders'] as int? ?? 0,
+      );
+}
+
 class MerchantMenuItem {
   const MerchantMenuItem({
     required this.id,

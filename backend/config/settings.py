@@ -331,3 +331,38 @@ CELERY_TASK_SOFT_TIME_LIMIT = 240
 # one twice — and every task here is written to be safe to run twice.
 CELERY_TASK_ACKS_LATE = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Fail fast when the broker is unreachable rather than retrying inside the
+# request that is trying to queue. Callers already treat "could not queue" as
+# survivable — losing the work, not the booking — and that promise is worth
+# nothing if making it takes ten seconds.
+CELERY_BROKER_CONNECTION_RETRY = False
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 0
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'socket_connect_timeout': 2,
+    'socket_timeout': 2,
+}
+
+# What runs without anyone asking. Both are cheap and both are safe to run
+# repeatedly, which is what lets them run this often.
+CELERY_BEAT_SCHEDULE = {
+    'queue-due-reminders': {
+        'task': 'notifications.tasks.queue_due_reminders',
+        'schedule': 300.0,
+    },
+    'sweep-no-shows': {
+        'task': 'notifications.tasks.sweep_no_shows',
+        'schedule': 600.0,
+    },
+}
+
+
+# --- Reminders ------------------------------------------------------------
+
+#: How long before a booking the customer is reminded.
+REMINDER_LEAD_HOURS = config('REMINDER_LEAD_HOURS', default=3, cast=int)
+
+#: Hours in which a reminder waits for morning instead of ringing a phone.
+#: A reminder that wakes somebody is worse than no reminder at all.
+REMINDER_QUIET_START = config('REMINDER_QUIET_START', default='22:00')
+REMINDER_QUIET_END = config('REMINDER_QUIET_END', default='07:00')

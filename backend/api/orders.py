@@ -5,9 +5,12 @@ order's reference, exactly as bookings are. The merchant side is token
 authenticated and scoped to venues the caller actually works at.
 """
 
+import logging
+
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from notifications.tasks import send_order_ready
 from orders.models import Order, OrderItem
 from orders.rules import order_refusal_reason
 from rest_framework import status
@@ -27,6 +30,8 @@ from .order_serializers import (
     OrderSerializer,
     resolve_menu_items,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def order_queryset():
@@ -232,6 +237,20 @@ class MerchantOrderStatusView(APIView):
 
         order.status = target
         order.save(update_fields=['status'])
+
+        # Ready means the food is on the counter, which is the one moment the
+        # customer needs telling. Queued rather than sent inline: a gateway
+        # having a bad minute must not fail the merchant's tap, and the task
+        # is safe to run twice.
+        if target == Order.Status.READY:
+            try:
+                send_order_ready.delay(order.pk)
+            except Exception:  # noqa: BLE001 - broker trouble of any kind
+                # The message is lost; the order is not. A queue is an
+                # addition to something that already worked.
+                logger.exception(
+                    'Could not queue the ready notice for order %s', order.pk
+                )
 
         order = order_queryset().get(pk=order.pk)
         return Response(OrderSerializer(order).data)

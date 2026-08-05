@@ -1352,6 +1352,20 @@ void main() {
       expect(find.text('Payment failed'), findsOneWidget);
     });
 
+    /// Bring a row into view before asserting on it.
+    ///
+    /// The list is lazy now: a card below the fold is not in the tree at all,
+    /// which is the whole point of the change. Tests that check the third
+    /// booking on a busy day have to reach it the way a merchant does.
+    Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('a mixed day badges each row for its own state',
         (tester) async {
       await signedIn(tester, reservationsBody: {
@@ -1365,7 +1379,9 @@ void main() {
       });
 
       expect(find.text('Cash'), findsOneWidget);
+      await scrollTo(tester, find.text('Paid (Orange Money)'));
       expect(find.text('Paid (Orange Money)'), findsOneWidget);
+      await scrollTo(tester, find.text('Unpaid'));
       expect(find.text('Unpaid'), findsOneWidget);
     });
 
@@ -1382,7 +1398,9 @@ void main() {
       });
 
       expect(find.byIcon(Icons.local_atm), findsOneWidget);
+      await scrollTo(tester, find.byIcon(Icons.check_circle));
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      await scrollTo(tester, find.byIcon(Icons.hourglass_top));
       expect(find.byIcon(Icons.hourglass_top), findsOneWidget);
     });
   });
@@ -4542,6 +4560,268 @@ void main() {
       expect(button.right, lessThanOrEqualTo(phoneSize.width));
       expect(button.bottom, lessThanOrEqualTo(phoneSize.height));
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('a venue with real volume', () {
+    /// A day's worth of bookings, all at plausible times.
+    List<Map<String, dynamic>> manyBookings(int howMany) {
+      final start = DateTime.now().subtract(const Duration(hours: 2));
+      return [
+        for (var i = 0; i < howMany; i++)
+          {
+            ...booking(id: i + 1, customer: 'Customer $i'),
+            'datetime': start
+                .add(Duration(minutes: i))
+                .toUtc()
+                .toIso8601String(),
+          },
+      ];
+    }
+
+    List<Map<String, dynamic>> manyOrders(int howMany) {
+      final pickup = DateTime.now().add(const Duration(minutes: 30));
+      return [
+        for (var i = 0; i < howMany; i++)
+          {
+            'id': i + 1,
+            'reference': '00000000-0000-0000-0000-${'$i'.padLeft(12, '0')}',
+            'establishment': 7,
+            'establishment_name': 'Le Petit Baobab',
+            'customer_name': 'Customer $i',
+            'customer_phone': '+224620000000',
+            'pickup_time': pickup.toUtc().toIso8601String(),
+            'status': 'placed',
+            'status_display': 'Placed',
+            'items': [],
+            'total': '75000.00',
+            'is_paid': false,
+            'payment_provider': 'cash_on_arrival',
+            'payment_provider_display': 'Cash on arrival',
+            'payment_status': null,
+            'can_advance': true,
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          },
+      ];
+    }
+
+    testWidgets('five hundred bookings do not all get built', (tester) async {
+      // **The point of this slice.** A Column builds every child at once, so
+      // the old grouping laid out the whole day before the first card was on
+      // screen. A lazy list builds what fits and a little more.
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 500,
+        'next': null,
+        'results': manyBookings(500),
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      final built = find.byType(ReservationCard).evaluate().length;
+      expect(built, lessThan(30), reason: '$built cards built for one screen');
+      expect(built, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('and the ones on screen are the first of them',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 500,
+        'next': null,
+        'results': manyBookings(500),
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Customer 0'), findsOneWidget);
+      expect(find.text('Customer 499'), findsNothing);
+    });
+
+    testWidgets('five hundred tickets do not all get built', (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 500,
+        'next': null,
+        'results': manyOrders(500),
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+
+      final built = find.byType(OrderTicket).evaluate().length;
+      expect(built, lessThan(30), reason: '$built tickets built for one screen');
+      expect(built, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the desk asks for one page, not all of them', (tester) async {
+      // It used to walk up to twenty pages before showing anything.
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 40,
+        'next': null,
+        'results': manyBookings(20),
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      final asked = backend.requests
+          .where((r) => r.url.path == '/api/reservations/')
+          .length;
+      expect(asked, 1);
+    });
+
+    testWidgets('scrolling to the end asks for the next page', (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 40,
+        'next': 'http://localhost:8000/api/reservations/?page=2',
+        'results': manyBookings(20),
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      final before = backend.requests
+          .where((r) => r.url.path == '/api/reservations/')
+          .length;
+
+      // Twenty cards is nearly seven thousand pixels; a four-thousand drag
+      // stops short of the trigger.
+      await tester.scrollUntilVisible(
+        find.byType(CircularProgressIndicator),
+        600,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      final after = backend.requests
+          .where((r) => r.url.path == '/api/reservations/');
+      expect(after.length, greaterThan(before));
+      // And it asked for the page after the one it has, rather than the
+      // same one again.
+      expect(after.last.url.queryParameters['page'], '2');
+    });
+
+    testWidgets('a list with nothing more asks for nothing more',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 3,
+        'next': null,
+        'results': manyBookings(3),
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      final before = backend.requests
+          .where((r) => r.url.path == '/api/reservations/')
+          .length;
+
+      await tester.drag(find.byType(ListView).first, const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests
+            .where((r) => r.url.path == '/api/reservations/')
+            .length,
+        before,
+      );
+    });
+
+    testWidgets('the day headings survive the flattening', (tester) async {
+      // The week view still has to read as a calendar rather than a run of
+      // rows; only the shape the list is built from changed.
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      final today = DateTime.now();
+      backend.on('GET', '/api/reservations/', {
+        'count': 2,
+        'next': null,
+        'results': [
+          {
+            ...booking(id: 1, customer: 'Today Customer'),
+            'datetime': today.toUtc().toIso8601String(),
+          },
+          {
+            ...booking(id: 2, customer: 'Tomorrow Customer'),
+            'datetime': today
+                .add(const Duration(days: 1))
+                .toUtc()
+                .toIso8601String(),
+          },
+        ],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next 7 days'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Today'), findsWidgets);
+      expect(find.text('Tomorrow'), findsOneWidget);
     });
   });
 }

@@ -15,6 +15,7 @@ from orders.models import Order, OrderItem
 from orders.rules import order_refusal_reason
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -133,6 +134,19 @@ class CustomerOrderView(APIView):
         return Response(OrderSerializer(order).data)
 
 
+class _QueuePagination(PageNumberPagination):
+    """A page big enough to be a whole shift for most venues.
+
+    Larger than the API default: a kitchen screen wants the queue, not the
+    first twenty of it, and paging every twenty tickets on a busy night is
+    more round trips than it saves.
+    """
+
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
 class MerchantOrderListView(APIView):
     """The kitchen queue for one venue.
 
@@ -167,7 +181,15 @@ class MerchantOrderListView(APIView):
         if request.query_params.get('status'):
             orders = orders.filter(status=request.query_params['status'])
 
-        return Response({'results': OrderSerializer(orders, many=True).data})
+        # Paged, because a busy Saturday is not twenty tickets. The response
+        # keeps its `results` key so a client that only ever reads the first
+        # page behaves exactly as it did before — it just stops being the
+        # whole truth, which is what `next` is for.
+        paginator = _QueuePagination()
+        page = paginator.paginate_queryset(orders, request, view=self)
+        return paginator.get_paginated_response(
+            OrderSerializer(page, many=True).data
+        )
 
 
 class MerchantWalkInOrderView(APIView):

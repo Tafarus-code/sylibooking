@@ -530,18 +530,22 @@ class SylibookingApi {
   }
 
   /// The kitchen queue for one venue, for the day being worked.
-  Future<List<Order>> merchantOrders({
+  /// One page of the kitchen queue.
+  ///
+  /// Paged rather than everything: a busy Saturday is not twenty tickets,
+  /// and a screen that waits for all of them before showing any is a screen
+  /// nobody uses at the moment they most need it.
+  Future<Page<Order>> merchantOrders({
     required int establishmentId,
     DateTime? date,
+    int page = 1,
   }) async {
     final json = await _get('/merchant/orders/', {
       'establishment': '$establishmentId',
       if (date != null) 'date': formatDate(date),
+      if (page > 1) 'page': '$page',
     });
-    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
-    return results
-        .map((e) => Order.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return Page.fromJson(json as Map<String, dynamic>, Order.fromJson);
   }
 
   Future<Order> setOrderStatus(int orderId, OrderStatus status) async {

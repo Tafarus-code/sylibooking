@@ -50,6 +50,8 @@ void main() {
       // catalogue translates it to itself for the same reason.
       'spaceTypeTable',
       'venueKindRestaurant',
+      // "Total" is the same word in French.
+      'walkInTotal',
     };
 
     final untranslated = [

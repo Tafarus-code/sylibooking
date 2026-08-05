@@ -1066,4 +1066,36 @@ class LFr extends L {
 
   @override
   String get send => 'Envoyer';
+
+  @override
+  String get addWalkInOrder => 'Ajouter une commande';
+
+  @override
+  String get walkInTitle => 'Commande au comptoir';
+
+  @override
+  String get walkInIntro =>
+      'Pour quelqu’un qui est devant vous. Espèces, à emporter ici — aucun numéro nécessaire.';
+
+  @override
+  String get walkInName => 'Nom (facultatif)';
+
+  @override
+  String get walkInNameHint => 'Le nom à annoncer quand c’est prêt';
+
+  @override
+  String get walkInEmpty => 'Rien d’ajouté. Touchez un plat pour commencer.';
+
+  @override
+  String get walkInTotal => 'Total';
+
+  @override
+  String get walkInSend => 'Envoyer en cuisine';
+
+  @override
+  String get walkInSent => 'Commande envoyée en cuisine.';
+
+  @override
+  String get walkInNoMenu =>
+      'Cet établissement n’a encore aucun article au menu.';
 }

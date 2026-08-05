@@ -28,6 +28,7 @@ from payments.services import refresh_payment, start_order_payment
 from .order_serializers import (
     OrderCreateSerializer,
     OrderSerializer,
+    WalkInOrderSerializer,
     resolve_menu_items,
 )
 from .throttling import BookingIpThrottle, BookingPhoneThrottle
@@ -167,6 +168,70 @@ class MerchantOrderListView(APIView):
             orders = orders.filter(status=request.query_params['status'])
 
         return Response({'results': OrderSerializer(orders, many=True).data})
+
+
+class MerchantWalkInOrderView(APIView):
+    """A merchant ringing up an order for somebody standing at the counter.
+
+    `Order.reservation` has been nullable since ordering was built precisely
+    so an order could stand alone; the model anticipated this and only the
+    way in was missing.
+
+    Staff may do it. This is floor work — the person taking the money at the
+    counter is the person who should be entering it, and routing it through a
+    manager is how a queue ends up on a paper pad instead.
+
+    Cash always. A walk-in is paying in the room; there is no prompt to push
+    to a phone and nothing to wait for, so no Payment row is written at all —
+    exactly as cash on pickup already behaves.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        establishment = get_establishment_or_404(pk)
+        require_operations_access(request.user, establishment)
+
+        refusal = order_refusal_reason(establishment)
+        if refusal:
+            raise ValidationError({'establishment': refusal})
+
+        form = WalkInOrderSerializer(data=request.data)
+        form.is_valid(raise_exception=True)
+        data = form.validated_data
+
+        menu_items = resolve_menu_items(establishment, data['items'])
+
+        with transaction.atomic():
+            order = Order.objects.create(
+                establishment=establishment,
+                reservation=None,
+                customer_name=(data.get('customer_name') or '').strip()
+                or str(_('Walk-in')),
+                customer_phone=data.get('customer_phone', ''),
+                # Now, because that is when a walk-in collects. Overridable
+                # for the counter that takes an order for later.
+                pickup_time=data.get('pickup_time') or timezone.now(),
+                # Straight into the kitchen. A walk-in has already been taken;
+                # there is no payment to wait on and nobody to confirm it.
+                status=Order.Status.PLACED,
+            )
+            OrderItem.objects.bulk_create(
+                [
+                    OrderItem(
+                        order=order,
+                        menu_item=menu_items[line['menu_item']],
+                        quantity=line['quantity'],
+                        unit_price_at_order=menu_items[line['menu_item']].price,
+                    )
+                    for line in data['items']
+                ]
+            )
+
+        order = order_queryset().get(pk=order.pk)
+        return Response(
+            OrderSerializer(order).data, status=status.HTTP_201_CREATED
+        )
 
 
 class MerchantOrderStatusView(APIView):

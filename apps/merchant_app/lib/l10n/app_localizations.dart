@@ -1890,6 +1890,66 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Send'**
   String get send;
+
+  /// No description provided for @addWalkInOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an order'**
+  String get addWalkInOrder;
+
+  /// No description provided for @walkInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order at the counter'**
+  String get walkInTitle;
+
+  /// No description provided for @walkInIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'For somebody standing in front of you. Cash, collected here — no phone number needed.'**
+  String get walkInIntro;
+
+  /// No description provided for @walkInName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (optional)'**
+  String get walkInName;
+
+  /// No description provided for @walkInNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What to call out when it is ready'**
+  String get walkInNameHint;
+
+  /// No description provided for @walkInEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing added yet. Tap a dish to start.'**
+  String get walkInEmpty;
+
+  /// No description provided for @walkInTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get walkInTotal;
+
+  /// No description provided for @walkInSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to the kitchen'**
+  String get walkInSend;
+
+  /// No description provided for @walkInSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Order sent to the kitchen.'**
+  String get walkInSent;
+
+  /// No description provided for @walkInNoMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'This venue has no items on its menu yet.'**
+  String get walkInNoMenu;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

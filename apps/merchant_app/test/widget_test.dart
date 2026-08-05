@@ -4251,4 +4251,297 @@ void main() {
       expect(rect.right, lessThanOrEqualTo(phoneSize.width));
     });
   });
+
+  group('ringing up an order at the counter', () {
+    Map<String, dynamic> menuItemJson({
+      int id = 1,
+      String name = 'Poulet braisé',
+      String price = '75000.00',
+      String category = 'food',
+      bool available = true,
+    }) =>
+        {
+          'id': id,
+          'name': name,
+          'description': '',
+          'category': category,
+          'category_display': category == 'food' ? 'Food' : 'Drink',
+          'price': price,
+          'is_available': available,
+          'image_url': null,
+        };
+
+    /// Enough of an order for the screen to treat the call as a success.
+    Map<String, dynamic> createdOrderJson() => {
+          'id': 99,
+          'reference': '99999999-9999-9999-9999-999999999999',
+          'establishment': 7,
+          'establishment_name': 'Le Petit Baobab',
+          'customer_name': 'Mariama',
+          'customer_phone': '',
+          'pickup_time': DateTime.now().toUtc().toIso8601String(),
+          'status': 'placed',
+          'status_display': 'Placed',
+          'items': [],
+          'total': '75000.00',
+          'is_paid': false,
+          'payment_provider': 'cash_on_arrival',
+          'payment_provider_display': 'Cash on arrival',
+          'payment_status': null,
+          'can_advance': true,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        };
+
+    Future<FakeBackend> openQueue(
+      WidgetTester tester, {
+      String role = 'staff',
+      List<Map<String, dynamic>>? menu,
+      String? language,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/merchant/establishments/7/menu/', {
+        'results': menu ??
+            [
+              menuItemJson(),
+              menuItemJson(
+                id: 2,
+                name: 'Jus de gingembre',
+                price: '15000.00',
+                category: 'drink',
+              ),
+            ],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Commandes'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('the queue offers it', (tester) async {
+      // On the queue rather than behind Manage: it happens while looking at
+      // the kitchen, not while configuring the venue.
+      await openQueue(tester);
+
+      expect(find.text('Add an order'), findsOneWidget);
+    });
+
+    testWidgets('staff can ring one up', (tester) async {
+      // Floor work. The person taking the money is the person entering it.
+      await openQueue(tester, role: 'staff');
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Order at the counter'), findsOneWidget);
+    });
+
+    testWidgets('it says no phone number is needed', (tester) async {
+      await openQueue(tester);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('no phone number needed'), findsOneWidget);
+    });
+
+    testWidgets('nothing can be sent until something is added',
+        (tester) async {
+      await openQueue(tester);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Send to the kitchen'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('tapping a dish adds one and totals it', (tester) async {
+      await openQueue(tester);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('75000 GNF'), findsOneWidget);
+    });
+
+    testWidgets('tapping it again adds another', (tester) async {
+      // No cart to open, no quantity dialog: a counter with a queue behind
+      // it should not need either.
+      await openQueue(tester);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('150000 GNF'), findsOneWidget);
+    });
+
+    testWidgets('one can be taken back off', (tester) async {
+      await openQueue(tester);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.remove_circle_outline).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('75000 GNF'), findsOneWidget);
+    });
+
+    testWidgets('a sold-out dish is not offered at all', (tester) async {
+      // A sold-out dish on a counter screen is a conversation the server
+      // ends with a 400.
+      await openQueue(tester, menu: [
+        menuItemJson(),
+        menuItemJson(id: 3, name: 'Capitaine grillé', available: false),
+      ]);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Capitaine grillé'), findsNothing);
+      expect(find.text('Poulet braisé'), findsOneWidget);
+    });
+
+    testWidgets('sending posts what the server expects', (tester) async {
+      final backend = await openQueue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/7/orders/',
+        createdOrderJson(),
+        status: 201,
+      );
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Jus de gingembre'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Mariama');
+      await tester.tap(find.text('Send to the kitchen'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests.lastWhere(
+        (r) => r.method == 'POST' && r.url.path.endsWith('/orders/'),
+      );
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body['customer_name'], 'Mariama');
+      expect(body['items'], [
+        {'menu_item': 1, 'quantity': 1},
+        {'menu_item': 2, 'quantity': 1},
+      ]);
+      // Nothing about payment: a walk-in pays in the room.
+      expect(body.containsKey('payment_provider'), isFalse);
+    });
+
+    testWidgets('no name is sent when none was typed', (tester) async {
+      final backend = await openQueue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/7/orders/',
+        createdOrderJson(),
+        status: 201,
+      );
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Send to the kitchen'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests.lastWhere(
+        (r) => r.method == 'POST' && r.url.path.endsWith('/orders/'),
+      );
+      final body = jsonDecode(posted.body) as Map<String, dynamic>;
+      expect(body.containsKey('customer_name'), isFalse);
+    });
+
+    testWidgets('a refusal is shown and the order is not lost',
+        (tester) async {
+      final backend = await openQueue(tester);
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/7/orders/',
+        {'items': ['Some of those dishes have sold out.']},
+        status: 400,
+      );
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Send to the kitchen'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('sold out'), findsOneWidget);
+      // Still on the screen with the order intact, not thrown away.
+      expect(find.text('75000 GNF'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no menu says so', (tester) async {
+      await openQueue(tester, menu: []);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('no items on its menu'), findsOneWidget);
+    });
+
+    testWidgets('it reads in French', (tester) async {
+      await openQueue(tester, language: 'fr');
+
+      expect(find.text('Ajouter une commande'), findsOneWidget);
+      await tester.tap(find.text('Ajouter une commande'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Envoyer en cuisine'), findsOneWidget);
+    });
+
+    testWidgets('the counter screen fits a 360dp phone', (tester) async {
+      await openQueue(tester);
+
+      await tester.tap(find.text('Add an order'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet braisé'));
+      await tester.pumpAndSettle();
+
+      // The total and the button are pinned: finishing an order must never
+      // need a scroll.
+      final button = tester.getRect(
+        find.widgetWithText(FilledButton, 'Send to the kitchen'),
+      );
+      expect(button.right, lessThanOrEqualTo(phoneSize.width));
+      expect(button.bottom, lessThanOrEqualTo(phoneSize.height));
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

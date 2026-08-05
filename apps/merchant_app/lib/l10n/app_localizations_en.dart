@@ -1058,4 +1058,35 @@ class LEn extends L {
 
   @override
   String get send => 'Send';
+
+  @override
+  String get addWalkInOrder => 'Add an order';
+
+  @override
+  String get walkInTitle => 'Order at the counter';
+
+  @override
+  String get walkInIntro =>
+      'For somebody standing in front of you. Cash, collected here — no phone number needed.';
+
+  @override
+  String get walkInName => 'Name (optional)';
+
+  @override
+  String get walkInNameHint => 'What to call out when it is ready';
+
+  @override
+  String get walkInEmpty => 'Nothing added yet. Tap a dish to start.';
+
+  @override
+  String get walkInTotal => 'Total';
+
+  @override
+  String get walkInSend => 'Send to the kitchen';
+
+  @override
+  String get walkInSent => 'Order sent to the kitchen.';
+
+  @override
+  String get walkInNoMenu => 'This venue has no items on its menu yet.';
 }

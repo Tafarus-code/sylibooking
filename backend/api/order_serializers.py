@@ -147,6 +147,42 @@ class OrderCreateSerializer(serializers.Serializer):
         return reservation
 
 
+class WalkInOrderSerializer(serializers.Serializer):
+    """An order rung up at the counter, by somebody standing there.
+
+    Everything the customer form insists on is optional here, because a
+    walk-in genuinely may not have it. A name is what gets called out when
+    the food is up, so it is asked for and defaulted rather than required; a
+    phone number is nobody's business if the customer is waiting in the room.
+
+    Pickup time is likewise optional: the answer for a walk-in is "now", and
+    making a merchant enter a time to sell a coffee is the kind of friction
+    that gets a system abandoned for a paper pad.
+    """
+
+    customer_name = serializers.CharField(
+        max_length=200, required=False, allow_blank=True
+    )
+    customer_phone = serializers.CharField(
+        max_length=30, required=False, allow_blank=True
+    )
+    pickup_time = serializers.DateTimeField(required=False)
+    items = OrderLineInputSerializer(many=True)
+
+    def validate_items(self, items):
+        if not items:
+            raise serializers.ValidationError(_('An order needs at least one item.'))
+
+        seen = set()
+        for line in items:
+            if line['menu_item'] in seen:
+                raise serializers.ValidationError(
+                    _('Each dish should appear once, with a quantity.')
+                )
+            seen.add(line['menu_item'])
+        return items
+
+
 def resolve_menu_items(establishment, lines):
     """Match the cart against the venue's own available menu.
 

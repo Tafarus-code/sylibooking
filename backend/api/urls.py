@@ -30,6 +30,7 @@ from .merchant import (
     MerchantStaffView,
     ThemePresetsView,
 )
+from .merchant_reviews import MerchantReviewFlagView, MerchantReviewsView
 from .orders import (
     CustomerOrderView,
     MerchantOrderListView,
@@ -174,6 +175,16 @@ urlpatterns = [
         'merchant/establishments/<int:pk>/spaces/<int:space_id>/',
         MerchantSpaceItemView.as_view(),
         name='merchant-space-item',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/reviews/',
+        MerchantReviewsView.as_view(),
+        name='merchant-reviews',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/reviews/<int:review_id>/flag/',
+        MerchantReviewFlagView.as_view(),
+        name='merchant-review-flag',
     ),
     path(
         'merchant/establishments/<int:pk>/staff/',

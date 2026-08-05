@@ -608,5 +608,27 @@
     }
   },
   "showNewWork": "Show",
-  "tooManyAttempts": "Too many attempts. Wait a moment and try again."
+  "tooManyAttempts": "Too many attempts. Wait a moment and try again.",
+  "reviews": "Reviews",
+  "reviewsSubtitle": "What customers said about you",
+  "noReviewsYet": "No reviews yet",
+  "noReviewsDetail": "Customers can review a visit once it is done. They will appear here.",
+  "reviewCount": "{count, plural, =1{1 review} other{{count} reviews}}",
+  "@reviewCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reviewTakenDown": "Taken down",
+  "reviewFlagged": "Reported — waiting to be looked at",
+  "reportReview": "Report this review",
+  "reportReviewTitle": "Report this review?",
+  "reportReviewDetail": "It stays visible to customers and keeps counting towards your rating. Reporting asks us to look at it — a venue cannot take down its own reviews.",
+  "reportReason": "What is wrong with it?",
+  "reportReasonHint": "e.g. this customer never came in",
+  "reportReasonRequired": "Say what is wrong with it.",
+  "reviewReported": "Reported. We will look at it.",
+  "send": "Send"
 }

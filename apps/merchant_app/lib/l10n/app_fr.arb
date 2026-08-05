@@ -283,5 +283,20 @@
   "returnedToCustomers": "Rendu",
   "newSinceYouLooked": "{count, plural, =1{1 nouveau depuis votre dernier coup d’œil} other{{count} nouveaux depuis votre dernier coup d’œil}}",
   "showNewWork": "Afficher",
-  "tooManyAttempts": "Trop de tentatives. Patientez un instant et réessayez."
+  "tooManyAttempts": "Trop de tentatives. Patientez un instant et réessayez.",
+  "reviews": "Avis",
+  "reviewsSubtitle": "Ce que les clients ont dit de vous",
+  "noReviewsYet": "Aucun avis",
+  "noReviewsDetail": "Les clients peuvent laisser un avis après leur visite. Ils apparaîtront ici.",
+  "reviewCount": "{count, plural, =1{1 avis} other{{count} avis}}",
+  "reviewTakenDown": "Retiré",
+  "reviewFlagged": "Signalé — en attente d’examen",
+  "reportReview": "Signaler cet avis",
+  "reportReviewTitle": "Signaler cet avis ?",
+  "reportReviewDetail": "Il reste visible pour les clients et continue de compter dans votre note. Le signaler nous demande de l’examiner — un établissement ne peut pas retirer ses propres avis.",
+  "reportReason": "Qu’est-ce qui ne va pas ?",
+  "reportReasonHint": "ex. ce client n’est jamais venu",
+  "reportReasonRequired": "Dites ce qui ne va pas.",
+  "reviewReported": "Signalé. Nous allons l’examiner.",
+  "send": "Envoyer"
 }

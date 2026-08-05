@@ -1967,10 +1967,21 @@ void main() {
     testWidgets('an owner sees every management entry', (tester) async {
       await openManage(tester, role: 'owner');
 
-      expect(find.text('Menu'), findsOneWidget);
-      expect(find.text('Opening hours'), findsOneWidget);
-      expect(find.text('Venue details'), findsOneWidget);
-      expect(find.text('Who has access'), findsOneWidget);
+      // The list is taller than a 360dp phone, so not every entry can be on
+      // screen at once. Each is reached the way a merchant reaches it.
+      for (final entry in [
+        'Menu',
+        'Opening hours',
+        'Venue details',
+        'Who has access',
+      ]) {
+        await tester.scrollUntilVisible(
+          find.text(entry),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text(entry), findsOneWidget, reason: entry);
+      }
     });
 
     testWidgets('a manager sees everything except access', (tester) async {
@@ -2577,7 +2588,7 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
       await tester.pumpAndSettle();
       expect(find.text('Sign out'), findsOneWidget);
 
@@ -3983,6 +3994,261 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Wrong username or password.'), findsOneWidget);
+    });
+  });
+
+  group('reading your own reviews', () {
+    Map<String, dynamic> reviewJson({
+      int id = 1,
+      int rating = 5,
+      String comment = 'Lovely evening',
+      String author = 'Mariama',
+      bool isFlagged = false,
+      bool isHidden = false,
+    }) =>
+        {
+          'id': id,
+          'rating': rating,
+          'comment': comment,
+          'author_display_name': author,
+          'visit_date': '2026-08-01T19:00:00Z',
+          'created_at': '2026-08-02T09:00:00Z',
+          'is_flagged': isFlagged,
+          'flagged_at': isFlagged ? '2026-08-02T10:00:00Z' : null,
+          'flagged_reason': isFlagged ? 'Never came in' : '',
+          'is_hidden': isHidden,
+        };
+
+    Future<FakeBackend> openReviews(
+      WidgetTester tester, {
+      List<Map<String, dynamic>>? reviews,
+      Map<String, int>? distribution,
+      double? average = 4.5,
+      String role = 'owner',
+      String? language,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/merchant/establishments/7/reviews/', {
+        'count': (reviews ?? [reviewJson()]).length,
+        'next': null,
+        'results': reviews ?? [reviewJson()],
+        'average_rating': average,
+        'distribution': distribution ??
+            {'1': 0, '2': 0, '3': 0, '4': 1, '5': 1},
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('everyone who works there can reach them', (tester) async {
+      // Knowing what customers said is floor knowledge, not a privilege.
+      await openReviews(tester, role: 'staff');
+
+      expect(find.text('Reviews'), findsOneWidget);
+    });
+
+    testWidgets('a review is shown with its stars and its words',
+        (tester) async {
+      await openReviews(tester);
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lovely evening'), findsOneWidget);
+      expect(find.text('Mariama'), findsOneWidget);
+    });
+
+    testWidgets('the spread is shown, not just the average', (tester) async {
+      // One angry two-star among forty fives is a different business from a
+      // steady drift downwards.
+      await openReviews(
+        tester,
+        average: 4.2,
+        distribution: {'1': 0, '2': 1, '3': 0, '4': 2, '5': 12},
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('4.2'), findsOneWidget);
+      expect(find.text('15 reviews'), findsOneWidget);
+      expect(find.text('12'), findsOneWidget);
+    });
+
+    testWidgets('a venue with no reviews is told what happens', (tester) async {
+      await openReviews(
+        tester,
+        reviews: [],
+        distribution: {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0},
+        average: null,
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No reviews yet'), findsOneWidget);
+    });
+
+    testWidgets('an owner can report one', (tester) async {
+      await openReviews(tester, reviews: [reviewJson(rating: 1)]);
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Report this review'), findsOneWidget);
+    });
+
+    testWidgets('staff cannot', (tester) async {
+      await openReviews(
+        tester,
+        role: 'staff',
+        reviews: [reviewJson(rating: 1)],
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Report this review'), findsNothing);
+    });
+
+    testWidgets('reporting says plainly that it is not a delete button',
+        (tester) async {
+      // **The wording that keeps the ratings honest.** A venue must not
+      // believe it just removed a review.
+      await openReviews(tester, reviews: [reviewJson(rating: 1)]);
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Report this review'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('stays visible to customers'), findsOneWidget);
+      expect(
+        find.textContaining('cannot take down its own reviews'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a reason is required', (tester) async {
+      final backend = await openReviews(
+        tester,
+        reviews: [reviewJson(rating: 1)],
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Report this review'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Say what is wrong with it.'), findsOneWidget);
+      expect(backend.requests.where((r) => r.method == 'POST'), isEmpty);
+    });
+
+    testWidgets('reporting posts the reason', (tester) async {
+      final backend = await openReviews(
+        tester,
+        reviews: [reviewJson(rating: 1)],
+      );
+      backend.on(
+        'POST',
+        '/api/merchant/establishments/7/reviews/1/flag/',
+        reviewJson(rating: 1, isFlagged: true),
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Report this review'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).last,
+        'This customer never came in',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+      await tester.pumpAndSettle();
+
+      final posted = backend.requests.lastWhere((r) => r.method == 'POST');
+      expect(
+        jsonDecode(posted.body) as Map<String, dynamic>,
+        {'reason': 'This customer never came in'},
+      );
+    });
+
+    testWidgets('a reported review stays on screen, marked', (tester) async {
+      // It is still visible to customers, so hiding it from the venue would
+      // be a lie about what happened.
+      await openReviews(
+        tester,
+        reviews: [reviewJson(rating: 1, isFlagged: true)],
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('waiting to be looked at'), findsOneWidget);
+      expect(find.text('Report this review'), findsNothing);
+    });
+
+    testWidgets('one an admin took down says so', (tester) async {
+      // So the merchant knows why it is missing from their average.
+      await openReviews(
+        tester,
+        reviews: [reviewJson(rating: 1, isHidden: true)],
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Taken down'), findsOneWidget);
+    });
+
+    testWidgets('it reads in French', (tester) async {
+      await openReviews(tester, language: 'fr');
+
+      await tester.tap(find.text('Avis'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Signaler cet avis'), findsOneWidget);
+    });
+
+    testWidgets('the card fits a 360dp phone', (tester) async {
+      await openReviews(
+        tester,
+        reviews: [
+          reviewJson(
+            comment: 'A very long comment about the evening that goes on and '
+                'on and would certainly wrap on a narrow screen.',
+            author: 'Mariama',
+          ),
+        ],
+      );
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final rect = tester.getRect(find.text('Mariama'));
+      expect(rect.right, lessThanOrEqualTo(phoneSize.width));
     });
   });
 }

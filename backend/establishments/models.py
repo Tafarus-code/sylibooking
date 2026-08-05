@@ -400,6 +400,22 @@ class Review(models.Model):
             'and from the average rating. Moderation only; never exposed.'
         ),
     )
+    flagged_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            'When the venue asked for this review to be looked at. Flagging '
+            'is all a merchant may do: a venue that can hide its own bad '
+            'reviews has a ratings system worth nothing, and the trust cost '
+            'lands on the platform rather than the venue. Only an admin sets '
+            'is_hidden.'
+        ),
+    )
+    flagged_reason = models.TextField(
+        blank=True,
+        default='',
+        help_text='Why the venue says it should be looked at.',
+    )
 
     class Meta:
         # -id breaks ties: two reviews written in the same millisecond would

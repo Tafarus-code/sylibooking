@@ -294,6 +294,79 @@ class MerchantActivity {
       );
 }
 
+/// A review as its own venue sees it: the moderation state included.
+class MerchantReview {
+  const MerchantReview({
+    required this.id,
+    required this.rating,
+    required this.comment,
+    required this.authorDisplayName,
+    required this.createdAt,
+    this.isFlagged = false,
+    this.flaggedReason = '',
+    this.isHidden = false,
+  });
+
+  final int id;
+  final int rating;
+  final String comment;
+  final String authorDisplayName;
+  final DateTime createdAt;
+
+  /// The venue has asked for it to be looked at. Changes nothing a customer
+  /// sees — only an admin can take a review down.
+  final bool isFlagged;
+  final String flaggedReason;
+
+  /// Taken down by an admin. Shown to the venue so they know why it is
+  /// missing from their average.
+  final bool isHidden;
+
+  factory MerchantReview.fromJson(Map<String, dynamic> json) => MerchantReview(
+        id: json['id'] as int,
+        rating: json['rating'] as int? ?? 0,
+        comment: json['comment'] as String? ?? '',
+        authorDisplayName: json['author_display_name'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+        isFlagged: json['is_flagged'] as bool? ?? false,
+        flaggedReason: json['flagged_reason'] as String? ?? '',
+        isHidden: json['is_hidden'] as bool? ?? false,
+      );
+}
+
+/// A venue's reviews with the shape of them, which is what a merchant reads
+/// the page for: one angry two-star among forty fives is a different
+/// business from a steady drift downwards.
+class MerchantReviewPage {
+  const MerchantReviewPage({
+    required this.reviews,
+    this.averageRating,
+    this.distribution = const {},
+  });
+
+  final List<MerchantReview> reviews;
+  final double? averageRating;
+
+  /// Star (1–5) to how many, excluding anything an admin took down.
+  final Map<int, int> distribution;
+
+  int get total => distribution.values.fold(0, (a, b) => a + b);
+
+  factory MerchantReviewPage.fromJson(Map<String, dynamic> json) {
+    final spread = (json['distribution'] as Map<String, dynamic>? ?? {});
+    return MerchantReviewPage(
+      reviews: (json['results'] as List<dynamic>? ?? [])
+          .map((e) => MerchantReview.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      averageRating: _toDouble(json['average_rating']),
+      distribution: {
+        for (final entry in spread.entries)
+          int.parse(entry.key): entry.value as int? ?? 0,
+      },
+    );
+  }
+}
+
 class MerchantMenuItem {
   const MerchantMenuItem({
     required this.id,

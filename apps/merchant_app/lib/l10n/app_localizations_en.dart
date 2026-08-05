@@ -1003,4 +1003,59 @@ class LEn extends L {
   @override
   String get tooManyAttempts =>
       'Too many attempts. Wait a moment and try again.';
+
+  @override
+  String get reviews => 'Reviews';
+
+  @override
+  String get reviewsSubtitle => 'What customers said about you';
+
+  @override
+  String get noReviewsYet => 'No reviews yet';
+
+  @override
+  String get noReviewsDetail =>
+      'Customers can review a visit once it is done. They will appear here.';
+
+  @override
+  String reviewCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reviews',
+      one: '1 review',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reviewTakenDown => 'Taken down';
+
+  @override
+  String get reviewFlagged => 'Reported — waiting to be looked at';
+
+  @override
+  String get reportReview => 'Report this review';
+
+  @override
+  String get reportReviewTitle => 'Report this review?';
+
+  @override
+  String get reportReviewDetail =>
+      'It stays visible to customers and keeps counting towards your rating. Reporting asks us to look at it — a venue cannot take down its own reviews.';
+
+  @override
+  String get reportReason => 'What is wrong with it?';
+
+  @override
+  String get reportReasonHint => 'e.g. this customer never came in';
+
+  @override
+  String get reportReasonRequired => 'Say what is wrong with it.';
+
+  @override
+  String get reviewReported => 'Reported. We will look at it.';
+
+  @override
+  String get send => 'Send';
 }

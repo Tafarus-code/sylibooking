@@ -1800,6 +1800,96 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Too many attempts. Wait a moment and try again.'**
   String get tooManyAttempts;
+
+  /// No description provided for @reviews.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviews'**
+  String get reviews;
+
+  /// No description provided for @reviewsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What customers said about you'**
+  String get reviewsSubtitle;
+
+  /// No description provided for @noReviewsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No reviews yet'**
+  String get noReviewsYet;
+
+  /// No description provided for @noReviewsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can review a visit once it is done. They will appear here.'**
+  String get noReviewsDetail;
+
+  /// No description provided for @reviewCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 review} other{{count} reviews}}'**
+  String reviewCount(int count);
+
+  /// No description provided for @reviewTakenDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down'**
+  String get reviewTakenDown;
+
+  /// No description provided for @reviewFlagged.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported — waiting to be looked at'**
+  String get reviewFlagged;
+
+  /// No description provided for @reportReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this review'**
+  String get reportReview;
+
+  /// No description provided for @reportReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this review?'**
+  String get reportReviewTitle;
+
+  /// No description provided for @reportReviewDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It stays visible to customers and keeps counting towards your rating. Reporting asks us to look at it — a venue cannot take down its own reviews.'**
+  String get reportReviewDetail;
+
+  /// No description provided for @reportReason.
+  ///
+  /// In en, this message translates to:
+  /// **'What is wrong with it?'**
+  String get reportReason;
+
+  /// No description provided for @reportReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. this customer never came in'**
+  String get reportReasonHint;
+
+  /// No description provided for @reportReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Say what is wrong with it.'**
+  String get reportReasonRequired;
+
+  /// No description provided for @reviewReported.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported. We will look at it.'**
+  String get reviewReported;
+
+  /// No description provided for @send.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get send;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

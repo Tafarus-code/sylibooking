@@ -711,6 +711,33 @@ class SylibookingApi {
     return MerchantActivity.fromJson(json as Map<String, dynamic>);
   }
 
+  // --- Merchant reviews ---------------------------------------------------
+
+  /// What customers said, including anything an admin has taken down.
+  Future<MerchantReviewPage> merchantReviews(int establishmentId) async {
+    final json = await _get(
+      '/merchant/establishments/$establishmentId/reviews/',
+    );
+    return MerchantReviewPage.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Ask an admin to look at one review.
+  ///
+  /// Flagging is all a venue may do. It changes nothing a customer sees —
+  /// a venue able to hide its own bad reviews would leave the ratings worth
+  /// nothing to the people they exist to inform.
+  Future<MerchantReview> flagReview({
+    required int establishmentId,
+    required int reviewId,
+    required String reason,
+  }) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/reviews/$reviewId/flag/',
+      {'reason': reason},
+    );
+    return MerchantReview.fromJson(json as Map<String, dynamic>);
+  }
+
   // --- Merchant spaces ----------------------------------------------------
 
   /// Every space including retired ones. Any member may read it.

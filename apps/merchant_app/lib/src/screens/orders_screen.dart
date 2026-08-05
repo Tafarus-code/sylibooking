@@ -5,6 +5,7 @@ import 'package:shared_client/shared_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../labels.dart';
+import 'walk_in_order_screen.dart';
 
 /// The kitchen queue: tickets grouped by where they have got to.
 ///
@@ -142,7 +143,27 @@ class _OrdersViewState extends State<OrdersView> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(onRefresh: _load, child: _body());
+    final l = L.of(context);
+
+    return Scaffold(
+      // On the queue rather than behind Manage: ringing one up happens while
+      // looking at the kitchen, not while configuring the venue.
+      floatingActionButton: _venueId == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () async {
+                final added = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => WalkInOrderScreen(auth: widget.auth),
+                  ),
+                );
+                if (added ?? false) await _load();
+              },
+              icon: const Icon(Icons.add),
+              label: Text(l.addWalkInOrder),
+            ),
+      body: RefreshIndicator(onRefresh: _load, child: _body()),
+    );
   }
 
   Widget _body() {

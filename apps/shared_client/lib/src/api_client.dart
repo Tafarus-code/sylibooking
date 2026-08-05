@@ -711,6 +711,31 @@ class SylibookingApi {
     return MerchantActivity.fromJson(json as Map<String, dynamic>);
   }
 
+  // --- Merchant orders ----------------------------------------------------
+
+  /// Ring up an order for somebody standing at the counter.
+  ///
+  /// Everything the customer form insists on is optional: a walk-in may have
+  /// no phone, no name worth typing and no collection time other than now.
+  /// Cash always — there is no prompt to push at somebody in the room.
+  Future<Order> createWalkInOrder({
+    required int establishmentId,
+    required List<({int menuItemId, int quantity})> items,
+    String customerName = '',
+  }) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/orders/',
+      {
+        if (customerName.trim().isNotEmpty) 'customer_name': customerName.trim(),
+        'items': [
+          for (final line in items)
+            {'menu_item': line.menuItemId, 'quantity': line.quantity},
+        ],
+      },
+    );
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
   // --- Merchant reviews ---------------------------------------------------
 
   /// What customers said, including anything an admin has taken down.

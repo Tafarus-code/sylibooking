@@ -35,6 +35,7 @@ from .orders import (
     CustomerOrderView,
     MerchantOrderListView,
     MerchantOrderStatusView,
+    MerchantWalkInOrderView,
     OrderCreateView,
 )
 from .password_reset import ConfirmResetView, RequestResetView
@@ -83,6 +84,11 @@ urlpatterns = [
         'merchant/orders/',
         MerchantOrderListView.as_view(),
         name='merchant-orders',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/orders/',
+        MerchantWalkInOrderView.as_view(),
+        name='merchant-walk-in-order',
     ),
     path(
         'merchant/orders/<int:pk>/status/',

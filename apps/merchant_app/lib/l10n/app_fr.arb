@@ -298,5 +298,15 @@
   "reportReasonHint": "ex. ce client n’est jamais venu",
   "reportReasonRequired": "Dites ce qui ne va pas.",
   "reviewReported": "Signalé. Nous allons l’examiner.",
-  "send": "Envoyer"
+  "send": "Envoyer",
+  "addWalkInOrder": "Ajouter une commande",
+  "walkInTitle": "Commande au comptoir",
+  "walkInIntro": "Pour quelqu’un qui est devant vous. Espèces, à emporter ici — aucun numéro nécessaire.",
+  "walkInName": "Nom (facultatif)",
+  "walkInNameHint": "Le nom à annoncer quand c’est prêt",
+  "walkInEmpty": "Rien d’ajouté. Touchez un plat pour commencer.",
+  "walkInTotal": "Total",
+  "walkInSend": "Envoyer en cuisine",
+  "walkInSent": "Commande envoyée en cuisine.",
+  "walkInNoMenu": "Cet établissement n’a encore aucun article au menu."
 }

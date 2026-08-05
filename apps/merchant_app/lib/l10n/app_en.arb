@@ -630,5 +630,15 @@
   "reportReasonHint": "e.g. this customer never came in",
   "reportReasonRequired": "Say what is wrong with it.",
   "reviewReported": "Reported. We will look at it.",
-  "send": "Send"
+  "send": "Send",
+  "addWalkInOrder": "Add an order",
+  "walkInTitle": "Order at the counter",
+  "walkInIntro": "For somebody standing in front of you. Cash, collected here — no phone number needed.",
+  "walkInName": "Name (optional)",
+  "walkInNameHint": "What to call out when it is ready",
+  "walkInEmpty": "Nothing added yet. Tap a dish to start.",
+  "walkInTotal": "Total",
+  "walkInSend": "Send to the kitchen",
+  "walkInSent": "Order sent to the kitchen.",
+  "walkInNoMenu": "This venue has no items on its menu yet."
 }

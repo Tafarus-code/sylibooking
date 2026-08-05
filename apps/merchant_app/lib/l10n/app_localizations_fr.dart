@@ -1007,4 +1007,8 @@ class LFr extends L {
 
   @override
   String get showNewWork => 'Afficher';
+
+  @override
+  String get tooManyAttempts =>
+      'Trop de tentatives. Patientez un instant et réessayez.';
 }

@@ -30,6 +30,7 @@ from .order_serializers import (
     OrderSerializer,
     resolve_menu_items,
 )
+from .throttling import BookingIpThrottle, BookingPhoneThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,9 @@ class OrderCreateView(APIView):
     """Place an order. No account, no login — the reference is the receipt."""
 
     permission_classes = [AllowAny]
+    # Unauthenticated by design, which is correct and also an open door once
+    # placing an order can initiate a real payment.
+    throttle_classes = [BookingIpThrottle, BookingPhoneThrottle]
 
     def post(self, request):
         form = OrderCreateSerializer(data=request.data)

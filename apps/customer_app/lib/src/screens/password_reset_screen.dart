@@ -25,6 +25,11 @@ class PasswordResetScreen extends StatefulWidget {
 }
 
 class _PasswordResetScreenState extends State<PasswordResetScreen> {
+
+  /// Read here rather than passed in: these are async paths that already
+  /// guard `mounted`, and threading a localisation object through each of
+  /// them would be noise.
+  String get _throttledText => L.of(context).tooManyAttempts;
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _identifier =
       TextEditingController(text: widget.initialIdentifier);
@@ -70,7 +75,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
+          _error = e.messageOr(whenThrottled: _throttledText);
           _busy = false;
         });
       }
@@ -103,7 +108,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
+          _error = e.messageOr(whenThrottled: _throttledText);
           _busy = false;
         });
       }

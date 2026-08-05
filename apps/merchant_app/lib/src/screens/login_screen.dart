@@ -117,6 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               : null,
                         ),
                         if (widget.auth.badCredentials ||
+                            widget.auth.throttled ||
                             widget.auth.errorMessage != null) ...[
                           const SizedBox(height: 16),
                           Container(
@@ -135,9 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    widget.auth.badCredentials
-                                        ? l.wrongUsernameOrPassword
-                                        : widget.auth.errorMessage!,
+                                    widget.auth.throttled
+                                        ? l.tooManyAttempts
+                                        : widget.auth.badCredentials
+                                            ? l.wrongUsernameOrPassword
+                                            : widget.auth.errorMessage!,
                                     style: TextStyle(
                                       color: theme.colorScheme.onErrorContainer,
                                     ),

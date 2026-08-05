@@ -1476,6 +1476,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Your {amount} GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.'**
   String depositTerms(String amount);
+
+  /// No description provided for @tooManyAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Wait a moment and try again.'**
+  String get tooManyAttempts;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

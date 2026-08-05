@@ -806,4 +806,8 @@ class LEn extends L {
   String depositTerms(String amount) {
     return 'Your $amount GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.';
   }
+
+  @override
+  String get tooManyAttempts =>
+      'Too many attempts. Wait a moment and try again.';
 }

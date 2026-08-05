@@ -24,6 +24,7 @@ from reservations.models import Reservation
 
 from .order_serializers import OrderSerializer
 from .serializers import EstablishmentListSerializer, ReservationSerializer
+from .throttling import RegistrationThrottle
 
 User = get_user_model()
 
@@ -90,6 +91,7 @@ class RegisterView(APIView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_classes = [RegistrationThrottle]
 
     def post(self, request):
         form = RegisterSerializer(data=request.data)

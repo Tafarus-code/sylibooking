@@ -19,6 +19,20 @@ class ApiException implements Exception {
 
   bool get isUnauthorized => statusCode == 401 || statusCode == 403;
   bool get isConflict => statusCode == 409;
+
+  /// Refused for asking too often, not for being wrong.
+  ///
+  /// Worth its own flag because the apps say something different for it: a
+  /// throttle the user cannot tell apart from a crash gets reported as one.
+  bool get isThrottled => statusCode == 429;
+
+  /// The server's own message, unless it is a throttle.
+  ///
+  /// DRF's throttle reply is English and counts seconds; neither belongs on
+  /// a customer's screen. Everything else the API says is already localised
+  /// and already written for the person reading it.
+  String messageOr({required String whenThrottled}) =>
+      isThrottled ? whenThrottled : message;
   bool get isNotFound => statusCode == 404;
 
   String get message {

@@ -112,6 +112,9 @@ jobs:
       DB_PASSWORD: sylibooking
       DB_HOST: localhost
       DB_PORT: '5432'
+      # Points the queue at the service below, so the one test that needs a
+      # real broker runs here rather than skipping everywhere.
+      CELERY_BROKER_URL: redis://localhost:6379/0
     services:
       postgres:
         image: postgres:16
@@ -125,6 +128,17 @@ jobs:
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
+          --health-retries 5
+      # A real broker on one job, so the queue is exercised against Redis
+      # rather than only in the eager mode the rest of the suite uses.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
           --health-retries 5
     steps:
       - uses: actions/checkout@v5

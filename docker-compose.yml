@@ -1,0 +1,25 @@
+# Local infrastructure, so a developer needs one command rather than a
+# Redis install.
+#
+#   docker compose up -d
+#   cd backend && celery -A config worker --loglevel=info
+#
+# Deliberately not the application itself — that is Slice 21, and packaging
+# Django before there is anywhere to deploy it would be guessing. This file
+# exists now because the task queue needs a broker to be worth running at
+# all, and it grows into the deployment story rather than being replaced by
+# it.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    # Nothing here is durable: a lost queue costs a repeated reminder, and
+    # every task is written to be safe to run twice.
+    command: redis-server --save '' --appendonly no
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5

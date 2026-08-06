@@ -5,9 +5,14 @@ what proves someone actually visited. Merchants use their token. Both paths end
 up in the same two endpoints.
 """
 
+from datetime import datetime, time
+
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.utils.translation import gettext as _
 from rest_framework import serializers, status
+from rest_framework.exceptions import Throttled
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -257,6 +262,21 @@ class EstablishmentReviewsView(APIView):
         )
 
 
+def photos_taken_today(establishment):
+    """How many photos this venue's gallery has taken since local midnight.
+
+    Counted from the start of the local day rather than with a rolling
+    window, so the answer a merchant gets — "try again tomorrow" — is true.
+    """
+    midnight = timezone.make_aware(
+        datetime.combine(timezone.localdate(), time.min),
+        timezone.get_current_timezone(),
+    )
+    return Photo.objects.filter(
+        establishment=establishment, created_at__gte=midnight
+    ).count()
+
+
 class EstablishmentPhotosView(APIView):
     """GET the visible photos, POST a new one."""
 
@@ -278,6 +298,18 @@ class EstablishmentPhotosView(APIView):
 
     def post(self, request, pk):
         establishment = self.get_establishment(pk)
+
+        # A size cap bounds each file and nothing else. Forty admissible
+        # uploads a day is already more than any venue's gallery wants, and
+        # well past what a real evening produces.
+        if photos_taken_today(establishment) >= settings.MAX_PHOTOS_PER_VENUE_PER_DAY:
+            raise Throttled(
+                detail=_(
+                    'This venue has taken as many photos as it can today. '
+                    'Try again tomorrow.'
+                )
+            )
+
         serializer = PhotoCreateSerializer(
             data=request.data,
             establishment=establishment,

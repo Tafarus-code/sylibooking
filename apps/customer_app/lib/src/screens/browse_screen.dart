@@ -214,7 +214,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        // The catalogue is throttled per connection now. DRF's own wording
+        // for that is English and counts seconds; this says the same thing
+        // in the customer's language and without the arithmetic.
+        _error = e.messageOr(whenThrottled: L.of(context).browsingTooFast);
         _loading = false;
       });
     } on ApiUnreachableException catch (e) {

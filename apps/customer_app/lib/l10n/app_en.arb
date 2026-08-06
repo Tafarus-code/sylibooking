@@ -439,6 +439,10 @@
     }
   },
   "tooManyAttempts": "Too many attempts. Wait a moment and try again.",
+  "browsingTooFast": "You're going a bit fast. Wait a moment and try again.",
+  "@browsingTooFast": {
+    "description": "Shown when the public catalogue refuses a request for coming too fast."
+  },
   "yourDetails": "Your details",
   "detailsIntro": "Used to fill in your next booking, and to reach you if you forget your password.",
   "profileName": "Name",

@@ -29,7 +29,7 @@ from .serializers import (
     ReservationSerializer,
     SpaceAvailabilitySerializer,
 )
-from .throttling import BookingIpThrottle, BookingPhoneThrottle
+from .throttling import BookingIpThrottle, BookingPhoneThrottle, BrowseThrottle
 
 
 class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -37,9 +37,15 @@ class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     Read-only and public: this is the customer's discovery surface. Merchants
     create and edit establishments through /admin/ for now.
+
+    Throttled per connection. Public and unlimited are not the same thing:
+    this is the whole catalogue, and a competitor pulling it nightly costs us
+    and gains them. The ceiling is set well above anything a person browsing
+    could reach.
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [BrowseThrottle]
 
     def get_queryset(self):
         queryset = Establishment.objects.all()

@@ -1483,6 +1483,12 @@ abstract class L {
   /// **'Too many attempts. Wait a moment and try again.'**
   String get tooManyAttempts;
 
+  /// Shown when the public catalogue refuses a request for coming too fast.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re going a bit fast. Wait a moment and try again.'**
+  String get browsingTooFast;
+
   /// No description provided for @yourDetails.
   ///
   /// In en, this message translates to:

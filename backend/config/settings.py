@@ -189,6 +189,29 @@ MAX_PHOTO_UPLOAD_BYTES = config(
 )
 ALLOWED_PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 
+# How many photos one venue's gallery may take in a day, from everyone
+# combined. A size cap alone bounds each file and nothing else: a hundred
+# admissible 5 MB uploads is still half a gigabyte of disk and a gallery
+# nobody can scroll. Counted per venue rather than per uploader because it is
+# the venue's gallery that suffers, and a customer with a reference is not the
+# only one who can post to it.
+MAX_PHOTOS_PER_VENUE_PER_DAY = config(
+    'MAX_PHOTOS_PER_VENUE_PER_DAY', default=40, cast=int
+)
+
+# The floor a password-reset request answers no faster than.
+#
+# The message is already the same whether or not the identifier exists. The
+# work behind it is not: a hit issues a code, writes a row and hands it to a
+# notifier, and a miss returns after one query. That difference is readable
+# from outside as a yes/no on whether an account exists, and it gets worse,
+# not better, once the notifier is a real SMS gateway making a network call.
+# So both answers wait out the same floor. Affordable because this endpoint
+# is already capped at a handful of requests an hour.
+PASSWORD_RESET_MIN_SECONDS = config(
+    'PASSWORD_RESET_MIN_SECONDS', default=0.25, cast=float
+)
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -216,11 +239,24 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
-    # Ceilings on the paths anyone can reach without signing in. Applied per
-    # view rather than globally: a blanket rate needs real traffic to size,
-    # and guessing one now risks throttling the first pilot. See
-    # api/throttling.py for why each of these is keyed the way it is.
+    # A floor under the whole API, so a route added next month is covered by
+    # having been written rather than by somebody remembering to cover it.
+    # Views that name their own throttles replace these, which is the order
+    # wanted: the tighter, purpose-built limit wins where there is one.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'api.throttling.AnonSurfaceThrottle',
+        'api.throttling.UserSurfaceThrottle',
+    ],
+    # See api/throttling.py for why each of these is keyed the way it is.
+    #
+    # The two surface rates and the browse rate are provisional. A blanket
+    # ceiling wants real traffic to size and there is none yet, so they are
+    # set loose enough that no honest use should ever meet them, and tightened
+    # once Slice 20 makes throttle hits visible.
     'DEFAULT_THROTTLE_RATES': {
+        'anon_surface': '90/min',
+        'user_surface': '240/min',
+        'browse': '300/hour',
         'login_ip': '10/min',
         'login_username': '5/min',
         'register': '5/hour',

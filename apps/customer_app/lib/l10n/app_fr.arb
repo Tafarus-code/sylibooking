@@ -230,5 +230,19 @@
   "bookingMissed": "Absent",
   "bookingMissedDetail": "Personne ne s’est présenté avant que l’établissement cesse de garder la table.",
   "depositTerms": "Votre acompte de {amount} GNF est déduit de l’addition à votre arrivée. Si personne ne se présente dans ce délai, l’établissement le conserve.",
-  "tooManyAttempts": "Trop de tentatives. Patientez un instant et réessayez."
+  "tooManyAttempts": "Trop de tentatives. Patientez un instant et réessayez.",
+  "yourDetails": "Vos coordonnées",
+  "detailsIntro": "Utilisées pour remplir votre prochaine réservation, et pour vous joindre si vous oubliez votre mot de passe.",
+  "profileName": "Nom",
+  "profilePhone": "Téléphone",
+  "profileEmail": "E-mail (facultatif)",
+  "saveDetails": "Enregistrer",
+  "detailsSaved": "Coordonnées enregistrées.",
+  "closeAccount": "Fermer mon compte",
+  "closeAccountTitle": "Fermer votre compte ?",
+  "closeAccountDetail": "Vos établissements favoris et votre identifiant disparaissent définitivement. Les réservations déjà faites restent dans les registres de l’établissement, sans votre nom ni votre numéro.",
+  "closeAccountCannotUndo": "Cette action est irréversible.",
+  "closeAccountPassword": "Votre mot de passe",
+  "closeAccountConfirm": "Fermer",
+  "accountClosed": "Votre compte est fermé."
 }

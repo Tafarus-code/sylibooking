@@ -146,6 +146,50 @@ class CustomerAuth extends ChangeNotifier {
     _set(CustomerAuthState.signedOut);
   }
 
+  /// Update the details this account carries.
+  ///
+  /// Returns null on success, or a message to show.
+  Future<String?> updateProfile({
+    String? name,
+    String? phone,
+    String? email,
+  }) async {
+    try {
+      _customer = await api.updateCustomerProfile(
+        name: name,
+        phone: phone,
+        email: email,
+      );
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } on ApiUnreachableException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Close the account for good, then leave this phone signed out.
+  ///
+  /// The local bookings and favourites on the device are deliberately kept:
+  /// closing an account is not the same as wiping the phone, and someone who
+  /// closes theirs is exactly back where an account-less customer already is.
+  Future<String?> closeAccount({required String password}) async {
+    try {
+      await api.closeCustomerAccount(password: password);
+    } on ApiException catch (e) {
+      return e.message;
+    } on ApiUnreachableException catch (e) {
+      return e.message;
+    }
+
+    await tokenStore.clear();
+    api.token = null;
+    _customer = null;
+    _set(CustomerAuthState.signedOut);
+    return null;
+  }
+
   void _set(CustomerAuthState state) {
     _state = state;
     notifyListeners();

@@ -815,4 +815,48 @@ class LFr extends L {
   @override
   String get tooManyAttempts =>
       'Trop de tentatives. Patientez un instant et réessayez.';
+
+  @override
+  String get yourDetails => 'Vos coordonnées';
+
+  @override
+  String get detailsIntro =>
+      'Utilisées pour remplir votre prochaine réservation, et pour vous joindre si vous oubliez votre mot de passe.';
+
+  @override
+  String get profileName => 'Nom';
+
+  @override
+  String get profilePhone => 'Téléphone';
+
+  @override
+  String get profileEmail => 'E-mail (facultatif)';
+
+  @override
+  String get saveDetails => 'Enregistrer';
+
+  @override
+  String get detailsSaved => 'Coordonnées enregistrées.';
+
+  @override
+  String get closeAccount => 'Fermer mon compte';
+
+  @override
+  String get closeAccountTitle => 'Fermer votre compte ?';
+
+  @override
+  String get closeAccountDetail =>
+      'Vos établissements favoris et votre identifiant disparaissent définitivement. Les réservations déjà faites restent dans les registres de l’établissement, sans votre nom ni votre numéro.';
+
+  @override
+  String get closeAccountCannotUndo => 'Cette action est irréversible.';
+
+  @override
+  String get closeAccountPassword => 'Votre mot de passe';
+
+  @override
+  String get closeAccountConfirm => 'Fermer';
+
+  @override
+  String get accountClosed => 'Votre compte est fermé.';
 }

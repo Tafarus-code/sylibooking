@@ -36,11 +36,74 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _SignedIn extends StatelessWidget {
+class _SignedIn extends StatefulWidget {
   const _SignedIn({required this.auth, required this.localeController});
 
   final CustomerAuth auth;
   final LocaleController localeController;
+
+  @override
+  State<_SignedIn> createState() => _SignedInState();
+}
+
+class _SignedInState extends State<_SignedIn> {
+  late final _name = TextEditingController(
+    text: widget.auth.customer?.name ?? '',
+  );
+  late final _phone = TextEditingController(
+    text: widget.auth.customer?.phone ?? '',
+  );
+  bool _saving = false;
+  bool _closing = false;
+
+  CustomerAuth get auth => widget.auth;
+  LocaleController get localeController => widget.localeController;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l = L.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = true);
+
+    final error = await auth.updateProfile(
+      name: _name.text.trim(),
+      phone: _phone.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text(error ?? l.detailsSaved)),
+      );
+  }
+
+  Future<void> _close() async {
+    final l = L.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final password = await showDialog<String>(
+      context: context,
+      builder: (context) => const _CloseAccountDialog(),
+    );
+    if (password == null || !mounted) return;
+
+    setState(() => _closing = true);
+    final error = await auth.closeAccount(password: password);
+    if (!mounted) return;
+    setState(() => _closing = false);
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error ?? l.accountClosed)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +171,133 @@ class _SignedIn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 32),
+
+        // The details themselves. Until now a name and a number were typed
+        // into every booking and never kept, so somebody who changed number
+        // had no way to say so except by typing it again next time.
+        Text(l.yourDetails, style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          l.detailsIntro,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _name,
+          enabled: !_saving,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: l.profileName,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _phone,
+          enabled: !_saving,
+          keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: l.profilePhone,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l.saveDetails),
+        ),
+
+        const SizedBox(height: 32),
         LanguageToggle(controller: localeController),
+
+        const SizedBox(height: 32),
+        // Last, and quiet. It is a real thing an account must be able to do,
+        // and not a thing to put next to Sign out where a tired thumb lands.
+        TextButton.icon(
+          onPressed: _closing ? null : _close,
+          icon: const Icon(Icons.person_remove_outlined, size: 18),
+          label: Text(l.closeAccount),
+          style: TextButton.styleFrom(
+            foregroundColor: theme.colorScheme.error,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Asks for the password, and says what closing actually does.
+///
+/// Named plainly rather than reassuringly: somebody who expects their past
+/// bookings to disappear with them should find that out here, not later.
+class _CloseAccountDialog extends StatefulWidget {
+  const _CloseAccountDialog();
+
+  @override
+  State<_CloseAccountDialog> createState() => _CloseAccountDialogState();
+}
+
+class _CloseAccountDialogState extends State<_CloseAccountDialog> {
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = L.of(context);
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Text(l.closeAccountTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l.closeAccountDetail, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Text(
+            l.closeAccountCannotUndo,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _password,
+            autofocus: true,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: l.closeAccountPassword,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _password.text),
+          style: FilledButton.styleFrom(
+            backgroundColor: theme.colorScheme.error,
+          ),
+          child: Text(l.closeAccountConfirm),
+        ),
       ],
     );
   }

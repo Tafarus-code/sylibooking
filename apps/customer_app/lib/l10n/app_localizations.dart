@@ -1482,6 +1482,90 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Too many attempts. Wait a moment and try again.'**
   String get tooManyAttempts;
+
+  /// No description provided for @yourDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Your details'**
+  String get yourDetails;
+
+  /// No description provided for @detailsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Used to fill in your next booking, and to reach you if you forget your password.'**
+  String get detailsIntro;
+
+  /// No description provided for @profileName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get profileName;
+
+  /// No description provided for @profilePhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get profilePhone;
+
+  /// No description provided for @profileEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email (optional)'**
+  String get profileEmail;
+
+  /// No description provided for @saveDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Save details'**
+  String get saveDetails;
+
+  /// No description provided for @detailsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Details saved.'**
+  String get detailsSaved;
+
+  /// No description provided for @closeAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Close my account'**
+  String get closeAccount;
+
+  /// No description provided for @closeAccountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close your account?'**
+  String get closeAccountTitle;
+
+  /// No description provided for @closeAccountDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved venues and your sign-in go for good. Bookings you have already made stay with the venue as part of their records, with your name and number removed.'**
+  String get closeAccountDetail;
+
+  /// No description provided for @closeAccountCannotUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone.'**
+  String get closeAccountCannotUndo;
+
+  /// No description provided for @closeAccountPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password'**
+  String get closeAccountPassword;
+
+  /// No description provided for @closeAccountConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Close it'**
+  String get closeAccountConfirm;
+
+  /// No description provided for @accountClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is closed.'**
+  String get accountClosed;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

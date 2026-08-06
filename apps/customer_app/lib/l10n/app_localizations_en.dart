@@ -810,4 +810,48 @@ class LEn extends L {
   @override
   String get tooManyAttempts =>
       'Too many attempts. Wait a moment and try again.';
+
+  @override
+  String get yourDetails => 'Your details';
+
+  @override
+  String get detailsIntro =>
+      'Used to fill in your next booking, and to reach you if you forget your password.';
+
+  @override
+  String get profileName => 'Name';
+
+  @override
+  String get profilePhone => 'Phone';
+
+  @override
+  String get profileEmail => 'Email (optional)';
+
+  @override
+  String get saveDetails => 'Save details';
+
+  @override
+  String get detailsSaved => 'Details saved.';
+
+  @override
+  String get closeAccount => 'Close my account';
+
+  @override
+  String get closeAccountTitle => 'Close your account?';
+
+  @override
+  String get closeAccountDetail =>
+      'Your saved venues and your sign-in go for good. Bookings you have already made stay with the venue as part of their records, with your name and number removed.';
+
+  @override
+  String get closeAccountCannotUndo => 'This cannot be undone.';
+
+  @override
+  String get closeAccountPassword => 'Your password';
+
+  @override
+  String get closeAccountConfirm => 'Close it';
+
+  @override
+  String get accountClosed => 'Your account is closed.';
 }

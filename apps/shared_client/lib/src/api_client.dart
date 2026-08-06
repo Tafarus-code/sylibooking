@@ -697,6 +697,39 @@ class SylibookingApi {
         .toList();
   }
 
+  /// Keep a returning customer's details current.
+  ///
+  /// Only what an account may change about itself: not the username, which
+  /// is what they sign in with.
+  Future<CustomerAccount> updateCustomerProfile({
+    String? name,
+    String? phone,
+    String? email,
+  }) async {
+    final json = await _patch('/customer/me/', {
+      'name': ?name,
+      'phone': ?phone,
+      'email': ?email,
+    });
+    return CustomerAccount.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Close the account for good.
+  ///
+  /// The password is asked for again because this cannot be undone and the
+  /// token on this phone may not be in the right hands. Past bookings stay
+  /// with the venue, stripped of anything that says whose they were.
+  Future<void> closeCustomerAccount({required String password}) async {
+    await _send(
+      () => _http.delete(
+        _uri('/customer/me/'),
+        headers: _headers,
+        body: jsonEncode({'password': password}),
+      ),
+    );
+    token = null;
+  }
+
   // --- Merchant activity --------------------------------------------------
 
   /// How much has arrived at this venue since [since].

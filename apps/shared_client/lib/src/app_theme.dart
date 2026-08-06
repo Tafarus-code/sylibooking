@@ -8,15 +8,15 @@ import 'package:google_fonts/google_fonts.dart';
 class SylibookingTokens {
   const SylibookingTokens._();
 
-  static const deepwood = Color(0xFF12281F);
-  static const deepwoodSoft = Color(0xFF1D3A2D);
-  static const ivory = Color(0xFFF7F3EC);
-  static const ivoryDim = Color(0xFFE8E0D3);
-  static const ember = Color(0xFFB4551C);
-  static const emberBright = Color(0xFFD9722F);
-  static const onEmber = Color(0xFFFFFFFF);
-  static const onDeepwood = Color(0xFFF7F3EC);
-  static const onIvory = Color(0xFF12281F);
+  static const deepwood = Color(0xFF12271F);
+  static const deepwoodSoft = Color(0xFF1B362A);
+  static const ivory = Color(0xFFF7F1E4);
+  static const ivoryDim = Color(0xFFCFC7B3);
+  static const ember = Color(0xFFD98E2B);
+  static const emberBright = Color(0xFFE8A94F);
+  static const onEmber = Color(0xFF3B2508);
+  static const onDeepwood = Color(0xFFF7F1E4);
+  static const onIvory = Color(0xFF1B1B18);
 
   static const displayFont = 'Fraunces';
   static const bodyFont = 'Manrope';

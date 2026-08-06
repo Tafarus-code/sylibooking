@@ -21,15 +21,15 @@
     "the described direction. Correct them here and both apps follow."
   ],
   "base": {
-    "deepwood": "#12281F",
-    "deepwood_soft": "#1D3A2D",
-    "ivory": "#F7F3EC",
-    "ivory_dim": "#E8E0D3",
-    "ember": "#B4551C",
-    "ember_bright": "#D9722F",
-    "on_ember": "#FFFFFF",
-    "on_deepwood": "#F7F3EC",
-    "on_ivory": "#12281F",
+    "deepwood": "#12271F",
+    "deepwood_soft": "#1B362A",
+    "ivory": "#F7F1E4",
+    "ivory_dim": "#CFC7B3",
+    "ember": "#D98E2B",
+    "ember_bright": "#E8A94F",
+    "on_ember": "#3B2508",
+    "on_deepwood": "#F7F1E4",
+    "on_ivory": "#1B1B18",
     "display_font": "Fraunces",
     "body_font": "Manrope",
     "mono_font": "IBM Plex Mono"
@@ -41,8 +41,8 @@
       "description": "Warm amber on deep green. The house style.",
       "display_font": "Fraunces",
       "body_font": "Manrope",
-      "accent": "#B4551C",
-      "on_accent": "#FFFFFF"
+      "accent": "#D98E2B",
+      "on_accent": "#3B2508"
     },
     {
       "key": "palm_night",

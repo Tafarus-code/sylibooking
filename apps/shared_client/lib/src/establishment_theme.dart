@@ -42,8 +42,8 @@ const _rawPresets = <Map<String, String>>[
     'description': 'Warm amber on deep green. The house style.',
     'display_font': 'Fraunces',
     'body_font': 'Manrope',
-    'accent': '#B4551C',
-    'on_accent': '#FFFFFF',
+    'accent': '#D98E2B',
+    'on_accent': '#3B2508',
   },
   {
     'key': 'palm_night',

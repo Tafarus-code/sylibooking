@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Sylibooking — Système complet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<style>
+  :root{
+    --deepwood:#12271F; --deepwood-2:#0C1D16; --deepwood-3:#1B362A;
+    --ember:#D98E2B; --ember-dim:#8A5C1C;
+    --palm:#3E8A63; --palm-dim:#1F4A34; --palm-deep:#1F6B44;
+    --clayrose:#A8453A;
+    --ivory:#F7F1E4; --ivory-dim:#CFC7B3;
+    --ink:#1B1B18; --paper:#FFFFFF; --line:#EAE3D2; --line-2:#F0EBDD; --muted:#9C9683;
+    --font-display:'Fraunces', serif;
+    --font-body:'Manrope', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--deepwood-2); font-family:var(--font-body); color:var(--ivory); padding:48px 32px 90px;}
+  .wrap{max-width:1440px; margin:0 auto;}
+  .intro{max-width:760px; margin:0 0 40px;}
+  .eyebrow{font-family:var(--font-mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ember); margin:0 0 10px;}
+  h1{font-family:var(--font-display); font-weight:500; font-size:36px; margin:0 0 10px; color:var(--ivory);}
+  .sub{font-size:15px; color:var(--ivory-dim); line-height:1.6; margin:0;}
+
+  .strategy{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:28px 0 50px;}
+  .strat-card{background:var(--deepwood); border:1px solid #24392F; border-radius:14px; padding:18px 20px;}
+  .strat-card i{color:var(--ember); font-size:20px; margin-bottom:8px; display:block;}
+  .strat-card h4{font-family:var(--font-display); font-size:17px; margin:0 0 6px; color:var(--ivory); font-weight:500;}
+  .strat-card p{font-size:12.5px; color:var(--ivory-dim); margin:0; line-height:1.55;}
+
+  .legend{display:flex; flex-wrap:wrap; gap:10px; margin:0 0 60px; background:var(--deepwood); border:1px solid #24392F; border-radius:14px; padding:18px 20px;}
+  .legend h3{width:100%; font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ivory-dim); margin:0 0 6px; font-weight:500;}
+  .leg-item{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ivory-dim);}
+  .leg-dot{width:9px; height:9px; border-radius:50%;}
+
+  .section-title{font-family:var(--font-display); font-size:26px; font-weight:500; color:var(--ivory); margin:0 0 4px; display:flex; align-items:center; gap:10px;}
+  .section-title i{color:var(--ember); font-size:22px;}
+  .section-note{font-size:12.5px; color:var(--ivory-dim); margin:0 0 26px; max-width:640px; line-height:1.6;}
+  .row{display:flex; flex-wrap:wrap; gap:32px; margin-bottom:70px;}
+
+  .screen-block{width:300px;}
+  .screen-label{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ivory-dim); margin:0 0 10px;}
+  .screen-label b{color:var(--ember);}
+
+  /* ---- phone chrome ---- */
+  .phone{width:300px; height:634px; background:var(--ivory); border-radius:34px; border:8px solid #06110C; box-shadow:0 26px 50px rgba(0,0,0,.4); overflow:hidden; position:relative; display:flex; flex-direction:column;}
+  .notch{position:absolute; top:0; left:50%; transform:translateX(-50%); width:110px; height:20px; background:#06110C; border-radius:0 0 12px 12px; z-index:5;}
+
+  /* ---- tablet chrome ---- */
+  .tablet-block{width:660px;}
+  .tablet{width:660px; height:474px; background:var(--ivory); border-radius:20px; border:10px solid #06110C; box-shadow:0 30px 60px rgba(0,0,0,.45); overflow:hidden; display:flex;}
+
+  /* shared bits */
+  .app-bar{padding:30px 16px 10px; background:var(--deepwood); color:var(--ivory);}
+  .app-bar.tab{padding:16px 18px 12px;}
+  .greet{font-size:12px; color:var(--ivory-dim); margin:0 0 2px;}
+  .greet strong{color:var(--ember); font-weight:600;}
+  .search{margin-top:10px; background:var(--deepwood-3); border-radius:12px; padding:9px 12px; display:flex; align-items:center; gap:8px; position:relative; overflow:hidden;}
+  .search:before{content:''; position:absolute; right:-20px; top:-30px; width:90px; height:90px; background:radial-gradient(circle, rgba(217,142,43,.35), transparent 70%);}
+  .search i{color:var(--ember); font-size:15px;}
+  .search span{font-size:12px; color:var(--ivory-dim);}
+  .chips{display:flex; gap:8px; padding:12px 16px 4px; overflow-x:auto; background:var(--deepwood);}
+  .chip{font-size:10.5px; padding:6px 11px; border-radius:20px; border:1px solid #2C4A3B; color:var(--ivory-dim); white-space:nowrap; font-weight:500; flex-shrink:0;}
+  .chip.active{background:var(--ember); border-color:var(--ember); color:#3B2508;}
+  .segment{display:flex; background:var(--deepwood-3); border-radius:10px; padding:3px; margin:10px 16px 0; gap:3px;}
+  .seg-opt{flex:1; text-align:center; font-size:11px; font-weight:600; padding:7px 0; border-radius:8px; color:var(--ivory-dim);}
+  .seg-opt.active{background:var(--ember); color:#3B2508;}
+
+  .list{flex:1; overflow-y:auto; padding:14px 14px 10px; background:var(--ivory); display:flex; flex-direction:column; gap:12px;}
+  .card{background:var(--paper); border-radius:14px; border:1px solid var(--line); overflow:hidden;}
+  .card .photo{height:92px; background:linear-gradient(135deg,#3E8A63,#12271F); position:relative;}
+  .status-dot{position:absolute; top:8px; left:8px; font-size:9px; font-weight:600; padding:3px 8px; border-radius:10px; background:rgba(0,0,0,.55); color:#8FE0B4; display:flex; align-items:center; gap:4px;}
+  .status-dot i{width:6px; height:6px; border-radius:50%; background:#4FCE82; display:inline-block;}
+  .dist{position:absolute; bottom:8px; right:8px; font-family:var(--font-mono); font-size:10px; background:rgba(0,0,0,.55); color:var(--ivory); padding:3px 7px; border-radius:8px;}
+  .card .body{padding:10px 12px;}
+  .card .body h4{font-family:var(--font-display); font-size:15.5px; margin:0 0 3px; color:var(--ink); font-weight:500;}
+  .meta{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--muted);}
+  .meta i{color:var(--ember); font-size:12px;}
+
+  .bottom-nav{display:flex; justify-content:space-around; padding:9px 0 13px; background:var(--paper); border-top:1px solid var(--line);}
+  .bottom-nav i{font-size:18px; color:#C7C0AC;}
+  .bottom-nav i.on{color:var(--ember);}
+  .bottom-nav .lbl{display:block; font-size:8px; margin-top:2px; text-align:center; color:inherit;}
+
+  .cta-bar{padding:12px 16px; background:var(--paper); border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  .cta-bar div p{margin:0; font-size:9.5px; color:var(--muted);}
+  .cta-bar div b{font-family:var(--font-mono); font-size:14px; color:var(--ink);}
+  .btn-ember{background:var(--ember); color:#3B2508; font-weight:600; font-size:12.5px; border:none; padding:10px 18px; border-radius:10px;}
+  .btn-ghost{background:none; border:1px solid var(--line); color:var(--ink); font-weight:600; font-size:11.5px; padding:9px 14px; border-radius:9px;}
+
+  /* badges (status language) */
+  .badge{font-size:9px; font-weight:600; padding:3px 8px; border-radius:8px; white-space:nowrap;}
+  .badge.paid{background:#E3F2E9; color:var(--palm-deep);}
+  .badge.cash{background:#F3EEE0; color:#8A6D2A;}
+  .badge.unpaid{background:#FBEAE8; color:var(--clayrose);}
+  .badge.placed{background:#EDEAE0; color:#6B6656;}
+  .badge.preparing{background:#FBF0DC; color:var(--ember-dim);}
+  .badge.ready{background:#E3F2E9; color:var(--palm-deep);}
+  .badge.completed{background:#E3EAF2; color:#2F5B8A;}
+  .badge.noshow{background:#FBEAE8; color:var(--clayrose);}
+
+  /* stage progress */
+  .stage-track{display:flex; align-items:center; padding:14px 4px;}
+  .stage-dot{width:20px; height:20px; border-radius:50%; background:var(--ember); display:flex; align-items:center; justify-content:center; color:#3B2508; font-size:10px; flex-shrink:0;}
+  .stage-dot.todo{background:#E5DFCE; color:#B5AD97;}
+  .stage-line{flex:1; height:2px; background:var(--ember);}
+  .stage-line.todo{background:#E5DFCE;}
+  .stage-labels{display:flex; justify-content:space-between; padding:0 2px; margin-top:4px;}
+  .stage-labels span{font-size:8.5px; color:var(--muted); width:44px; text-align:center;}
+
+  /* menu / detail */
+  .detail-scroll{flex:1; overflow-y:auto; background:var(--ivory);}
+  .hero{height:150px; background:linear-gradient(160deg,#1F4A34,#0C1D16); position:relative;}
+  .hero-glow{position:absolute; inset:0; background:radial-gradient(circle at 70% 20%, rgba(217,142,43,.32), transparent 60%);}
+  .hero-tag{position:absolute; bottom:12px; left:14px; right:14px;}
+  .hero-tag h3{font-family:var(--font-display); font-size:20px; color:var(--ivory); margin:0 0 2px;}
+  .hero-tag p{font-size:10.5px; color:var(--ivory-dim); margin:0;}
+  .stitch{border:none; border-top:1px dashed #D9CFB4; margin:2px 16px 8px;}
+  .section{padding:6px 16px 12px;}
+  .section h5{font-family:var(--font-mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; font-weight:500;}
+  .menu-item{display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--line-2); align-items:center;}
+  .menu-item div p{margin:0; font-size:12.5px; color:var(--ink); font-weight:500;}
+  .menu-item div span{font-size:9.5px; color:var(--muted);}
+  .menu-item b{font-family:var(--font-mono); font-size:11.5px; color:var(--palm-dim); font-weight:500;}
+  .qty-step{display:flex; align-items:center; gap:8px;}
+  .qty-step i{width:20px; height:20px; border-radius:6px; background:var(--ivory); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--ink);}
+
+  .disclosure{background:#FBF3E4; border:1px solid #EED9A9; border-radius:10px; padding:10px 12px; margin:0 16px 10px; font-size:10.5px; color:#6B5424; line-height:1.5;}
+  .disclosure b{color:var(--ember-dim);}
+
+  .slot-row{display:flex; flex-wrap:wrap; gap:8px; padding:2px 16px 10px;}
+  .slot{font-family:var(--font-mono); font-size:11px; padding:8px 12px; border-radius:9px; border:1px solid var(--line); color:var(--ink); background:var(--paper);}
+  .slot.active{background:var(--ember); border-color:var(--ember); color:#3B2508; font-weight:600;}
+  .slot.taken{color:#C7C0AC; text-decoration:line-through; background:#F4F1E7;}
+
+  .stepper-row{display:flex; align-items:center; gap:10px; padding:10px 16px;}
+  .stepper-row span{flex:1; font-size:12px; color:var(--ink); font-weight:500;}
+
+  .stars-input{display:flex; gap:6px; font-size:22px; color:#E5DFCE; padding:6px 16px 12px;}
+  .stars-input i.on{color:var(--ember);}
+  textarea.rev-box{margin:0 16px; width:calc(100% - 32px); height:70px; border-radius:10px; border:1px solid var(--line); padding:10px; font-family:var(--font-body); font-size:12px; color:var(--ink); resize:none;}
+
+  .empty-state{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; text-align:center; background:var(--ivory);}
+  .empty-state i{font-size:34px; color:#D9CFB4; margin-bottom:10px;}
+  .empty-state p{font-size:11.5px; color:var(--muted); margin:0; line-height:1.5;}
+
+  /* ---- tablet layout: nav rail + split view ---- */
+  .rail{width:76px; background:var(--deepwood); display:flex; flex-direction:column; align-items:center; padding:18px 0; gap:6px; flex-shrink:0;}
+  .rail .mark{width:34px; height:34px; border-radius:9px; background:var(--ember); margin-bottom:14px;}
+  .rail-item{width:56px; padding:9px 0; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--ivory-dim);}
+  .rail-item.on{background:var(--deepwood-3); color:var(--ember);}
+  .rail-item i{font-size:17px;}
+  .rail-item span{font-size:8px; font-weight:600;}
+
+  .tab-main{flex:1; display:flex; flex-direction:column; min-width:0;}
+  .tab-top{padding:14px 18px; background:var(--paper); border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+  .tab-top h4{font-family:var(--font-display); font-size:17px; margin:0; color:var(--ink); font-weight:500;}
+  .venue-pill{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--muted); background:var(--ivory); border:1px solid var(--line); padding:5px 10px; border-radius:20px;}
+  .venue-pill i{font-size:12px; color:var(--ember);}
+
+  .split{flex:1; display:flex; min-height:0;}
+  .split-list{width:44%; overflow-y:auto; background:var(--ivory); padding:12px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:8px;}
+  .split-detail{flex:1; overflow-y:auto; background:var(--paper); padding:18px;}
+
+  .res-row{background:var(--paper); border:1px solid var(--line); border-radius:11px; padding:10px 12px; cursor:default;}
+  .res-row.sel{border-color:var(--ember); box-shadow:0 0 0 1px var(--ember);}
+  .res-row .top{display:flex; justify-content:space-between; align-items:flex-start;}
+  .res-row .top p{margin:0; font-size:12px; font-weight:600; color:var(--ink);}
+  .res-row .top span.time{font-family:var(--font-mono); font-size:10.5px; color:var(--muted);}
+  .res-row .sub{font-size:10px; color:var(--muted); margin-top:2px;}
+
+  .detail-hd{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
+  .detail-hd h3{font-family:var(--font-display); font-size:19px; margin:0 0 4px; color:var(--ink); font-weight:500;}
+  .ref{font-family:var(--font-mono); font-size:10px; color:var(--muted); background:var(--ivory); padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:5px;}
+  .field-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
+  .field-grid div{background:var(--ivory); border-radius:9px; padding:9px 11px;}
+  .field-grid div p{margin:0 0 2px; font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-family:var(--font-mono);}
+  .field-grid div span{font-size:12.5px; color:var(--ink); font-weight:500;}
+  .action-row{display:flex; gap:10px; margin-top:16px;}
+  .action-row button{flex:1; padding:11px; border-radius:10px; font-size:12.5px; font-weight:600;}
+  .action-row button.pri{background:var(--palm); color:#fff; border:none;}
+  .action-row button.sec{background:#fff; border:1px solid var(--line); color:var(--ink);}
+  .action-row button.dis{background:#F0EBDD; color:#B5AD97; border:none;}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px;}
+  .manage-tile{background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:8px;}
+  .manage-tile i{font-size:18px; color:var(--ember);}
+  .manage-tile p{margin:0; font-size:12.5px; font-weight:600; color:var(--ink);}
+  .manage-tile span{font-size:9.5px; color:var(--muted);}
+  .manage-tile.locked{opacity:.4;}
+
+  .metric-row{display:flex; gap:10px; padding:14px 14px 4px;}
+  .metric{flex:1; background:var(--paper); border:1px solid var(--line); border-radius:11px; padding:12px;}
+  .metric p{margin:0 0 3px; font-size:9px; text-transform:uppercase; color:var(--muted); font-family:var(--font-mono);}
+  .metric b{font-family:var(--font-mono); font-size:16px; color:var(--ink);}
+  .metric.warn b{color:var(--clayrose);}
+  .metric.good b{color:var(--palm-deep);}
+
+  .day-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line-2);}
+  .day-row span:first-child{font-size:12px; color:var(--ink); font-weight:500; width:70px;}
+  .day-row span.hrs{font-family:var(--font-mono); font-size:11px; color:#5C7A65;}
+  .toggle{width:32px; height:18px; border-radius:10px; background:var(--palm); position:relative;}
+  .toggle i{position:absolute; right:2px; top:2px; width:14px; height:14px; border-radius:50%; background:#fff;}
+
+  .space-card{background:var(--paper); border:1px solid var(--line); border-radius:11px; padding:11px 13px; display:flex; justify-content:space-between; align-items:center;}
+  .space-card p{margin:0; font-size:12.5px; font-weight:600; color:var(--ink);}
+  .space-card span{font-size:9.5px; color:var(--muted);}
+  .space-tag{font-size:9px; padding:3px 8px; border-radius:7px; background:var(--ivory); color:var(--ember-dim); font-weight:600;}
+
+  .staff-row{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line-2);}
+  .staff-row .av{width:28px; height:28px; border-radius:50%; background:var(--palm); flex-shrink:0; margin-right:10px;}
+  .staff-row .name p{margin:0; font-size:12px; font-weight:600; color:var(--ink);}
+  .staff-row .name span{font-size:9.5px; color:var(--muted);}
+  .role-pill{font-size:9px; padding:3px 9px; border-radius:8px; font-weight:600;}
+  .role-pill.owner{background:#FBF0DC; color:var(--ember-dim);}
+  .role-pill.manager{background:#E3EAF2; color:#2F5B8A;}
+  .role-pill.staff{background:#EDEAE0; color:#6B6656;}
+
+  .review-bar-row{display:flex; align-items:center; gap:8px; margin-bottom:4px;}
+  .review-bar-row span:first-child{font-size:10px; color:var(--muted); width:40px;}
+  .review-bar-track{flex:1; height:6px; background:var(--ivory); border-radius:3px; overflow:hidden;}
+  .review-bar-fill{height:100%; background:var(--ember);}
+
+  .note{max-width:900px; margin:50px auto 0; font-size:12px; color:var(--ivory-dim); line-height:1.75; border-top:1px solid #24392F; padding-top:22px;}
+  .note b{color:var(--ivory); font-weight:600;}
+  .note h5{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ember); margin:20px 0 8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="intro">
+    <p class="eyebrow">Système complet — v2, construit sur la direction v1</p>
+    <h1>Chaque écran, pensé pour l'appareil qui le tiendra</h1>
+    <p class="sub">Même palette, même typographie, même lueur ambrée que la première direction — étendue ici à l'ensemble des deux applications, avec une règle simple : le client tient son téléphone d'une main, le gérant travaille sur une tablette posée sur le comptoir, le personnel garde le même outil dans sa poche.</p>
+  </div>
+
+  <div class="strategy">
+    <div class="strat-card"><i class="ti ti-device-mobile"></i><h4>Client — téléphone</h4><p>Une main, un pouce. Navigation par onglets en bas, cartes verticales, CTA toujours atteignable en bas d'écran.</p></div>
+    <div class="strat-card"><i class="ti ti-device-tablet"></i><h4>Gérant / manager — tablette</h4><p>Rail de navigation latéral, vue liste + détail côte à côte. L'espace sert à comparer et trancher, pas à agrandir un écran de téléphone.</p></div>
+    <div class="strat-card"><i class="ti ti-device-mobile-cog"></i><h4>Personnel — téléphone</h4><p>Même application que le gérant, même composants — mais navigation du bas, une seule colonne, et les entrées de gestion du profil disparaissent plutôt que d'être grisées.</p></div>
+  </div>
+
+  <div class="legend">
+    <h3>Langage des statuts — cohérent dans les deux applications</h3>
+    <div class="leg-item"><span class="leg-dot" style="background:#1F6B44"></span>Payé / Prêt / Terminé</div>
+    <div class="leg-item"><span class="leg-dot" style="background:#8A6D2A"></span>Sur place / En espèces</div>
+    <div class="leg-item"><span class="leg-dot" style="background:#A8453A"></span>Non payé / Manqué</div>
+    <div class="leg-item"><span class="leg-dot" style="background:#D98E2B"></span>En préparation</div>
+    <div class="leg-item"><span class="leg-dot" style="background:#6B6656"></span>Passée / En attente</div>
+    <div class="leg-item"><span class="leg-dot" style="background:#2F5B8A"></span>Terminée (réservation)</div>
+  </div>
+
+  <!-- ============ CUSTOMER — PHONE ============ -->
+  <p class="section-title"><i class="ti ti-device-mobile"></i>Client — téléphone</p>
+  <p class="section-note">Huit écrans couvrant le parcours complet : découverte, plats en vedette, fiche établissement, réservation avec la clause de dépôt en clair, suivi de commande, avis, et le compte. Les écrans plus petits déjà stables dans l'app (visualiseur photo plein écran, réinitialisation de mot de passe) reprennent ces mêmes composants sans variation méritant leur propre maquette.</p>
+  <div class="row">
+
+    <div class="screen-block">
+      <p class="screen-label">1 · Parcourir</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar">
+          <p class="greet">Bonsoir, <strong>Mariama</strong></p>
+          <div class="search"><i class="ti ti-search"></i><span>Restaurants, lounges, quartiers…</span></div>
+        </div>
+        <div class="chips">
+          <div class="chip active">Tout</div><div class="chip">Restaurants</div><div class="chip">Lounges</div><div class="chip">Ouvert maintenant</div>
+        </div>
+        <div class="list">
+          <div class="card"><div class="photo"><div class="status-dot"><i></i>Ouvert</div><div class="dist">1.2 km</div></div>
+            <div class="body"><h4>Chicha Lounge LaParisienne</h4><div class="meta"><i class="ti ti-star-filled"></i>4.8 · Kipé, salon privé</div></div></div>
+          <div class="card"><div class="photo" style="background:linear-gradient(135deg,#8A5C1C,#12271F)"><div class="status-dot"><i></i>Ouvert</div><div class="dist">2.4 km</div></div>
+            <div class="body"><h4>Le Baobab Doré</h4><div class="meta"><i class="ti ti-star-filled"></i>4.6 · Kaloum, guinéenne</div></div></div>
+        </div>
+        <div class="bottom-nav">
+          <div><i class="ti ti-compass on"></i><span class="lbl" style="color:var(--ember)">Parcourir</span></div>
+          <div><i class="ti ti-calendar-event"></i><span class="lbl" style="color:#C7C0AC">Réservations</span></div>
+          <div><i class="ti ti-heart"></i><span class="lbl" style="color:#C7C0AC">Favoris</span></div>
+          <div><i class="ti ti-user"></i><span class="lbl" style="color:#C7C0AC">Profil</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">2 · Plats en vedette <b>· nouveau</b></p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar">
+          <p class="greet">Restaurants</p>
+          <div class="search"><i class="ti ti-search"></i><span>Restaurants, lounges, quartiers…</span></div>
+        </div>
+        <div class="segment"><div class="seg-opt">Établissements</div><div class="seg-opt active">Plats</div></div>
+        <div class="list" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="card"><div class="photo" style="height:78px; background:linear-gradient(135deg,#D98E2B,#8A5C1C)"></div>
+            <div class="body" style="padding:8px 9px;"><h4 style="font-size:12.5px;">Poulet yassa</h4><div class="meta" style="font-size:9px;">Le Baobab Doré</div><b style="font-family:var(--font-mono); font-size:11px; color:var(--palm-dim);">45 000 GNF</b></div></div>
+          <div class="card"><div class="photo" style="height:78px; background:linear-gradient(135deg,#3E8A63,#12271F)"></div>
+            <div class="body" style="padding:8px 9px;"><h4 style="font-size:12.5px;">Chicha pomme</h4><div class="meta" style="font-size:9px;">LaParisienne</div><b style="font-family:var(--font-mono); font-size:11px; color:var(--palm-dim);">50 000 GNF</b></div></div>
+          <div class="card"><div class="photo" style="height:78px; background:linear-gradient(135deg,#A8453A,#12271F)"></div>
+            <div class="body" style="padding:8px 9px;"><h4 style="font-size:12.5px;">Thiéboudienne</h4><div class="meta" style="font-size:9px;">Terrasse Coleah</div><b style="font-family:var(--font-mono); font-size:11px; color:var(--palm-dim);">55 000 GNF</b></div></div>
+          <div class="card"><div class="photo" style="height:78px; background:linear-gradient(135deg,#3E4A8A,#12271F)"></div>
+            <div class="body" style="padding:8px 9px;"><h4 style="font-size:12.5px;">Jus de bissap</h4><div class="meta" style="font-size:9px;">Le Baobab Doré</div><b style="font-family:var(--font-mono); font-size:11px; color:var(--palm-dim);">15 000 GNF</b></div></div>
+        </div>
+        <div class="bottom-nav">
+          <div><i class="ti ti-compass on"></i><span class="lbl" style="color:var(--ember)">Parcourir</span></div>
+          <div><i class="ti ti-calendar-event"></i><span class="lbl" style="color:#C7C0AC">Réservations</span></div>
+          <div><i class="ti ti-heart"></i><span class="lbl" style="color:#C7C0AC">Favoris</span></div>
+          <div><i class="ti ti-user"></i><span class="lbl" style="color:#C7C0AC">Profil</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">3 · Fiche établissement</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="detail-scroll">
+          <div class="hero"><div class="hero-glow"></div>
+            <div class="hero-tag"><h3>Chicha Lounge LaParisienne</h3><p>Plaza Diamant, Kipé · Ouvert jusqu'à 2h</p></div>
+          </div>
+          <div style="display:flex; gap:14px; padding:10px 16px 0; font-size:10.5px;">
+            <span style="color:var(--ember); font-weight:600; border-bottom:2px solid var(--ember); padding-bottom:6px;">Menu</span>
+            <span style="color:var(--muted);">Horaires</span><span style="color:var(--muted);">Avis (128)</span><span style="color:var(--muted);">Photos</span>
+          </div>
+          <hr class="stitch">
+          <div class="section">
+            <div class="menu-item"><div><p>Chicha pomme double</p><span>Saveur maison</span></div><b>50 000 GNF</b></div>
+            <div class="menu-item"><div><p>Jus de bissap</p><span>Boisson</span></div><b>15 000 GNF</b></div>
+            <div class="menu-item"><div><p>Brochette de bœuf</p><span>Épuisé aujourd'hui</span></div><b style="color:#C7C0AC;">35 000 GNF</b></div>
+          </div>
+        </div>
+        <div class="cta-bar"><div><p>À partir de</p><b>50 000 GNF</b></div><button class="btn-ember">Réserver</button></div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">4 · Réserver <b>· dépôt en clair</b></p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar"><p class="greet" style="font-size:13px; color:var(--ivory); font-weight:600;">Choisir un créneau</p></div>
+        <div class="detail-scroll">
+          <div class="section" style="padding-top:12px;">
+            <h5>Ce soir · 4 personnes</h5>
+            <div class="slot-row" style="padding:0;">
+              <div class="slot">18:30</div><div class="slot active">19:30</div><div class="slot taken">20:00</div><div class="slot">21:00</div>
+            </div>
+          </div>
+          <div class="disclosure"><b>Acompte 50 000 GNF.</b> Compensé sur l'addition à votre arrivée. Si la table n'est pas honorée 30 minutes après l'heure réservée, l'acompte est retenu.</div>
+          <div class="section" style="padding-top:0;">
+            <h5>Paiement</h5>
+            <div class="menu-item"><div><p>Orange Money</p></div><i class="ti ti-circle-check" style="color:var(--ember); font-size:16px;"></i></div>
+            <div class="menu-item"><div><p>MTN Mobile Money</p></div><i class="ti ti-circle" style="color:#D9CFB4; font-size:16px;"></i></div>
+            <div class="menu-item"><div><p>Payer sur place</p></div><i class="ti ti-circle" style="color:#D9CFB4; font-size:16px;"></i></div>
+          </div>
+        </div>
+        <div class="cta-bar"><div><p>19:30 · 4 pers.</p><b>50 000 GNF</b></div><button class="btn-ember">Confirmer</button></div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">5 · Mes réservations</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar"><p class="greet" style="font-size:13px; color:var(--ivory); font-weight:600;">Mes réservations</p></div>
+        <div class="segment"><div class="seg-opt active">Réservations</div><div class="seg-opt">Commandes</div></div>
+        <div class="list">
+          <div class="card"><div class="body" style="padding:12px;">
+            <div style="display:flex; justify-content:space-between;"><h4 style="font-size:13.5px;">LaParisienne</h4><span class="badge ready">Confirmée</span></div>
+            <div class="meta">Ce soir, 19:30 · 4 pers. · Salon VIP 1</div></div></div>
+          <div class="card"><div class="body" style="padding:12px;">
+            <div style="display:flex; justify-content:space-between;"><h4 style="font-size:13.5px;">Le Baobab Doré</h4><span class="badge completed">Terminée</span></div>
+            <div class="meta">28 juillet · 2 pers.</div></div></div>
+          <div class="card"><div class="body" style="padding:12px;">
+            <div style="display:flex; justify-content:space-between;"><h4 style="font-size:13.5px;">Terrasse Coleah</h4><span class="badge noshow">Manquée</span></div>
+            <div class="meta">14 juillet · 6 pers. · Acompte retenu</div></div></div>
+        </div>
+        <div class="bottom-nav">
+          <div><i class="ti ti-compass"></i><span class="lbl" style="color:#C7C0AC">Parcourir</span></div>
+          <div><i class="ti ti-calendar-event on"></i><span class="lbl" style="color:var(--ember)">Réservations</span></div>
+          <div><i class="ti ti-heart"></i><span class="lbl" style="color:#C7C0AC">Favoris</span></div>
+          <div><i class="ti ti-user"></i><span class="lbl" style="color:#C7C0AC">Profil</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">6 · Suivi de commande</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar"><p class="greet" style="font-size:13px; color:var(--ivory); font-weight:600;">Commande #A214</p></div>
+        <div class="detail-scroll">
+          <div class="section" style="padding-top:16px;">
+            <div class="stage-track">
+              <div class="stage-dot"><i class="ti ti-check" style="font-size:11px;"></i></div><div class="stage-line"></div>
+              <div class="stage-dot"><i class="ti ti-flame" style="font-size:11px;"></i></div><div class="stage-line todo"></div>
+              <div class="stage-dot todo"></div>
+            </div>
+            <div class="stage-labels"><span>Passée</span><span>En préparation</span><span>Prête</span></div>
+          </div>
+          <hr class="stitch">
+          <div class="section">
+            <h5>Retrait prévu — 20:15</h5>
+            <div class="menu-item"><div><p>Poulet yassa ×2</p></div><b>90 000 GNF</b></div>
+            <div class="menu-item"><div><p>Jus de bissap ×2</p></div><b>30 000 GNF</b></div>
+          </div>
+        </div>
+        <div class="cta-bar"><div><p>Total payé</p><b>120 000 GNF</b></div><button class="btn-ghost">Itinéraire</button></div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">7 · Laisser un avis <b>· nouveau</b></p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar"><p class="greet" style="font-size:13px; color:var(--ivory); font-weight:600;">Votre visite chez LaParisienne</p></div>
+        <div class="detail-scroll">
+          <div class="section" style="padding-top:16px;">
+            <h5>Note</h5>
+            <div class="stars-input"><i class="ti ti-star-filled on"></i><i class="ti ti-star-filled on"></i><i class="ti ti-star-filled on"></i><i class="ti ti-star-filled on"></i><i class="ti ti-star"></i></div>
+          </div>
+          <h5 style="margin:0 16px 6px; font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; color:var(--muted);">Commentaire</h5>
+          <textarea class="rev-box" placeholder="Ambiance, service, ce qui vous a marqué…"></textarea>
+          <p style="font-size:10px; color:var(--muted); margin:10px 16px 0;"><i class="ti ti-shield-check" style="font-size:12px; vertical-align:-2px; color:var(--palm);"></i> Lié à votre réservation du 28 juillet — un avis par visite.</p>
+        </div>
+        <div class="cta-bar"><div></div><button class="btn-ember">Publier l'avis</button></div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">8 · Profil</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar" style="padding-bottom:18px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:44px; height:44px; border-radius:50%; background:var(--ember);"></div>
+            <div><p style="margin:0; font-family:var(--font-display); font-size:16px; color:var(--ivory);">Mariama Diallo</p><p style="margin:0; font-size:10.5px; color:var(--ivory-dim);">+224 6XX XX XX XX</p></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="menu-item" style="background:var(--paper); border-radius:11px; padding:11px 13px; border-bottom:none;"><div><p>Favoris</p></div><i class="ti ti-chevron-right" style="color:var(--muted);"></i></div>
+          <div class="menu-item" style="background:var(--paper); border-radius:11px; padding:11px 13px; border-bottom:none;"><div><p>Historique de commandes</p></div><i class="ti ti-chevron-right" style="color:var(--muted);"></i></div>
+          <div class="menu-item" style="background:var(--paper); border-radius:11px; padding:11px 13px; border-bottom:none;"><div><p>Langue — Français</p></div><i class="ti ti-chevron-right" style="color:var(--muted);"></i></div>
+          <div class="menu-item" style="background:var(--paper); border-radius:11px; padding:11px 13px; border-bottom:none;"><div><p>Supprimer mon compte</p></div><i class="ti ti-chevron-right" style="color:var(--muted);"></i></div>
+        </div>
+        <div class="bottom-nav">
+          <div><i class="ti ti-compass"></i><span class="lbl" style="color:#C7C0AC">Parcourir</span></div>
+          <div><i class="ti ti-calendar-event"></i><span class="lbl" style="color:#C7C0AC">Réservations</span></div>
+          <div><i class="ti ti-heart"></i><span class="lbl" style="color:#C7C0AC">Favoris</span></div>
+          <div><i class="ti ti-user on"></i><span class="lbl" style="color:var(--ember)">Profil</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ MERCHANT — TABLET ============ -->
+  <p class="section-title"><i class="ti ti-device-tablet"></i>Gérant / manager — tablette</p>
+  <p class="section-note">Rail de navigation à gauche, vue liste + détail à droite : la tablette n'agrandit pas le téléphone, elle permet de garder la liste du jour visible pendant qu'on travaille un dossier — l'espace vide relevé dans l'audit disparaît parce qu'il est utilisé, pas élargi.</p>
+  <div class="row">
+
+    <div class="screen-block tablet-block">
+      <p class="screen-label">1 · Bureau — réservations</p>
+      <div class="tablet">
+        <div class="rail">
+          <div class="mark"></div>
+          <div class="rail-item on"><i class="ti ti-calendar-event"></i><span>Bureau</span></div>
+          <div class="rail-item"><i class="ti ti-flame"></i><span>Cuisine</span></div>
+          <div class="rail-item"><i class="ti ti-credit-card"></i><span>Paiements</span></div>
+          <div class="rail-item"><i class="ti ti-star"></i><span>Avis</span></div>
+          <div class="rail-item"><i class="ti ti-settings"></i><span>Gérer</span></div>
+        </div>
+        <div class="tab-main">
+          <div class="tab-top"><h4>Aujourd'hui</h4><div class="venue-pill"><i class="ti ti-building-store"></i>La Parisienne — Kipé <i class="ti ti-chevron-down" style="font-size:11px;"></i></div></div>
+          <div class="split">
+            <div class="split-list">
+              <div class="res-row sel"><div class="top"><p>Mariama D. · 4 pers.</p><span class="time">19:30</span></div><div class="sub">Salon VIP 1</div><span class="badge paid" style="margin-top:6px; display:inline-block;">Payé · MTN</span></div>
+              <div class="res-row"><div class="top"><p>Ibrahima S. · 2 pers.</p><span class="time">20:00</span></div><div class="sub">Table 4</div><span class="badge unpaid" style="margin-top:6px; display:inline-block;">Non payé</span></div>
+              <div class="res-row"><div class="top"><p>Fatoumata B. · 6 pers.</p><span class="time">21:15</span></div><div class="sub">Terrasse</div><span class="badge cash" style="margin-top:6px; display:inline-block;">Sur place</span></div>
+            </div>
+            <div class="split-detail">
+              <div class="detail-hd"><div><h3>Mariama D.</h3><span class="ref"><i class="ti ti-copy" style="font-size:11px;"></i> RES-2A9F-7731</span></div><span class="badge paid">Payé · MTN</span></div>
+              <div class="field-grid">
+                <div><p>Heure</p><span>19:30</span></div><div><p>Convives</p><span>4 personnes</span></div>
+                <div><p>Espace</p><span>Salon VIP 1</span></div><div><p>Grâce no-show</p><span>90 min (lounge)</span></div>
+              </div>
+              <div class="action-row"><button class="pri">Marquer arrivé</button><button class="sec">Annuler</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block tablet-block">
+      <p class="screen-label">2 · Cuisine — commandes</p>
+      <div class="tablet">
+        <div class="rail">
+          <div class="mark"></div>
+          <div class="rail-item"><i class="ti ti-calendar-event"></i><span>Bureau</span></div>
+          <div class="rail-item on"><i class="ti ti-flame"></i><span>Cuisine</span></div>
+          <div class="rail-item"><i class="ti ti-credit-card"></i><span>Paiements</span></div>
+          <div class="rail-item"><i class="ti ti-star"></i><span>Avis</span></div>
+          <div class="rail-item"><i class="ti ti-settings"></i><span>Gérer</span></div>
+        </div>
+        <div class="tab-main">
+          <div class="tab-top"><h4>File de commandes</h4><button class="btn-ghost"><i class="ti ti-plus" style="font-size:12px; vertical-align:-1px;"></i> Commande sur place</button></div>
+          <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="manage-tile"><span class="badge placed">Passée</span><p>#A214 · Ibrahima</p><span>Poulet yassa ×2</span></div>
+            <div class="manage-tile"><span class="badge preparing">En préparation</span><p>#A211 · Fatoumata</p><span>Thiéboudienne ×1</span></div>
+            <div class="manage-tile"><span class="badge ready">Prête</span><p>#A208 · Comptoir</p><span>Brochettes ×3</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block tablet-block">
+      <p class="screen-label">3 · Paiements</p>
+      <div class="tablet">
+        <div class="rail">
+          <div class="mark"></div>
+          <div class="rail-item"><i class="ti ti-calendar-event"></i><span>Bureau</span></div>
+          <div class="rail-item"><i class="ti ti-flame"></i><span>Cuisine</span></div>
+          <div class="rail-item on"><i class="ti ti-credit-card"></i><span>Paiements</span></div>
+          <div class="rail-item"><i class="ti ti-star"></i><span>Avis</span></div>
+          <div class="rail-item"><i class="ti ti-settings"></i><span>Gérer</span></div>
+        </div>
+        <div class="tab-main">
+          <div class="tab-top"><h4>Paiements — juillet</h4></div>
+          <div class="metric-row">
+            <div class="metric good"><p>Encaissé</p><b>2,4M GNF</b></div>
+            <div class="metric warn"><p>À relancer</p><b>150K GNF</b></div>
+            <div class="metric"><p>Échoué</p><b>0 GNF</b></div>
+          </div>
+          <div class="section">
+            <h5>Ne correspond pas</h5>
+            <div class="menu-item"><div><p>RES-9F21</p><span>Fournisseur : payé</span></div><b style="color:var(--clayrose);">Nous : en attente</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block tablet-block">
+      <p class="screen-label">4 · Gérer — hub</p>
+      <div class="tablet">
+        <div class="rail">
+          <div class="mark"></div>
+          <div class="rail-item"><i class="ti ti-calendar-event"></i><span>Bureau</span></div>
+          <div class="rail-item"><i class="ti ti-flame"></i><span>Cuisine</span></div>
+          <div class="rail-item"><i class="ti ti-credit-card"></i><span>Paiements</span></div>
+          <div class="rail-item"><i class="ti ti-star"></i><span>Avis</span></div>
+          <div class="rail-item on"><i class="ti ti-settings"></i><span>Gérer</span></div>
+        </div>
+        <div class="tab-main">
+          <div class="tab-top"><h4>Gérer — La Parisienne</h4></div>
+          <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="manage-tile"><i class="ti ti-armchair"></i><p>Tables et salons</p><span>6 espaces actifs</span></div>
+            <div class="manage-tile"><i class="ti ti-clock"></i><p>Horaires</p><span>7j/7 · jusqu'à 2h</span></div>
+            <div class="manage-tile"><i class="ti ti-tools-kitchen-2"></i><p>Menu</p><span>18 plats</span></div>
+            <div class="manage-tile"><i class="ti ti-photo"></i><p>Photos</p><span>9 photos</span></div>
+            <div class="manage-tile"><i class="ti ti-palette"></i><p>Image de marque</p><span>Préréglage Ember</span></div>
+            <div class="manage-tile"><i class="ti ti-users"></i><p>Personnel</p><span>4 comptes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block tablet-block">
+      <p class="screen-label">5 · Tables et salons <b>· nouveau</b></p>
+      <div class="tablet">
+        <div class="rail">
+          <div class="mark"></div>
+          <div class="rail-item"><i class="ti ti-calendar-event"></i><span>Bureau</span></div>
+          <div class="rail-item"><i class="ti ti-flame"></i><span>Cuisine</span></div>
+          <div class="rail-item"><i class="ti ti-credit-card"></i><span>Paiements</span></div>
+          <div class="rail-item"><i class="ti ti-star"></i><span>Avis</span></div>
+          <div class="rail-item on"><i class="ti ti-settings"></i><span>Gérer</span></div>
+        </div>
+        <div class="tab-main">
+          <div class="tab-top"><h4>Tables et salons</h4><button class="btn-ghost"><i class="ti ti-plus" style="font-size:12px; vertical-align:-1px;"></i> Ajouter</button></div>
+          <div style="padding:14px; display:flex; flex-direction:column; gap:9px;">
+            <div class="space-card"><div><p>Salon VIP 1</p><span>6 places</span></div><span class="space-tag">Salon</span></div>
+            <div class="space-card"><div><p>Table 4</p><span>2 places</span></div><span class="space-tag">Table</span></div>
+            <div class="space-card"><div><p>Terrasse</p><span>8 places</span></div><span class="space-tag">Terrasse</span></div>
+            <div class="space-card" style="opacity:.45;"><div><p>Salon VIP 2</p><span>Désactivé — réservations conservées</span></div><span class="space-tag">Salon</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block tablet-block">
+      <p class="screen-label">6 · Personnel</p>
+      <div class="tablet">
+        <div class="rail">
+          <div class="mark"></div>
+          <div class="rail-item"><i class="ti ti-calendar-event"></i><span>Bureau</span></div>
+          <div class="rail-item"><i class="ti ti-flame"></i><span>Cuisine</span></div>
+          <div class="rail-item"><i class="ti ti-credit-card"></i><span>Paiements</span></div>
+          <div class="rail-item"><i class="ti ti-star"></i><span>Avis</span></div>
+          <div class="rail-item on"><i class="ti ti-settings"></i><span>Gérer</span></div>
+        </div>
+        <div class="tab-main">
+          <div class="tab-top"><h4>Personnel — La Parisienne</h4><button class="btn-ghost"><i class="ti ti-plus" style="font-size:12px; vertical-align:-1px;"></i> Inviter</button></div>
+          <div style="padding:14px;">
+            <div class="staff-row"><div style="display:flex; align-items:center;"><div class="av"></div><div class="name"><p>Mamadou Sylla</p><span>+224 6XX XX XX 01</span></div></div><span class="role-pill owner">Propriétaire</span></div>
+            <div class="staff-row"><div style="display:flex; align-items:center;"><div class="av" style="background:var(--ember);"></div><div class="name"><p>Aïssatou Bah</p><span>+224 6XX XX XX 02</span></div></div><span class="role-pill manager">Manager</span></div>
+            <div class="staff-row"><div style="display:flex; align-items:center;"><div class="av" style="background:#8A6D2A;"></div><div class="name"><p>Ousmane Diallo</p><span>+224 6XX XX XX 03</span></div></div><span class="role-pill staff">Personnel</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ STAFF — PHONE ============ -->
+  <p class="section-title"><i class="ti ti-device-mobile-cog"></i>Personnel — téléphone</p>
+  <p class="section-note">Même application, même composants que la tablette du gérant — mais la barre de navigation redescend en bas, la vue liste + détail redevient une seule colonne, et les entrées réservées au rôle propriétaire/manager (Image de marque, Personnel, Profil de l'établissement) sont absentes de "Gérer" plutôt que grisées : un membre du personnel ne doit jamais tomber sur un bouton qui lui refuse l'accès.</p>
+  <div class="row">
+
+    <div class="screen-block">
+      <p class="screen-label">Bureau — vue personnel</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar tab">
+          <div class="venue-switch" style="display:flex; justify-content:space-between; align-items:center;">
+            <p style="margin:0; font-family:var(--font-display); font-size:15px; color:var(--ivory);">La Parisienne</p>
+          </div>
+        </div>
+        <div class="segment"><div class="seg-opt active">Réservations</div><div class="seg-opt">Commandes</div></div>
+        <div class="list">
+          <div class="card"><div class="body" style="padding:11px;">
+            <div style="display:flex; justify-content:space-between;"><p style="margin:0; font-size:12.5px; font-weight:600;">Mariama D. · 4 pers.</p><span class="badge paid">Payé · MTN</span></div>
+            <div class="meta">19:30 · Salon VIP 1</div>
+            <div style="display:flex; gap:8px; margin-top:8px;"><button class="btn-ghost" style="flex:1; background:var(--palm); color:#fff; border:none;">Marquer arrivé</button><button class="btn-ghost" style="flex:1;">Annuler</button></div>
+          </div></div>
+          <div class="card"><div class="body" style="padding:11px;">
+            <div style="display:flex; justify-content:space-between;"><p style="margin:0; font-size:12.5px; font-weight:600;">Ibrahima S. · 2 pers.</p><span class="badge unpaid">Non payé</span></div>
+            <div class="meta">20:00 · Table 4</div>
+            <div style="display:flex; gap:8px; margin-top:8px;"><button class="btn-ghost" style="flex:1; opacity:.4;" disabled>Marquer arrivé</button><button class="btn-ghost" style="flex:1;">Annuler</button></div>
+          </div></div>
+        </div>
+        <div class="bottom-nav">
+          <div><i class="ti ti-calendar-event on"></i><span class="lbl" style="color:var(--ember)">Bureau</span></div>
+          <div><i class="ti ti-flame"></i><span class="lbl" style="color:#C7C0AC">Cuisine</span></div>
+          <div><i class="ti ti-tools-kitchen-2"></i><span class="lbl" style="color:#C7C0AC">Menu</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-block">
+      <p class="screen-label">Gérer — vue personnel (comparer à la tablette)</p>
+      <div class="phone"><div class="notch"></div>
+        <div class="app-bar tab"><p style="margin:0; font-family:var(--font-display); font-size:15px; color:var(--ivory);">Gérer</p></div>
+        <div class="list" style="display:flex; flex-direction:column; gap:9px;">
+          <div class="manage-tile"><i class="ti ti-armchair"></i><p>Tables et salons</p><span>Lecture seule pour le personnel</span></div>
+          <div class="manage-tile"><i class="ti ti-tools-kitchen-2"></i><p>Menu — marquer épuisé</p><span>Seule action de menu autorisée</span></div>
+          <div style="text-align:center; padding:16px 0;"><p style="font-size:10px; color:var(--muted); font-family:var(--font-mono);">— Horaires, Personnel, Image de marque : absents pour ce rôle —</p></div>
+        </div>
+        <div class="bottom-nav">
+          <div><i class="ti ti-calendar-event"></i><span class="lbl" style="color:#C7C0AC">Bureau</span></div>
+          <div><i class="ti ti-flame"></i><span class="lbl" style="color:#C7C0AC">Cuisine</span></div>
+          <div><i class="ti ti-tools-kitchen-2 on"></i><span class="lbl" style="color:var(--ember)">Menu</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <b>Ce qui a changé depuis la v1, et pourquoi.</b> La première direction posait la palette et la typographie ; celle-ci les met au travail sur la surface réelle des deux applications, telle qu'auditée dans PROJECT_STATUS.md — jusqu'aux écrans qui n'existaient encore que côté backend (Tables et salons, Avis marchand) au moment de l'audit.
+    <h5>Pourquoi la tablette n'est pas un téléphone agrandi</h5>
+    Le défaut relevé dans l'audit — une colonne centrale étroite flottant dans un écran de 2560px — vient d'un réflexe : construire une seule mise en page et l'étirer. Le rail de navigation et la vue liste + détail ne sont pas une décoration ; ils donnent à l'espace supplémentaire un travail réel — comparer une réservation à la suivante sans perdre le fil de la journée.
+    <h5>Pourquoi le personnel voit un menu plus court, pas plus grisé</h5>
+    Un bouton visible mais désactivé invite à essayer puis à se sentir refusé. Faire disparaître Personnel, Image de marque et Profil de l'établissement pour un rôle qui n'y a pas accès évite ce moment — cohérent avec la façon dont le contrôle d'accès est déjà appliqué côté serveur, pas seulement dans l'interface.
+    <h5>Pourquoi le dépôt et le statut de commande ont chacun leur propre langage visuel</h5>
+    Payé/Sur place/Non payé (paiement) et Passée/En préparation/Prête (commande) ne partagent jamais une couleur par accident : ce sont deux questions différentes qu'un gérant pose en un coup d'œil, et la légende en tête de document existe pour que ce langage reste identique partout où il apparaît, dans les deux applications.
+  </div>
+
+</div>
+</body>
+</html>

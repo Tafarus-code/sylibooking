@@ -231,6 +231,7 @@
   "bookingMissedDetail": "Personne ne s’est présenté avant que l’établissement cesse de garder la table.",
   "depositTerms": "Votre acompte de {amount} GNF est déduit de l’addition à votre arrivée. Si personne ne se présente dans ce délai, l’établissement le conserve.",
   "tooManyAttempts": "Trop de tentatives. Patientez un instant et réessayez.",
+  "browsingTooFast": "Vous allez un peu vite. Patientez un instant et réessayez.",
   "yourDetails": "Vos coordonnées",
   "detailsIntro": "Utilisées pour remplir votre prochaine réservation, et pour vous joindre si vous oubliez votre mot de passe.",
   "profileName": "Nom",

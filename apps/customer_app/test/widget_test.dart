@@ -4937,4 +4937,59 @@ void main() {
       expect(find.text('Enregistrer'), findsOneWidget);
     });
   });
+
+  group('the catalogue answers 429', () {
+    testWidgets('browsing too fast is explained in plain words',
+        (tester) async {
+      // The public list is throttled per connection now. DRF's own wording
+      // is English and counts seconds at the customer.
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on(
+        'GET',
+        '/api/establishments/',
+        {'detail': 'Request was throttled. Expected available in 42 seconds.'},
+        status: 429,
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("going a bit fast"), findsOneWidget);
+      expect(find.textContaining('42 seconds'), findsNothing);
+    });
+
+    testWidgets('and in French', (tester) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: InMemoryLocaleStore('fr'),
+      );
+      backend.on(
+        'GET',
+        '/api/establishments/',
+        {'detail': 'Request was throttled.'},
+        status: 429,
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('un peu vite'), findsOneWidget);
+    });
+
+    testWidgets('an ordinary failure still says what the server said',
+        (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on(
+        'GET',
+        '/api/establishments/',
+        {'detail': 'Something specific went wrong.'},
+        status: 500,
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Something specific'), findsOneWidget);
+    });
+  });
 }

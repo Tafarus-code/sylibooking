@@ -10,9 +10,11 @@ expired code and an account that was never there.
 """
 
 import logging
+import time
 
 from accounts.models import CustomerProfile, PasswordResetCode
 from accounts.notifications import NotificationError, get_notifier, mask
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
@@ -100,19 +102,52 @@ class RequestResetView(APIView):
     throttle_classes = [PasswordResetIpThrottle, PasswordResetIdentifierThrottle]
 
     def post(self, request):
+        """Answer no faster than the floor, whatever the answer is.
+
+        The wording is already identical whether or not the identifier
+        exists. The work behind it is not: a hit issues a code, writes a row
+        and hands it to a notifier, while a miss returns after a single
+        query. Timed from outside, that difference reads as a yes/no on
+        whether an account exists — which is exactly what the identical
+        wording was there to withhold. It gets worse once the notifier is a
+        real SMS gateway and the hit path includes a network round trip.
+
+        So both answers wait out the same floor. The cost is a worker held
+        for a quarter of a second on an endpoint already capped at a handful
+        of requests an hour, which is affordable; a rejected request never
+        reaches here, because the throttle refuses it first.
+        """
+        started = time.monotonic()
+        try:
+            return self._respond(request)
+        finally:
+            remaining = settings.PASSWORD_RESET_MIN_SECONDS - (
+                time.monotonic() - started
+            )
+            if remaining > 0:
+                time.sleep(remaining)
+
+    def _respond(self, request):
         form = RequestResetSerializer(data=request.data)
         form.is_valid(raise_exception=True)
 
         user = find_user(form.validated_data['identifier'])
         if user is None:
-            # Same answer as success, and the same rough timing.
+            # Same answer as a success, and — thanks to the floor in post()
+            # — no sooner.
             return Response({'detail': SENT_MESSAGE})
 
         channel, destination = channel_for(user)
         if channel is None:
             # An account with no phone and no email cannot be reset by code.
-            # Say so plainly — this is not a secret, and silence would leave
-            # the customer waiting for a message that is never coming.
+            # Say so plainly — silence would leave the customer waiting for a
+            # message that is never coming.
+            #
+            # Knowingly, this one answer does confirm the account exists. It
+            # is the only such leak left, it is bounded to accounts that
+            # cannot be reset anyway, and the alternative is a dead end with
+            # no explanation. Worth revisiting if enumeration ever matters
+            # more than that customer getting unstuck.
             return Response(
                 {
                     'detail': _(

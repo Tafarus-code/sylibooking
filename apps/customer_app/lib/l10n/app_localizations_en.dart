@@ -812,6 +812,10 @@ class LEn extends L {
       'Too many attempts. Wait a moment and try again.';
 
   @override
+  String get browsingTooFast =>
+      'You\'re going a bit fast. Wait a moment and try again.';
+
+  @override
   String get yourDetails => 'Your details';
 
   @override

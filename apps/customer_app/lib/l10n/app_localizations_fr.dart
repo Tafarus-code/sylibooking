@@ -817,6 +817,10 @@ class LFr extends L {
       'Trop de tentatives. Patientez un instant et réessayez.';
 
   @override
+  String get browsingTooFast =>
+      'Vous allez un peu vite. Patientez un instant et réessayez.';
+
+  @override
   String get yourDetails => 'Vos coordonnées';
 
   @override

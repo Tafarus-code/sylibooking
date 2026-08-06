@@ -4629,4 +4629,81 @@ void main() {
       expect(find.textContaining('Expected available'), findsNothing);
     });
   });
+
+  group('filters without sideways scrolling', () {
+    Future<void> openBrowse(WidgetTester tester, {String? language}) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        localeStore: InMemoryLocaleStore(language),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('every filter is on screen at 360dp', (tester) async {
+      // A strip clipped "Restaurants" mid-word and hid the last filter past
+      // the edge. A filter nobody can see is a filter nobody uses.
+      await openBrowse(tester);
+
+      for (final label in [
+        'All',
+        'Restaurants',
+        'Lounges',
+        'Open now',
+      ]) {
+        final rect = tester.getRect(find.text(label));
+        expect(rect.left, greaterThanOrEqualTo(0), reason: label);
+        expect(
+          rect.right,
+          lessThanOrEqualTo(360),
+          reason: '$label runs off the right edge',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('they wrap rather than scroll', (tester) async {
+      await openBrowse(tester);
+
+      // Two rows, not one row with a scrollbar.
+      final all = tester.getRect(find.text('All'));
+      final openNow = tester.getRect(find.text('Open now'));
+      expect(openNow.top, greaterThan(all.top));
+    });
+
+    testWidgets('the longer French labels fit too', (tester) async {
+      await openBrowse(tester, language: 'fr');
+
+      for (final label in ['Restaurants', 'Salons']) {
+        final rect = tester.getRect(find.text(label));
+        expect(rect.right, lessThanOrEqualTo(360), reason: label);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('tapping one still filters', (tester) async {
+      final (:app, :backend, :store) = buildApp(tester);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lounges'));
+      await tester.pumpAndSettle();
+
+      final asked = backend.requests.lastWhere(
+        (r) => r.url.path == '/api/establishments/',
+      );
+      expect(asked.url.queryParameters['type'], 'lounge');
+    });
+  });
 }

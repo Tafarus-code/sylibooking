@@ -397,14 +397,58 @@ class Command(BaseCommand):
             f'+2246{self.rng.randint(10000000, 99999999)}',
         )
 
+    def seed_today(self, venue, spaces):
+        """Give this venue a day worth opening the desk on.
+
+        The random spread elsewhere lands on today about one night in seven,
+        so most venues showed "Nothing booked today" — which demonstrates the
+        empty state and nothing else. One sitting already past exercises
+        marking guests arrived; the two ahead are what a merchant would be
+        working.
+
+        Safe to run repeatedly: a venue that already has something today is
+        left alone, so this tops a stale database up without doubling it.
+        """
+        today = timezone.localdate()
+        if Reservation.objects.filter(
+            space__establishment=venue, datetime__date=today
+        ).exists():
+            return
+
+        start = timezone.localtime(timezone.now()).replace(
+            minute=0, second=0, microsecond=0
+        )
+        for hour, status in (
+            (13, Reservation.Status.CONFIRMED),
+            (19, Reservation.Status.CONFIRMED),
+            (21, Reservation.Status.PENDING),
+        ):
+            name, phone = self.person()
+            Reservation.objects.create(
+                space=self.rng.choice(spaces),
+                customer_name=name,
+                customer_phone=phone,
+                datetime=start.replace(hour=hour),
+                party_size=self.rng.randint(2, 5),
+                status=status,
+            )
+
     def seed_reservations(self, venues):
         now = timezone.now()
 
         for venue in venues:
-            if venue.spaces.filter(reservations__isnull=False).exists():
+            spaces = list(venue.spaces.all())
+            if not spaces:
                 continue
 
-            spaces = list(venue.spaces.all())
+            # Today first, and on every run rather than only the first.
+            # Seeding is idempotent by skipping venues that already have
+            # bookings, which meant a database seeded last week still opened
+            # on "Nothing booked today" — the one screen a demo starts from.
+            self.seed_today(venue, spaces)
+
+            if venue.spaces.filter(reservations__isnull=False).exists():
+                continue
 
             # Past, completed bookings — these are what make reviews possible.
             for _ in range(self.rng.randint(3, 6)):
@@ -430,11 +474,11 @@ class Command(BaseCommand):
                         comment=comment,
                     )
 
-            # Tonight and the days ahead, in a mix of states.
+            # The days ahead, in a mix of states.
             for _ in range(self.rng.randint(2, 5)):
                 name, phone = self.person()
                 when = now + timedelta(
-                    days=self.rng.randint(0, 6),
+                    days=self.rng.randint(1, 6),
                     hours=self.rng.randint(1, 8),
                 )
                 status = self.rng.choice(

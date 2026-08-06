@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -4822,6 +4823,143 @@ void main() {
 
       expect(find.text('Today'), findsWidgets);
       expect(find.text('Tomorrow'), findsOneWidget);
+    });
+  });
+
+  group('labels that used to be clipped', () {
+    /// The rendered width of a piece of text against the width it wants.
+    ///
+    /// Clipping does not throw and does not paint an overflow stripe inside
+    /// a segmented button — it just quietly eats a letter. Measuring is the
+    /// only way this stays fixed.
+    void expectNotClipped(WidgetTester tester, String label, {Finder? within}) {
+      // The label directly: find.byType does not match a generic across its
+      // type argument, so reaching through the SegmentedButton finds nothing.
+      // Scoped where given, because "Réservations" is also a navigation
+      // destination and matching both finds two.
+      final paragraph = tester.renderObject<RenderParagraph>(
+        within == null
+            ? find.text(label)
+            : find.descendant(of: within, matching: find.text(label)),
+      );
+      final wanted = paragraph.getMaxIntrinsicWidth(double.infinity);
+      expect(
+        paragraph.size.width,
+        greaterThanOrEqualTo(wanted - 0.5),
+        reason: '"$label" is $wanted wide and was given ${paragraph.size.width}',
+      );
+    }
+
+    Future<void> openDesk(WidgetTester tester, {String? language}) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(
+          auth: auth,
+          localeStore: InMemoryLocaleStore(language),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the French range picker shows its whole label',
+        (tester) async {
+      // "7 prochains jours" lost its final s and read as a typo.
+      await openDesk(tester, language: 'fr');
+
+      expect(find.text('7 prochains jours'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the English one too', (tester) async {
+      await openDesk(tester);
+
+      expect(find.text('Next 7 days'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the label is given the width it asks for', (tester) async {
+      await openDesk(tester, language: 'fr');
+
+      expectNotClipped(tester, '7 prochains jours');
+    });
+
+    testWidgets('and so is the desk switcher', (tester) async {
+      await openDesk(tester, language: 'fr');
+
+      // The bar's bottom slot, not the bar: its title is "Réservations"
+      // too, and so is the navigation destination behind it.
+      final switcher = find.byType(PreferredSize);
+      expectNotClipped(tester, 'Réservations', within: switcher);
+      expectNotClipped(tester, 'Commandes', within: switcher);
+    });
+  });
+
+  group('a very wide window', () {
+    testWidgets('the desk does not sit in a narrow strip', (tester) async {
+      // A 2560px tablet gave the list 1100px and 700px of nothing each side,
+      // which reads as a screen that has not finished loading.
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: const Size(2560, 1600),
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [booking()],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      final card = tester.getSize(find.byType(ReservationCard).first);
+      expect(card.width, greaterThan(ContentWidth.list));
+      // Still bounded: a booking card set across 2500px is not readable
+      // either, it is just differently wrong.
+      expect(card.width, lessThanOrEqualTo(ContentWidth.wideList));
+    });
+
+    testWidgets('a phone is unaffected', (tester) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [booking()],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+
+      final card = tester.getSize(find.byType(ReservationCard).first);
+      expect(card.width, lessThanOrEqualTo(phoneSize.width));
     });
   });
 }

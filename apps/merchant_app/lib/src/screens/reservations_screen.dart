@@ -235,9 +235,20 @@ class _ReservationsViewState extends State<ReservationsView> {
               for (final range in DateRange.values)
                 ButtonSegment(
                   value: range,
-                  // No wrapping: a segment is a fixed-height pill, so a label
-                  // that runs to two lines has its second one clipped off.
-                  label: Text(range.label(l), maxLines: 1, softWrap: false),
+                  // Scaled down rather than clipped. A segment is a
+                  // fixed-height pill, so a label that wraps loses its second
+                  // line — but one that simply runs off the end loses a
+                  // letter and reads "7 prochains jour", which is worse
+                  // because it looks like a typo rather than a layout
+                  // problem.
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      range.label(l),
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                  ),
                 ),
             ],
             selected: {_range},
@@ -308,7 +319,7 @@ class _ReservationsViewState extends State<ReservationsView> {
         return false;
       },
       child: ListView.builder(
-        padding: contentInsets(context, maxWidth: ContentWidth.list),
+        padding: contentInsets(context, maxWidth: ContentWidth.listFor(context)),
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: rows.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {

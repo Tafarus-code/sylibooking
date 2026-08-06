@@ -143,18 +143,21 @@ class BrowseFilters extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // A strip, not a Wrap: a second row of chips would cost the browse screen
-    // vertical space it cannot spare in landscape. HorizontalStrip is what
-    // makes the chips past the edge reachable with a mouse rather than only a
-    // thumb, and shows that they are there.
-    return HorizontalStrip(
-      height: 44,
+    // A Wrap, not a strip. This was a sideways-scrolling row, on the
+    // reasoning that a second line of chips costs the browse screen vertical
+    // space. It does — about 44dp on a phone — and that is the cheaper loss:
+    // a strip clipped "Restaurants" mid-word and hid the last filter behind
+    // an edge, and a filter nobody can see is a filter nobody uses. It is
+    // also the pattern already rejected for the photos and the day picker,
+    // and having one screen disagree with the rest is its own cost.
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      children: [
-        for (final (value, label) in options)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: FilterChip(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final (value, label) in options)
+            FilterChip(
               label: Text(label),
               selected: isSelected(value),
               onSelected: (_) => onSelected(value),
@@ -178,8 +181,8 @@ class BrowseFilters extends StatelessWidget {
                     : theme.colorScheme.outline,
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

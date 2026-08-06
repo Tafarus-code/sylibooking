@@ -253,7 +253,7 @@ class _OrdersViewState extends State<OrdersView> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: contentInsets(
           context,
-          maxWidth: ContentWidth.list,
+          maxWidth: ContentWidth.listFor(context),
         ).copyWith(bottom: 24),
         itemCount: rows.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {

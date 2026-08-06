@@ -36,6 +36,18 @@ from reservations.models import Reservation
 
 EAGER = override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 
+#: Quiet hours turned off, so "is this reminder due?" does not depend on what
+#: time the suite happens to run at.
+#:
+#: A booking three hours out is due — unless sending it would land between
+#: 22:00 and 07:00, in which case it waits for morning and is correctly not
+#: due. That is the behaviour QuietHoursTests exists to check; everywhere
+#: else it is a way for the suite to pass all day and fail overnight.
+#: An empty window (start == end) is never quiet.
+NO_QUIET = override_settings(
+    REMINDER_QUIET_START='00:00', REMINDER_QUIET_END='00:00'
+)
+
 
 class ReminderTestBase(APITestCase):
     def setUp(self):
@@ -108,6 +120,7 @@ class QuietHoursTests(ReminderTestBase):
         self.assertLess(send_after(booking), booking.datetime)
 
 
+@NO_QUIET
 class DueTests(ReminderTestBase):
     def test_a_booking_far_off_is_not_due_yet(self):
         self.book(when=timezone.now() + timedelta(days=3))
@@ -233,6 +246,7 @@ class SendingTests(ReminderTestBase):
 
 
 @EAGER
+@NO_QUIET
 class BeatTests(ReminderTestBase):
     def test_the_sweep_queues_one_task_per_due_booking(self):
         self.book(when=timezone.now() + timedelta(hours=2))

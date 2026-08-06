@@ -47,6 +47,20 @@ class ContentWidth {
 
   /// Lists and grids of cards, which tolerate more width than prose.
   static const list = 1100.0;
+
+  /// Lists on a window wide enough that 1100 leaves acres of nothing.
+  ///
+  /// A 2560px tablet in landscape gave the merchant's desk a 1100px strip
+  /// down the middle and 700px of empty on each side, which reads as a
+  /// screen that has not finished loading. Wider cards are not the ideal
+  /// answer — the real one is a second column, the day's list beside the
+  /// selected booking — but that is a screen to design, not a number to
+  /// change, and this stops the desk looking broken in the meantime.
+  static const wideList = 1600.0;
+
+  /// The list width for the window this context is in.
+  static double listFor(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= 2000 ? wideList : list;
 }
 
 /// Centres its child and stops it growing past [maxWidth].

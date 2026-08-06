@@ -197,11 +197,16 @@ class KitchenQueueTests(WalkInTestBase):
 
     def test_it_appears_in_the_same_queue_as_a_customer_order(self):
         self.authenticate(self.floor)
+        # Pinned to midday rather than now + an hour: the queue is filtered
+        # to today, and near midnight "in an hour" is tomorrow.
+        midday = timezone.localtime(timezone.now()).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
         Order.objects.create(
             establishment=self.venue,
             customer_name='Mariama',
             customer_phone='+224620000000',
-            pickup_time=timezone.now() + timedelta(hours=1),
+            pickup_time=midday,
         )
 
         self.ring_up(customer_name='Counter')

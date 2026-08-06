@@ -73,6 +73,21 @@ class LFr extends L {
   String get statusHoursNotListed => 'Horaires non indiqués';
 
   @override
+  String get resStatusPending => 'En attente';
+
+  @override
+  String get resStatusConfirmed => 'Confirmée';
+
+  @override
+  String get resStatusCancelled => 'Annulée';
+
+  @override
+  String get resStatusCompleted => 'Terminée';
+
+  @override
+  String get resStatusMissed => 'Manquée';
+
+  @override
   String typeAndCity(String type, String city) {
     return '$type · $city';
   }
@@ -151,6 +166,9 @@ class LFr extends L {
 
   @override
   String get lastSpaceFree => 'Dernière place à cette heure';
+
+  @override
+  String get slotTaken => 'Déjà pris';
 
   @override
   String spacesFree(int count) {
@@ -801,15 +819,22 @@ class LFr extends L {
   }
 
   @override
-  String get bookingMissed => 'Absent';
-
-  @override
   String get bookingMissedDetail =>
       'Personne ne s’est présenté avant que l’établissement cesse de garder la table.';
 
   @override
   String depositTerms(String amount) {
     return 'Votre acompte de $amount GNF est déduit de l’addition à votre arrivée. Si personne ne se présente dans ce délai, l’établissement le conserve.';
+  }
+
+  @override
+  String depositHeadline(String amount) {
+    return 'Acompte $amount GNF.';
+  }
+
+  @override
+  String depositDetail(int minutes) {
+    return 'Compensé sur l\'addition à votre arrivée. Si la table n\'est pas honorée $minutes minutes après l\'heure réservée, l\'acompte est retenu.';
   }
 
   @override

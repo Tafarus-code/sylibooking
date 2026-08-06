@@ -396,56 +396,32 @@ class _StatusChip extends StatelessWidget {
 
   final ReservationStatus status;
 
+  /// The shared vocabulary, not this screen's own palette.
+  ///
+  /// A completed booking is deliberately blue rather than the green a
+  /// finished order wears: they answer different questions, and the customer
+  /// sees both lists behind the same toggle.
+  static StatusTone toneFor(ReservationStatus status) => switch (status) {
+        ReservationStatus.pending => StatusTone.orderPlaced,
+        ReservationStatus.confirmed => StatusTone.confirmed,
+        ReservationStatus.cancelled => StatusTone.unpaid,
+        ReservationStatus.completed => StatusTone.reservationCompleted,
+        ReservationStatus.noShow => StatusTone.noShow,
+        ReservationStatus.unknown => StatusTone.orderPlaced,
+      };
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final (label, background, foreground) = switch (status) {
-      ReservationStatus.pending => (
-          'Pending',
-          scheme.tertiaryContainer,
-          scheme.onTertiaryContainer,
-        ),
-      ReservationStatus.confirmed => (
-          'Confirmed',
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-        ),
-      ReservationStatus.cancelled => (
-          'Cancelled',
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-        ),
-      ReservationStatus.completed => (
-          'Completed',
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-        ),
-      ReservationStatus.noShow => (
-          'Missed',
-          scheme.surfaceContainerHighest,
-          scheme.error,
-        ),
-      ReservationStatus.unknown => (
-          'Unknown',
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-        ),
+    final l = L.of(context);
+    final label = switch (status) {
+      ReservationStatus.pending => l.resStatusPending,
+      ReservationStatus.confirmed => l.resStatusConfirmed,
+      ReservationStatus.cancelled => l.resStatusCancelled,
+      ReservationStatus.completed => l.resStatusCompleted,
+      ReservationStatus.noShow => l.resStatusMissed,
+      ReservationStatus.unknown => l.resStatusPending,
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: foreground,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+    return StatusBadge(label: label, tone: toneFor(status));
   }
 }

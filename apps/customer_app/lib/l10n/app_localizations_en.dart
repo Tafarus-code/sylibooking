@@ -73,6 +73,21 @@ class LEn extends L {
   String get statusHoursNotListed => 'Hours not listed';
 
   @override
+  String get resStatusPending => 'Pending';
+
+  @override
+  String get resStatusConfirmed => 'Confirmed';
+
+  @override
+  String get resStatusCancelled => 'Cancelled';
+
+  @override
+  String get resStatusCompleted => 'Completed';
+
+  @override
+  String get resStatusMissed => 'Missed';
+
+  @override
   String typeAndCity(String type, String city) {
     return '$type · $city';
   }
@@ -151,6 +166,9 @@ class LEn extends L {
 
   @override
   String get lastSpaceFree => 'Last space free at this time';
+
+  @override
+  String get slotTaken => 'Already taken';
 
   @override
   String spacesFree(int count) {
@@ -796,15 +814,22 @@ class LEn extends L {
   }
 
   @override
-  String get bookingMissed => 'Missed';
-
-  @override
   String get bookingMissedDetail =>
       'Nobody arrived before the venue stopped holding the table.';
 
   @override
   String depositTerms(String amount) {
     return 'Your $amount GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.';
+  }
+
+  @override
+  String depositHeadline(String amount) {
+    return 'Deposit $amount GNF.';
+  }
+
+  @override
+  String depositDetail(int minutes) {
+    return 'It comes off your bill when you arrive. If the table isn\'t taken $minutes minutes after the booked time, the venue keeps it.';
   }
 
   @override

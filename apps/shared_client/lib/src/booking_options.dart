@@ -57,3 +57,51 @@ List<TimeOption> bookableTimes(
       ),
   ];
 }
+/// One time on the picker, whether or not it can be booked.
+///
+/// [bookableTimes] answers "what can I have"; this answers "what does the
+/// evening look like". They are different questions and the booking screen
+/// asks the second one.
+class SlotTime {
+  const SlotTime({required this.start, required this.option});
+
+  final DateTime start;
+
+  /// What would be booked, or null when the time is already gone.
+  final TimeOption? option;
+
+  bool get isTaken => option == null;
+}
+
+/// Every slot the venue offers for the day, taken ones included.
+///
+/// Deliberately different from [bookableTimes], which drops what is gone. A
+/// list showing only free times tells a customer nothing about the evening:
+/// 19:30 alone reads as "barely open", where 19:30 free between two struck-
+/// through neighbours reads as "busy night, take this one". Same information
+/// the venue has, and it is the difference between a customer choosing
+/// around the rush and one assuming the place is dead.
+///
+/// Taken slots are not tappable — they carry no space to reserve.
+List<SlotTime> slotTimes(
+  List<SpaceAvailability> availability, {
+  int? partySize,
+}) {
+  final bookable = {
+    for (final option in bookableTimes(availability, partySize: partySize))
+      option.start: option,
+  };
+
+  // Every start the venue offers, from every space, free or not. A time only
+  // one space ever opens at is still a time the venue offers.
+  final starts = <DateTime>{
+    for (final entry in availability)
+      for (final slot in entry.slots) slot.start,
+  }.toList()
+    ..sort();
+
+  return [
+    for (final start in starts)
+      SlotTime(start: start, option: bookable[start]),
+  ];
+}

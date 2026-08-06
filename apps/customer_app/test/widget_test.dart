@@ -3732,12 +3732,36 @@ void main() {
       return backend;
     }
 
-    testWidgets('shows only free times', (tester) async {
+    testWidgets('shows the whole evening, taken times included',
+        (tester) async {
+      // Changed deliberately. Dropping taken slots left a short list that
+      // read as an empty venue; the shape of the evening is what tells a
+      // customer to book around the rush.
       await openVenue(tester);
 
       expect(find.text('19:00'), findsOneWidget);
       expect(find.text('20:30'), findsOneWidget);
-      expect(find.text('21:00'), findsNothing);
+      expect(find.text('21:00'), findsOneWidget);
+    });
+
+    testWidgets('a taken time is struck through and cannot be tapped',
+        (tester) async {
+      await openVenue(tester);
+
+      final taken = tester.widget<Text>(find.text('21:00'));
+      expect(taken.style?.decoration, TextDecoration.lineThrough);
+
+      // Tapping it must not open the booking form.
+      await tester.tap(find.text('21:00'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm booking'), findsNothing);
+    });
+
+    testWidgets('a free time is not struck through', (tester) async {
+      await openVenue(tester);
+
+      final free = tester.widget<Text>(find.text('19:00'));
+      expect(free.style?.decoration, isNot(TextDecoration.lineThrough));
     });
 
     testWidgets('shows the venue details', (tester) async {
@@ -4499,7 +4523,7 @@ void main() {
         (tester) async {
       await reachForm(tester);
 
-      expect(find.textContaining('comes off the bill'), findsNothing);
+      expect(find.textContaining('comes off your bill'), findsNothing);
     });
 
     testWidgets('choosing mobile money states what happens to the money',
@@ -4511,8 +4535,11 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
 
+      // The window is the half a dispute turns on. The old copy said "in
+      // that time" without ever saying how long that was.
+      expect(find.textContaining('Deposit 50000.00 GNF.'), findsOneWidget);
       expect(
-        find.textContaining('50000.00 GNF deposit comes off the bill'),
+        find.textContaining('90 minutes after the booked time'),
         findsOneWidget,
       );
       expect(find.textContaining('the venue keeps it'), findsOneWidget);
@@ -4527,7 +4554,7 @@ void main() {
       await tester.tap(find.text('Pay on arrival'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('comes off the bill'), findsNothing);
+      expect(find.textContaining('comes off your bill'), findsNothing);
     });
 
     testWidgets('a venue that sent no amount says nothing', (tester) async {
@@ -4536,7 +4563,7 @@ void main() {
       await tester.tap(find.text('Orange Money'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('comes off the bill'), findsNothing);
+      expect(find.textContaining('comes off your bill'), findsNothing);
     });
 
     testWidgets('the terms read in French', (tester) async {
@@ -4573,7 +4600,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('déduit de l’addition'),
+        find.textContaining("Compensé sur l'addition"),
         findsOneWidget,
       );
     });

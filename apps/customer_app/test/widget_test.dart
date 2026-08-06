@@ -4706,4 +4706,235 @@ void main() {
       expect(asked.url.queryParameters['type'], 'lounge');
     });
   });
+
+  group('your details, and closing the account', () {
+    /// A signed-in profile with a name and a number already on file.
+    Future<FakeBackend> openDetails(WidgetTester tester) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        storedToken: 'customer-token',
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/customer/me/', {
+        'id': 1,
+        'username': 'mariama',
+        'name': 'Mariama Diallo',
+        'phone': '+224620000000',
+        'can_reset_password': true,
+      });
+      backend.on('GET', '/api/customer/favourites/', {'results': []});
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    /// The profile is a ListView taller than a phone; the details sit under
+    /// the sign-out block, so nothing here is on screen until we scroll.
+    ///
+    /// Named by axis rather than by position: the screen also holds a short
+    /// horizontal scroller, and asking for `.last` drags that one instead —
+    /// which scrolls nothing and fails fifty drags later.
+    Future<void> scrollTo(WidgetTester tester, Finder target) async {
+      await tester.scrollUntilVisible(
+        target,
+        200,
+        scrollable: find
+            .byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the form shows what is already on file', (tester) async {
+      // An empty box would read as "we never saved this", and somebody would
+      // retype a number that was already right.
+      await openDetails(tester);
+      await scrollTo(tester, find.widgetWithText(TextField, 'Name'));
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+      expect(find.text('+224620000000'), findsOneWidget);
+    });
+
+    testWidgets('a changed number is sent', (tester) async {
+      final backend = await openDetails(tester);
+      backend.on('PATCH', '/api/customer/me/', {
+        'id': 1,
+        'username': 'mariama',
+        'name': 'Mariama Diallo',
+        'phone': '+224620111111',
+        'can_reset_password': true,
+      });
+
+      await scrollTo(tester, find.widgetWithText(TextField, 'Phone'));
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Phone'),
+        '+224620111111',
+      );
+      await tester.tap(find.text('Save details'));
+      await tester.pumpAndSettle();
+
+      final sent = jsonDecode(
+        backend.requests.lastWhere((r) => r.method == 'PATCH').body,
+      ) as Map<String, dynamic>;
+      expect(sent['phone'], '+224620111111');
+      expect(find.text('Details saved.'), findsOneWidget);
+    });
+
+    testWidgets('a refused change says why', (tester) async {
+      final backend = await openDetails(tester);
+      backend.on(
+        'PATCH',
+        '/api/customer/me/',
+        {'phone': ['That number is not valid.']},
+        status: 400,
+      );
+
+      await scrollTo(tester, find.widgetWithText(TextField, 'Phone'));
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Phone'),
+        'nonsense',
+      );
+      await tester.tap(find.text('Save details'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('not valid'), findsOneWidget);
+      expect(find.text('Details saved.'), findsNothing);
+    });
+
+    testWidgets('closing is asked for twice, and says what stays',
+        (tester) async {
+      // Somebody expecting their past bookings to vanish with them should
+      // learn that here, not afterwards.
+      await openDetails(tester);
+      await scrollTo(tester, find.text('Close my account'));
+      await tester.tap(find.text('Close my account'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.textContaining('cannot be undone'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Your password'), findsOneWidget);
+    });
+
+    testWidgets('backing out of the dialog closes nothing', (tester) async {
+      final backend = await openDetails(tester);
+      await scrollTo(tester, find.text('Close my account'));
+      await tester.tap(find.text('Close my account'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(backend.requests.where((r) => r.method == 'DELETE'), isEmpty);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
+    testWidgets('confirming sends the password and signs out', (tester) async {
+      final backend = await openDetails(tester);
+      backend.on('DELETE', '/api/customer/me/', null, status: 204);
+
+      await scrollTo(tester, find.text('Close my account'));
+      await tester.tap(find.text('Close my account'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Your password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Close it'));
+      await tester.pumpAndSettle();
+
+      final sent = jsonDecode(
+        backend.requests.lastWhere((r) => r.method == 'DELETE').body,
+      ) as Map<String, dynamic>;
+      expect(sent['password'], 'chicha-2026');
+      // Back to the offer: the account is gone, the app is not.
+      expect(find.text('Make an account'), findsOneWidget);
+    });
+
+    testWidgets('a wrong password leaves the account alone', (tester) async {
+      final backend = await openDetails(tester);
+      backend.on(
+        'DELETE',
+        '/api/customer/me/',
+        {'password': ['That password is not right.']},
+        status: 400,
+      );
+
+      await scrollTo(tester, find.text('Close my account'));
+      await tester.tap(find.text('Close my account'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Your password'),
+        'wrong',
+      );
+      await tester.tap(find.text('Close it'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('not right'), findsOneWidget);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
+    testWidgets('a merchant is told to ask their owner', (tester) async {
+      // The 409 the backend returns rather than taking somebody's staff
+      // access away with their customer account.
+      final backend = await openDetails(tester);
+      backend.on(
+        'DELETE',
+        '/api/customer/me/',
+        {'detail': 'This account also works at a venue. Ask an owner to '
+            'remove your access there first.'},
+        status: 409,
+      );
+
+      await scrollTo(tester, find.text('Close my account'));
+      await tester.tap(find.text('Close my account'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Your password'),
+        'chicha-2026',
+      );
+      await tester.tap(find.text('Close it'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Ask an owner'), findsOneWidget);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
+    testWidgets('the whole thing is in French too', (tester) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        storedToken: 'customer-token',
+        localeStore: InMemoryLocaleStore('fr'),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/customer/me/', {
+        'id': 1,
+        'username': 'mariama',
+        'name': 'Mariama Diallo',
+        'phone': '+224620000000',
+      });
+      backend.on('GET', '/api/customer/favourites/', {'results': []});
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profil'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('Fermer mon compte'));
+
+      expect(find.text('Fermer mon compte'), findsOneWidget);
+      expect(find.text('Enregistrer'), findsOneWidget);
+    });
+  });
 }

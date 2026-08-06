@@ -438,5 +438,19 @@
       }
     }
   },
-  "tooManyAttempts": "Too many attempts. Wait a moment and try again."
+  "tooManyAttempts": "Too many attempts. Wait a moment and try again.",
+  "yourDetails": "Your details",
+  "detailsIntro": "Used to fill in your next booking, and to reach you if you forget your password.",
+  "profileName": "Name",
+  "profilePhone": "Phone",
+  "profileEmail": "Email (optional)",
+  "saveDetails": "Save details",
+  "detailsSaved": "Details saved.",
+  "closeAccount": "Close my account",
+  "closeAccountTitle": "Close your account?",
+  "closeAccountDetail": "Your saved venues and your sign-in go for good. Bookings you have already made stay with the venue as part of their records, with your name and number removed.",
+  "closeAccountCannotUndo": "This cannot be undone.",
+  "closeAccountPassword": "Your password",
+  "closeAccountConfirm": "Close it",
+  "accountClosed": "Your account is closed."
 }

@@ -227,3 +227,18 @@ msgstr "Établissement introuvable."
 
 msgid "No such order."
 msgstr "Commande introuvable."
+
+# --- Closing an account -----------------------------------------------------
+
+msgid "That password is not right."
+msgstr "Ce mot de passe n'est pas correct."
+
+msgid ""
+"This account also works at a venue. Ask an owner to remove your access there "
+"first."
+msgstr ""
+"Ce compte travaille aussi dans un établissement. Demandez à un propriétaire "
+"de retirer votre accès là-bas d'abord."
+
+msgid "Administrator accounts are closed by an administrator."
+msgstr "Les comptes administrateurs sont fermés par un administrateur."

@@ -9,11 +9,18 @@ class CustomerAccount {
     required this.id,
     required this.username,
     required this.name,
+    this.phone = '',
+    this.email = '',
     this.canResetPassword = false,
   });
 
   final int id;
   final String username;
+
+  /// What is on file, so the profile form shows it rather than an empty box
+  /// that looks like nothing was ever saved.
+  final String phone;
+  final String email;
 
   /// False when the account has neither a phone nor an email, so a forgotten
   /// password would lock them out. The app warns while there is time to fix it.
@@ -39,6 +46,9 @@ class CustomerAccount {
             json['first_name'] as String? ??
             json['username'] as String? ??
             '',
+        phone: json['phone'] as String? ?? '',
+        email: json['email'] as String? ?? '',
+        canResetPassword: json['can_reset_password'] as bool? ?? false,
       );
 }
 

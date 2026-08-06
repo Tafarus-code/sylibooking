@@ -7,6 +7,7 @@ only two — the list survives losing the phone, and favourites become portable.
 So nothing here gates the booking flow. Everything is additive.
 """
 
+from accounts.deletion import close_account, refusal_reason
 from accounts.models import CustomerProfile
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -38,14 +39,29 @@ class CustomerSerializer(serializers.ModelSerializer):
     """
 
     name = serializers.SerializerMethodField()
+    # Sent so the profile form can show what is on file rather than an empty
+    # box that looks like nothing was ever saved.
+    phone = serializers.SerializerMethodField()
+    email = serializers.CharField(read_only=True)
     # So the app can warn someone with no contact details that forgetting the
     # password would lock them out, while there is still time to add one.
     can_reset_password = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'name', 'can_reset_password']
+        fields = [
+            'id',
+            'username',
+            'name',
+            'phone',
+            'email',
+            'can_reset_password',
+        ]
         read_only_fields = fields
+
+    def get_phone(self, user):
+        profile = getattr(user, 'customer_profile', None)
+        return profile.phone if profile else ''
 
     def get_can_reset_password(self, user):
         profile = getattr(user, 'customer_profile', None)
@@ -125,13 +141,76 @@ class RegisterView(APIView):
         )
 
 
+class ProfileSerializer(serializers.Serializer):
+    """The three things an account is allowed to change about itself.
+
+    Not the username: it is what somebody signs in with, and letting it move
+    turns "I cannot get in" into a support conversation nobody can settle.
+    """
+
+    name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+
+
 class CustomerMeView(APIView):
-    """Check a stored token still works, and get the name back."""
+    """Who is signed in — read it, change it, or close it."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         return Response(CustomerSerializer(request.user).data)
+
+    def patch(self, request):
+        """Keep a returning customer's details current.
+
+        Until now a name and a number were captured per booking and never
+        maintained, so a customer who changed number had no way to say so
+        except by typing it again on the next booking.
+        """
+        form = ProfileSerializer(data=request.data, partial=True)
+        form.is_valid(raise_exception=True)
+        data = form.validated_data
+
+        user = request.user
+        if 'name' in data:
+            user.first_name = data['name'].strip()[:150]
+        if 'email' in data:
+            user.email = data['email'].strip()
+        user.save(update_fields=['first_name', 'email'])
+
+        if 'phone' in data:
+            profile, _created = CustomerProfile.objects.get_or_create(user=user)
+            profile.phone = data['phone'].strip()
+            profile.save(update_fields=['phone'])
+
+        return Response(CustomerSerializer(user).data)
+
+    def delete(self, request):
+        """Close the account.
+
+        The password is asked for again because the token on this phone may
+        not be in the hands of the person it belongs to, and this is the one
+        action here that cannot be undone.
+
+        What happens to the data is decided in accounts/deletion.py, which
+        explains the trade — the person goes, the venue's books stay.
+        """
+        password = request.data.get('password') or ''
+        if not request.user.check_password(password):
+            return Response(
+                {'password': _('That password is not right.')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        refusal = refusal_reason(request.user)
+        if refusal:
+            return Response(
+                {'detail': refusal}, status=status.HTTP_409_CONFLICT
+            )
+
+        close_account(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ClaimView(APIView):

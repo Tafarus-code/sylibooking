@@ -117,14 +117,19 @@ class RequestResetView(APIView):
         of requests an hour, which is affordable; a rejected request never
         reaches here, because the throttle refuses it first.
         """
-        started = time.monotonic()
+        deadline = time.monotonic() + settings.PASSWORD_RESET_MIN_SECONDS
         try:
             return self._respond(request)
         finally:
-            remaining = settings.PASSWORD_RESET_MIN_SECONDS - (
-                time.monotonic() - started
-            )
-            if remaining > 0:
+            # A loop, not a single sleep. time.sleep may return early — on
+            # Windows it undersleeps by up to a timer tick — and a floor that
+            # is usually respected is not a floor at all: the whole point is
+            # that a miss and a hit are indistinguishable, and an occasional
+            # twelve milliseconds is exactly the signal being hidden.
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
                 time.sleep(remaining)
 
     def _respond(self, request):

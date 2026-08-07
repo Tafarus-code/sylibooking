@@ -10,6 +10,7 @@ import '../widgets/menu_section.dart';
 import '../widgets/photos_section.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/reviews_section.dart';
+import '../widgets/venue_tabs.dart';
 import 'booking_form_screen.dart';
 import 'order_ahead_screen.dart';
 import 'photo_viewer_screen.dart';
@@ -47,6 +48,10 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
   Establishment? _detail;
   List<TimeOption> _options = const [];
   List<SlotTime> _slots = const [];
+
+  /// Which of the four is showing. Menu first: it is what most
+  /// customers open a venue to see.
+  int _tab = 0;
   bool _loading = true;
   String? _error;
 
@@ -280,36 +285,61 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
                 ],
               ),
             ),
-            if (_photos.isNotEmpty || _loadingExtras) ...[
-              const SizedBox(height: 16),
-              PhotosSection(
-                photos: _photos,
-                loading: _loadingExtras,
-                onTapPhoto: _openPhoto,
-              ),
-            ],
-            if (establishment.hasMenu) ...[
-              const Divider(height: 32),
-              // Restaurants only, and only when there is a menu to order
-              // from. A lounge showing this would be an invitation the server
-              // is going to refuse.
-              if (establishment.type == EstablishmentType.restaurant)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: FilledButton.icon(
-                    onPressed: () => _openOrderAhead(establishment),
-                    icon: const Icon(Icons.shopping_bag_outlined),
-                    label: Text(l.orderAhead),
-                  ),
-                ),
-              MenuSection(menu: establishment.menu),
-            ],
-            const Divider(height: 32),
-            ReviewsSection(
-              establishment: establishment,
-              reviews: _reviews,
-              loading: _loadingExtras,
+            // Four sections behind a tab row rather than stacked down one
+            // scroll. Stacked, a venue with a real menu buried its reviews
+            // about a thousand pixels below the fold.
+            VenueTabs(
+              labels: [l.menu, l.tabHours, l.reviews, l.tabPhotos],
+              selectedIndex: _tab,
+              onSelected: (index) => setState(() => _tab = index),
             ),
+            const Divider(height: 17),
+            switch (_tab) {
+              0 => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (establishment.hasMenu) ...[
+                      // Restaurants only, and only when there is a menu to
+                      // order from. A lounge showing this would be an
+                      // invitation the server is going to refuse.
+                      if (establishment.type == EstablishmentType.restaurant)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: FilledButton.icon(
+                            onPressed: () => _openOrderAhead(establishment),
+                            icon: const Icon(Icons.shopping_bag_outlined),
+                            label: Text(l.orderAhead),
+                          ),
+                        ),
+                      MenuSection(menu: establishment.menu),
+                    ] else
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          l.noMenuYet,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              1 => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: HoursSection(establishment: establishment),
+                ),
+              2 => ReviewsSection(
+                  establishment: establishment,
+                  reviews: _reviews,
+                  loading: _loadingExtras,
+                ),
+              _ => PhotosSection(
+                  photos: _photos,
+                  loading: _loadingExtras,
+                  onTapPhoto: _openPhoto,
+                ),
+            },
             const Divider(height: 32),
             _SectionLabel(l.partySize),
             _PartySizePicker(

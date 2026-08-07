@@ -96,6 +96,9 @@
     }
   },
   "menu": "Menu",
+  "tabHours": "Hours",
+  "tabPhotos": "Photos",
+  "noMenuYet": "This venue has not put its menu up yet.",
   "orderAhead": "Order ahead",
   "reviews": "Reviews",
   "reviewCount": "{count, plural, =0{No reviews yet} =1{1 review} other{{count} reviews}}",
@@ -108,6 +111,7 @@
   },
   "beTheFirstToReview": "Be the first to leave a review.",
   "writeAReview": "Write a review",
+  "oneReviewPerVisit": "Tied to this visit — one review per booking.",
   "partySize": "Party size",
   "day": "Day",
   "availableTimes": "Available times",

@@ -427,6 +427,24 @@ abstract class L {
   /// **'Menu'**
   String get menu;
 
+  /// No description provided for @tabHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get tabHours;
+
+  /// No description provided for @tabPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get tabPhotos;
+
+  /// No description provided for @noMenuYet.
+  ///
+  /// In en, this message translates to:
+  /// **'This venue has not put its menu up yet.'**
+  String get noMenuYet;
+
   /// No description provided for @orderAhead.
   ///
   /// In en, this message translates to:
@@ -456,6 +474,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Write a review'**
   String get writeAReview;
+
+  /// No description provided for @oneReviewPerVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Tied to this visit — one review per booking.'**
+  String get oneReviewPerVisit;
 
   /// No description provided for @partySize.
   ///

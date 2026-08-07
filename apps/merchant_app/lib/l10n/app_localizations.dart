@@ -697,6 +697,30 @@ abstract class L {
   /// **'Reference'**
   String get rowReference;
 
+  /// No description provided for @selectABooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a booking from the list'**
+  String get selectABooking;
+
+  /// No description provided for @selectABookingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Its details open here, without losing today\'s list.'**
+  String get selectABookingDetail;
+
+  /// No description provided for @rowGraceWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'No-show grace'**
+  String get rowGraceWindow;
+
+  /// No description provided for @graceMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String graceMinutes(int minutes);
+
   /// No description provided for @sectionPayment.
   ///
   /// In en, this message translates to:

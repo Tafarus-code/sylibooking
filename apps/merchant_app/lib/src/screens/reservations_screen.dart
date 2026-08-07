@@ -5,6 +5,7 @@ import 'package:shared_client/shared_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../widgets/reservation_card.dart';
+import '../widgets/reservation_detail_pane.dart';
 import 'reservation_detail_screen.dart';
 
 enum DateRange {
@@ -220,6 +221,10 @@ class _ReservationsViewState extends State<ReservationsView> {
     }
   }
 
+  /// The booking showing in the detail pane, on a screen wide enough to have
+  /// one. Null on a phone, where tapping still pushes a screen.
+  Reservation? _selected;
+
   @override
   Widget build(BuildContext context) {
     final l = L.of(context);
@@ -258,14 +263,52 @@ class _ReservationsViewState extends State<ReservationsView> {
             },
           ),
         ),
-        Expanded(
-          child: RefreshIndicator(onRefresh: _load, child: _body()),
-        ),
+        Expanded(child: _desk(l)),
       ],
     );
   }
 
-  Widget _body() {
+  /// The list on its own, or the list beside a detail pane.
+  ///
+  /// The split lives out here rather than inside `_body`, because
+  /// RefreshIndicator has to wrap a scrollable and a two-pane Row is not
+  /// one — putting the Row inside it collapsed the list to five pixels.
+  ///
+  /// The audit's complaint about the tablet was not that the column was too
+  /// narrow; it was that the extra space did nothing. Here it holds the rest
+  /// of the day while one booking is worked, which is the reason to have it.
+  Widget _desk(L l) {
+    if (!_isSplit(context)) {
+      return RefreshIndicator(onRefresh: _load, child: _body());
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 44:56, the design's proportion. The flex weights do the sizing —
+        // a Row cannot hand either pane a degenerate width the way a
+        // measured SizedBox can — and the same fraction is handed to the
+        // list so it centres its cards against its own column rather than
+        // against the window, which is what left it five pixels wide.
+        final paneWidth = constraints.maxWidth * 0.44;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 44,
+              child: RefreshIndicator(
+                onRefresh: _load,
+                child: _body(paneWidth: paneWidth),
+              ),
+            ),
+            const VerticalDivider(width: 1, thickness: 1),
+            Expanded(flex: 56, child: _detailPane(l)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _body({double? paneWidth}) {
     final l = L.of(context);
 
     if (_loading) {
@@ -307,7 +350,7 @@ class _ReservationsViewState extends State<ReservationsView> {
     // on screen.
     final rows = _rows();
 
-    return NotificationListener<ScrollNotification>(
+    final list = NotificationListener<ScrollNotification>(
       // Reaching the end is the request for more. No button, because a
       // merchant scrolling a list is already telling us what they want.
       onNotification: (notification) {
@@ -319,7 +362,14 @@ class _ReservationsViewState extends State<ReservationsView> {
         return false;
       },
       child: ListView.builder(
-        padding: contentInsets(context, maxWidth: ContentWidth.listFor(context)),
+        // Measured from the pane, not the window: on a tablet this list is a
+        // 44% column, and a gutter sized for the whole screen is wider than
+        // the column it is centring.
+        padding: contentInsets(
+          context,
+          maxWidth: ContentWidth.listFor(context),
+          available: paneWidth,
+        ),
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: rows.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
@@ -350,14 +400,20 @@ class _ReservationsViewState extends State<ReservationsView> {
           return ReservationCard(
             reservation: reservation,
             busy: _pendingActions.contains(reservation.id),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ReservationDetailScreen(
-                  reservation: reservation,
-                  api: _api,
-                ),
-              ),
-            ),
+            selected: _selected?.id == reservation.id,
+            // On a wide screen the detail opens beside the list rather than
+            // on top of it: the point of the second pane is keeping the day
+            // in view while working one booking.
+            onTap: () => _isSplit(context)
+                ? setState(() => _selected = reservation)
+                : Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ReservationDetailScreen(
+                        reservation: reservation,
+                        api: _api,
+                      ),
+                    ),
+                  ),
             onConfirm: () => _act(
               reservation,
               _api.confirmReservation,
@@ -372,6 +428,70 @@ class _ReservationsViewState extends State<ReservationsView> {
           );
         },
       ),
+    );
+
+    return list;
+  }
+
+  /// Wide enough for two panes.
+  ///
+  /// Expanded rather than medium: a portrait tablet split in two gives a list
+  /// too narrow to read a name in and a detail pane too narrow to lay out,
+  /// which is worse than either alone.
+  bool _isSplit(BuildContext context) =>
+      LayoutSize.of(context) == LayoutSize.expanded;
+
+  Widget _detailPane(L l) {
+    final reservation = _selected;
+    if (reservation == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.touch_app_outlined,
+                size: 40,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l.selectABooking,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l.selectABookingDetail,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ReservationDetailPane(
+      key: ValueKey(reservation.id),
+      reservation: reservation,
+      busy: _pendingActions.contains(reservation.id),
+      onConfirm: reservation.canConfirm
+          ? () => _act(reservation, _api.confirmReservation,
+              l.reservationConfirmed)
+          : null,
+      onCancel: reservation.canCancel ? () => _confirmCancel(reservation) : null,
+      // Same rule the card applies: offered only once the sitting has begun,
+      // because nobody has arrived for a table that is not due yet and the
+      // server refuses it anyway.
+      onComplete: reservation.status.isOpen &&
+              reservation.dateTime.isBefore(DateTime.now())
+          ? () => _act(reservation, _api.completeReservation,
+              l.guestsArrived(reservation.customerName))
+          : null,
     );
   }
 

@@ -97,8 +97,16 @@ EdgeInsets contentInsets(
   double maxWidth = ContentWidth.reading,
   double vertical = 0,
   double minHorizontal = 0,
+
+  /// The width actually available, when it is not the window's.
+  ///
+  /// Pass this for anything laid out in a pane rather than across the
+  /// screen. Without it the gutter is computed from the window: a list in a
+  /// 44%-wide pane on a 2560px tablet gets a gutter sized for 2560, which is
+  /// wider than the pane and leaves the content nothing at all.
+  double? available,
 }) {
-  final width = MediaQuery.sizeOf(context).width;
+  final width = available ?? MediaQuery.sizeOf(context).width;
   final gutter = ((width - maxWidth) / 2).clamp(minHorizontal, double.infinity);
   return EdgeInsets.symmetric(horizontal: gutter, vertical: vertical);
 }

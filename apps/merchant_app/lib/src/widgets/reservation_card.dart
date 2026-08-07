@@ -16,6 +16,7 @@ class ReservationCard extends StatelessWidget {
     required this.onComplete,
     this.onTap,
     this.busy = false,
+    this.selected = false,
   });
 
   final Reservation reservation;
@@ -28,6 +29,10 @@ class ReservationCard extends StatelessWidget {
   /// Opens the detail view, where the reference and amount live.
   final VoidCallback? onTap;
   final bool busy;
+
+  /// Showing in the detail pane beside the list. Only ever true on a screen
+  /// wide enough to have one.
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +53,14 @@ class ReservationCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      // The selected row wears the accent as an outline rather than a fill:
+      // a filled row would fight the payment badge sitting inside it.
+      shape: selected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: theme.colorScheme.primary, width: 2),
+            )
+          : null,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -59,37 +72,29 @@ class ReservationCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(time, style: theme.textTheme.titleLarge),
-                    Text(
-                      DateFormat.MMMEd().format(reservation.dateTime),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
+                // The whole row has to survive the 44%-wide list pane on a
+                // tablet as well as a full-width phone card, so every text in
+                // it is allowed to shorten rather than push its neighbour off
+                // the edge.
+                // The time keeps its own column; the name takes the rest.
+                // The status used to sit here too, and three children
+                // negotiating for width is how this row ended up seven
+                // pixels over once the list became a 44% pane. It now sits
+                // on the line below, which is where the design puts it.
+                Flexible(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        reservation.customerName,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${reservation.spaceName} · '
-                        '${l.guestCount(reservation.partySize)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        time,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge,
                       ),
                       Text(
-                        reservation.customerPhone,
+                        DateFormat.MMMEd().format(reservation.dateTime),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -97,13 +102,55 @@ class ReservationCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StatusChip(status: reservation.status),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        reservation.customerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${reservation.spaceName} · '
+                        '${l.guestCount(reservation.partySize)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        reservation.customerPhone,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Flexible, because this row now also has to survive the
+                // 44%-wide list pane on a tablet. A status word is the one
+                // thing here that can be shortened without losing meaning —
+                // the time and the name cannot.
               ],
             ),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: PaymentBadge(reservation: reservation),
+            // Status and payment on one line of their own. Two short chips
+            // side by side survive any width the list is given; a chip
+            // wedged beside a name and a time does not.
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _StatusChip(status: reservation.status),
+                PaymentBadge(reservation: reservation),
+              ],
             ),
             if (blockedByPayment) ...[
               const SizedBox(height: 6),
@@ -204,6 +251,8 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: theme.textTheme.labelMedium?.copyWith(
           color: foreground,
           fontWeight: FontWeight.w600,

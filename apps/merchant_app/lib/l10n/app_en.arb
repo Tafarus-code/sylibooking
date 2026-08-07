@@ -178,6 +178,17 @@
   "rowParty": "Party",
   "rowPhone": "Phone",
   "rowReference": "Reference",
+  "selectABooking": "Pick a booking from the list",
+  "selectABookingDetail": "Its details open here, without losing today's list.",
+  "rowGraceWindow": "No-show grace",
+  "graceMinutes": "{minutes} min",
+  "@graceMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "sectionPayment": "Payment",
   "rowMethod": "Method",
   "rowTaken": "Taken",

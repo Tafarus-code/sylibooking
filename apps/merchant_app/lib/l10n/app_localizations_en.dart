@@ -339,6 +339,21 @@ class LEn extends L {
   String get rowReference => 'Reference';
 
   @override
+  String get selectABooking => 'Pick a booking from the list';
+
+  @override
+  String get selectABookingDetail =>
+      'Its details open here, without losing today\'s list.';
+
+  @override
+  String get rowGraceWindow => 'No-show grace';
+
+  @override
+  String graceMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
   String get sectionPayment => 'Payment';
 
   @override

@@ -52,6 +52,9 @@ void main() {
       'venueKindRestaurant',
       // "Total" is the same word in French.
       'walkInTotal',
+      // "min" is the abbreviation in both languages, and a grace window is
+      // read as a figure rather than as a sentence.
+      'graceMinutes',
     };
 
     final untranslated = [

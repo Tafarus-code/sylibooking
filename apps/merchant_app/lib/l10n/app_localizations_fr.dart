@@ -342,6 +342,21 @@ class LFr extends L {
   String get rowReference => 'Référence';
 
   @override
+  String get selectABooking => 'Choisissez une réservation dans la liste';
+
+  @override
+  String get selectABookingDetail =>
+      'Le détail s\'ouvre ici, sans perdre la liste du jour.';
+
+  @override
+  String get rowGraceWindow => 'Grâce no-show';
+
+  @override
+  String graceMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
   String get sectionPayment => 'Paiement';
 
   @override

@@ -11,7 +11,9 @@ import 'package:merchant_app/src/auth_controller.dart';
 import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
 import 'package:merchant_app/src/screens/orders_screen.dart';
+import 'package:merchant_app/src/screens/reservation_detail_screen.dart';
 import 'package:merchant_app/src/widgets/reservation_card.dart';
+import 'package:merchant_app/src/widgets/reservation_detail_pane.dart';
 import 'package:shared_client/shared_client.dart';
 
 /// A locale store whose read is held open until the test lets it finish.
@@ -4734,13 +4736,15 @@ void main() {
           .where((r) => r.url.path == '/api/reservations/')
           .length;
 
-      // Twenty cards is nearly seven thousand pixels; a four-thousand drag
-      // stops short of the trigger.
-      await tester.scrollUntilVisible(
-        find.byType(CircularProgressIndicator),
-        600,
-        scrollable: find.byType(Scrollable).first,
-      );
+      // Drag towards the end rather than scrolling until the spinner shows.
+      // The spinner is an artefact of the request being in flight, and the
+      // cards are short enough now that the fetch can start and finish before
+      // it would ever come into view — which is the list working, not failing.
+      final scrollable = find.byType(Scrollable).first;
+      for (var i = 0; i < 12; i++) {
+        await tester.drag(scrollable, const Offset(0, -600));
+        await tester.pump();
+      }
       await tester.pumpAndSettle();
 
       final after = backend.requests
@@ -4932,8 +4936,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // The fix for this defect turned out not to be a wider column but a
+      // second pane: the list keeps the day in view while a booking is
+      // worked beside it. So the assertion is that the space is *used*, not
+      // that one card got fatter.
+      // Measured against the window: the rail takes a little off the top of
+      // it, so the list lands slightly under its 44% of the whole.
+      const window = 2560.0;
+      final list = tester.getSize(find.byType(ListView).first);
+      expect(list.width, lessThan(window * 0.45));
+      expect(list.width, greaterThan(window * 0.36));
+      expect(find.text('Pick a booking from the list'), findsOneWidget);
+
       final card = tester.getSize(find.byType(ReservationCard).first);
-      expect(card.width, greaterThan(ContentWidth.list));
       // Still bounded: a booking card set across 2500px is not readable
       // either, it is just differently wrong.
       expect(card.width, lessThanOrEqualTo(ContentWidth.wideList));
@@ -4960,6 +4975,112 @@ void main() {
 
       final card = tester.getSize(find.byType(ReservationCard).first);
       expect(card.width, lessThanOrEqualTo(phoneSize.width));
+    });
+  });
+
+  group('the tablet desk is two panes', () {
+    Future<FakeBackend> openDesk(WidgetTester tester, {required Size size}) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 2,
+        'next': null,
+        'results': [
+          booking(),
+          booking(id: 2, customer: 'Ibrahima Sow'),
+        ],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('a phone keeps its bottom bar and one column', (tester) async {
+      // **The regression this slice is most likely to cause.** Staff work on
+      // phones; the tablet fix must not reach them.
+      await openDesk(tester, size: phoneSize);
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+      expect(find.text('Pick a booking from the list'), findsNothing);
+    });
+
+    testWidgets('a tablet gets the rail instead', (tester) async {
+      await openDesk(tester, size: const Size(1280, 800));
+
+      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+    });
+
+    testWidgets('and a detail pane waiting to be filled', (tester) async {
+      await openDesk(tester, size: const Size(1280, 800));
+
+      expect(find.text('Pick a booking from the list'), findsOneWidget);
+    });
+
+    testWidgets('picking a booking fills the pane without navigating',
+        (tester) async {
+      // The whole point: the day stays in view while one booking is worked.
+      await openDesk(tester, size: const Size(1280, 800));
+
+      await tester.tap(find.text('Mariama Diallo').first);
+      await tester.pumpAndSettle();
+
+      // Still on the desk — both bookings are still listed beside it.
+      expect(find.text('Ibrahima Sow'), findsWidgets);
+      expect(find.text('Pick a booking from the list'), findsNothing);
+      // And the pane is showing the one that was picked.
+      expect(find.text('Mariama Diallo'), findsWidgets);
+    });
+
+    testWidgets('the pane shows the booking reference', (tester) async {
+      await openDesk(tester, size: const Size(1280, 800));
+
+      await tester.tap(find.text('Mariama Diallo').first);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReservationDetailPane), findsOneWidget);
+      expect(find.textContaining('11111111'), findsWidgets);
+    });
+
+    testWidgets('a phone still pushes a whole screen', (tester) async {
+      await openDesk(tester, size: phoneSize);
+
+      await tester.tap(find.text('Mariama Diallo').first);
+      await tester.pumpAndSettle();
+
+      // The pane is a tablet idea; on a phone the detail takes the screen.
+      expect(find.byType(ReservationDetailPane), findsNothing);
+      expect(find.byType(ReservationDetailScreen), findsOneWidget);
+    });
+
+    testWidgets('narrowing the window puts the phone layout back',
+        (tester) async {
+      // Resizing is how this gets checked in practice, and it is the easiest
+      // way to leave the phone holding a layout meant for a tablet.
+      await openDesk(tester, size: const Size(1280, 800));
+      expect(find.byType(NavigationRail), findsOneWidget);
+
+      tester.view.physicalSize = phoneSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+      expect(find.text('Pick a booking from the list'), findsNothing);
     });
   });
 }

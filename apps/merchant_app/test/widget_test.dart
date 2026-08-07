@@ -2827,12 +2827,14 @@ void main() {
       expect(find.text('Tables and rooms'), findsOneWidget);
     });
 
-    testWidgets('staff are not', (tester) async {
-      // They may read the layout over the API — the desk names the table a
-      // booking is on — but there is nothing here they can change.
+    testWidgets('staff are offered it too, to read', (tester) async {
+      // Changed deliberately. Knowing which tables exist and how many they
+      // seat is floor knowledge — a waiter seating a party of six needs it —
+      // and the screen hides what they cannot use rather than the whole room.
       await openSpaces(tester, role: 'staff');
 
-      expect(find.text('Tables and rooms'), findsNothing);
+      expect(find.text('Tables and rooms'), findsOneWidget);
+      expect(find.text('Read-only for staff'), findsOneWidget);
     });
 
     testWidgets('it sits above opening hours', (tester) async {
@@ -5178,7 +5180,10 @@ void main() {
         'Opening hours',
         'Venue details',
         'Who has access',
-        'Look and feel',
+        // Was written as "Look and feel" here, which is not what the entry
+        // is called — so the assertion passed by looking for a string that
+        // never existed in either role's screen.
+        'Branding',
       ]) {
         expect(find.text(entry), findsNothing, reason: entry);
       }
@@ -5603,4 +5608,153 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNWidgets(5));
     });
   });
+
+  group('a staff phone shows exactly what the role allows', () {
+    /// What each Manage entry needs, taken from the role capabilities rather
+    /// than from a list typed out here. If the boundary moves in
+    /// MerchantRole, this moves with it — which is the point: the test is
+    /// asking the rule, not remembering it.
+    const gates = <String, bool Function(MerchantRole)>{
+      'Menu': _always,
+      'Photos': _always,
+      'Tables and rooms': _always,
+      'Opening hours': _editsProfile,
+      'Venue details': _editsProfile,
+      'Branding': _editsProfile,
+      'Who has access': _managesStaff,
+    };
+
+    Future<FakeBackend> openShell(
+      WidgetTester tester, {
+      required String role,
+      Size size = phoneSize,
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [booking(status: 'confirmed')],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/merchant/establishments/7/spaces/', {
+        'results': [
+          {
+            'id': 1,
+            'name': 'Table 4',
+            'type': 'table',
+            'type_display': 'Table',
+            'capacity': 4,
+            'is_active': true,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    Future<void> openManage(WidgetTester tester) async {
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('every Manage entry matches what its role permits',
+        (tester) async {
+      for (final role in [MerchantRole.owner, MerchantRole.manager,
+          MerchantRole.staff]) {
+        await openShell(tester, role: role.name);
+        await openManage(tester);
+
+        for (final entry in gates.entries) {
+          final allowed = entry.value(role);
+          expect(
+            find.text(entry.key),
+            allowed ? findsOneWidget : findsNothing,
+            reason: '${role.name} and "${entry.key}"',
+          );
+        }
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      }
+    });
+
+    testWidgets('staff get strictly fewer entries than an owner',
+        (tester) async {
+      await openShell(tester, role: 'staff');
+      await openManage(tester);
+      final staff = gates.keys.where(
+        (title) => find.text(title).evaluate().isNotEmpty,
+      ).toSet();
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+
+      await openShell(tester, role: 'owner');
+      await openManage(tester);
+      final owner = gates.keys.where(
+        (title) => find.text(title).evaluate().isNotEmpty,
+      ).toSet();
+
+      expect(staff.length, lessThan(owner.length));
+      // A strict subset: staff never see something an owner does not.
+      expect(owner.containsAll(staff), isTrue);
+    });
+
+    testWidgets('staff can still work the day', (tester) async {
+      // Running the floor is theirs: the server lets staff confirm, cancel
+      // and mark arrived, and the desk must not be stricter than the server.
+      await openShell(tester, role: 'staff');
+
+      expect(find.text('Cancel'), findsWidgets);
+      expect(find.text('Mark arrived'), findsWidgets);
+    });
+
+    testWidgets('and get the bottom bar, not a rail', (tester) async {
+      await openShell(tester, role: 'staff');
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+    });
+
+    testWidgets('the room is readable but not editable', (tester) async {
+      await openShell(tester, role: 'staff');
+      await openManage(tester);
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      // The table is there to read.
+      expect(find.text('Table 4'), findsOneWidget);
+      // Nothing to change it with.
+      expect(find.text('Add'), findsNothing);
+      expect(find.byIcon(Icons.more_vert), findsNothing);
+      expect(find.byType(FloatingActionButton), findsNothing);
+    });
+
+    testWidgets('an owner gets the controls on the same screen',
+        (tester) async {
+      await openShell(tester, role: 'owner');
+      await openManage(tester);
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.more_vert), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+    });
+  });
 }
+
+bool _always(MerchantRole role) => true;
+bool _editsProfile(MerchantRole role) => role.canEditProfile;
+bool _managesStaff(MerchantRole role) => role.canManageStaff;

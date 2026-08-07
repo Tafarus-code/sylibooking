@@ -171,18 +171,28 @@ class _SpacesScreenState extends State<SpacesScreen> {
   Widget build(BuildContext context) {
     final l = L.of(context);
 
+    // Staff read the room; owners and managers change it. The server draws
+    // the same line, so a hidden button here is the interface agreeing with
+    // the rule rather than the only thing enforcing it.
+    final canEdit = widget.auth.role.canEditProfile;
+
     return Scaffold(
       appBar: AppBar(title: Text(l.tablesAndRooms)),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(),
-        icon: const Icon(Icons.add),
-        label: Text(l.addSpace),
+      floatingActionButton: canEdit
+          ? FloatingActionButton.extended(
+              onPressed: () => _edit(),
+              icon: const Icon(Icons.add),
+              label: Text(l.addSpace),
+            )
+          : null,
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: _body(l, canEdit: canEdit),
       ),
-      body: RefreshIndicator(onRefresh: _load, child: _body(l)),
     );
   }
 
-  Widget _body(L l) {
+  Widget _body(L l, {required bool canEdit}) {
     final theme = Theme.of(context);
 
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -255,6 +265,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
           for (final space in byType[type]!)
             _SpaceRow(
               space: space,
+              canEdit: canEdit,
               busy: _busy.contains(space.id),
               onEdit: () => _edit(space: space),
               onRemove: () => _remove(space),
@@ -276,6 +287,7 @@ String _typeLabel(L l, SpaceType type) => switch (type) {
 class _SpaceRow extends StatelessWidget {
   const _SpaceRow({
     required this.space,
+    required this.canEdit,
     required this.busy,
     required this.onEdit,
     required this.onRemove,
@@ -283,6 +295,9 @@ class _SpaceRow extends StatelessWidget {
   });
 
   final Space space;
+
+  /// Whether this account may change the room, rather than only read it.
+  final bool canEdit;
   final bool busy;
   final VoidCallback onEdit;
   final VoidCallback onRemove;
@@ -336,7 +351,9 @@ class _SpaceRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              if (space.isActive)
+              if (!canEdit)
+                const SizedBox.shrink()
+              else if (space.isActive)
                 PopupMenuButton<String>(
                   enabled: !busy,
                   onSelected: (choice) =>

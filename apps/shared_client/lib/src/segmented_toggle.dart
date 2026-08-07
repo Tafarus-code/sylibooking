@@ -90,14 +90,18 @@ class _Option extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: InkWell(
-        onTap: onTap,
+      // Material + InkWell rather than Ink: an `Ink` decoration is painted
+      // onto the nearest Material ancestor, which here is the page behind the
+      // toggle's own dark background — so the ember fill was drawn *under*
+      // the deepwood pill and never seen, leaving the selected label as dark
+      // brown on dark green. A Material of its own gives the fill somewhere
+      // to land and still lets the tap ripple.
+      child: Material(
+        color: selected ? SylibookingTokens.ember : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: selected ? SylibookingTokens.ember : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
               vertical: dense ? 5 : 8,

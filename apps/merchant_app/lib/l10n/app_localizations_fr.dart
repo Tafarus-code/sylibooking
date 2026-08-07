@@ -85,6 +85,12 @@ class LFr extends L {
   String get navReservations => 'Réservations';
 
   @override
+  String get navKitchen => 'Cuisine';
+
+  @override
+  String get navReviews => 'Avis';
+
+  @override
   String get navPayments => 'Paiements';
 
   @override

@@ -247,6 +247,18 @@ abstract class L {
   /// **'Reservations'**
   String get navReservations;
 
+  /// No description provided for @navKitchen.
+  ///
+  /// In en, this message translates to:
+  /// **'Kitchen'**
+  String get navKitchen;
+
+  /// No description provided for @navReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviews'**
+  String get navReviews;
+
   /// No description provided for @navPayments.
   ///
   /// In en, this message translates to:

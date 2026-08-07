@@ -6,26 +6,14 @@ import 'package:shared_client/shared_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../labels.dart';
-import 'orders_screen.dart';
 import 'reservations_screen.dart';
 
-/// The two halves of the front desk: who is coming, and what to cook.
-enum DeskTab {
-  reservations,
-  orders;
-
-  /// Both labels stay French in either language: they are the words merchants
-  /// already use on the floor, and the switcher is read at a glance.
-  String label(L l) =>
-      this == DeskTab.reservations ? l.tabReservations : l.tabOrders;
-}
-
-/// One screen for the venue being worked, with a switcher between its two
-/// queues.
+/// One screen for the venue being worked: who is coming, and when.
 ///
-/// Orders sit beside reservations rather than in their own navigation
-/// destination because they are the same job: a person turning up at a time,
-/// and something owed to them when they do.
+/// Orders used to sit here too, behind a switcher. They have their own
+/// destination now — a cook watches the queue all evening and should not
+/// reach it through the bookings — and having them in exactly one place also
+/// stops the polling timer being run twice over the same list.
 class VenueDeskScreen extends StatefulWidget {
   const VenueDeskScreen({super.key, required this.auth});
 
@@ -36,7 +24,6 @@ class VenueDeskScreen extends StatefulWidget {
 }
 
 class _VenueDeskScreenState extends State<VenueDeskScreen> {
-  DeskTab _tab = DeskTab.reservations;
 
   /// Bumped by the refresh button. Each view watches it and reloads, so one
   /// button in the bar serves whichever queue is on screen.
@@ -143,33 +130,6 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
             tooltip: l.signOut,
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: SegmentedButton<DeskTab>(
-              segments: [
-                for (final tab in DeskTab.values)
-                  ButtonSegment(
-                    value: tab,
-                    // Scaled rather than clipped, for the same reason as
-                    // the range picker below it.
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        tab.label(l),
-                        maxLines: 1,
-                        softWrap: false,
-                      ),
-                    ),
-                  ),
-              ],
-              selected: {_tab},
-              onSelectionChanged: (selection) =>
-                  setState(() => _tab = selection.first),
-            ),
-          ),
-        ),
       ),
       // The venue's own branding, on the venue's own screens. The bar above
       // and the navigation below stay on the app theme, so switching venues
@@ -230,17 +190,14 @@ class _VenueDeskScreenState extends State<VenueDeskScreen> {
 
   Widget _queues(MerchantVenue? venue) {
     final auth = widget.auth;
+    // Bookings only. The kitchen queue is its own destination in the rail
+    // now, and it has to be somewhere exactly once: OrdersView polls on a
+    // timer, so a copy of it living here as well would fetch the same list
+    // twice a minute forever — which on a connection paid for by the megabyte
+    // is not a rounding error.
     return EstablishmentThemeScope(
-        presetKey: venue?.themePreset,
-        // IndexedStack: flipping between the two queues must not throw either
-        // of them away and refetch, nor lose the date range on the other side.
-        child: IndexedStack(
-          index: _tab.index,
-          children: [
-            ReservationsView(auth: auth, reloadToken: _reloadToken),
-            OrdersView(auth: auth, reloadToken: _reloadToken),
-          ],
-        ),
+      presetKey: venue?.themePreset,
+      child: ReservationsView(auth: auth, reloadToken: _reloadToken),
     );
   }
 }

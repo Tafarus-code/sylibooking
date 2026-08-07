@@ -358,8 +358,8 @@ void main() {
           localeStore: InMemoryLocaleStore(),
         ));
       await tester.pumpAndSettle();
-      // Orders is a tab on the venue desk, not its own navigation destination.
-      await tester.tap(find.text('Commandes'));
+      // Orders has its own destination now, rather than a tab on the desk.
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -649,21 +649,27 @@ void main() {
       return backend;
     }
 
-    testWidgets('both queues live on one screen', (tester) async {
+    testWidgets('both queues are one tap apart', (tester) async {
       await signIn(tester);
 
-      expect(find.text('Réservations'), findsOneWidget);
-      expect(find.text('Commandes'), findsOneWidget);
+      expect(find.byIcon(Icons.event_note), findsOneWidget);
+      expect(
+        find.byIcon(Icons.local_fire_department_outlined),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('orders are not a separate navigation destination',
-        (tester) async {
+    testWidgets('the kitchen has its own destination now', (tester) async {
+      // It used to be a tab on the desk. A cook watches the queue all
+      // evening and should not reach it through the bookings — and one
+      // owner also means the polling timer runs over that list once.
       await signIn(tester);
 
-      // Same job as reservations: someone arriving at a time, and something
-      // owed to them when they do.
       expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.text('Orders'), findsNothing);
+      expect(
+        find.byIcon(Icons.local_fire_department_outlined),
+        findsOneWidget,
+      );
     });
 
     testWidgets('switching to orders and back keeps the date range',
@@ -676,9 +682,9 @@ void main() {
           backend.requests.where((r) => r.url.path == '/api/reservations/');
       final rangeRequest = callsBefore.last.url.queryParameters;
 
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Réservations'));
+      await tester.tap(find.byIcon(Icons.event_note_outlined));
       await tester.pumpAndSettle();
 
       // The week range survived the round trip, and nothing refetched.
@@ -702,9 +708,9 @@ void main() {
       final reservations = calls('/api/reservations/');
       final orders = calls('/api/merchant/orders/');
 
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Réservations'));
+      await tester.tap(find.byIcon(Icons.event_note_outlined));
       await tester.pumpAndSettle();
 
       expect(calls('/api/reservations/'), reservations);
@@ -740,13 +746,13 @@ void main() {
         },
       ]);
 
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
       expect(find.text('Mariama Diallo'), findsOneWidget);
 
-      await tester.tap(find.text('Réservations'));
+      await tester.tap(find.byIcon(Icons.event_note_outlined));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
 
       expect(find.text('Mariama Diallo'), findsOneWidget);
@@ -754,7 +760,7 @@ void main() {
 
     testWidgets('the desk carries the venue own branding', (tester) async {
       await signIn(tester, preset: 'bissap');
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
 
       // A venue's own screens look like the venue, the way a customer sees it.
@@ -2557,14 +2563,15 @@ void main() {
       expect(find.text('Paiements'), findsOneWidget);
     });
 
-    testWidgets('the desk switcher stays French in both languages',
+    testWidgets('the navigation is translated, unlike the old switcher',
         (tester) async {
-      await signedIn(tester);
+      // The desk switcher used to stay French in both languages because they
+      // were the words merchants say on the floor. These are navigation
+      // labels now, and navigation follows the language like everything else.
+      await signedIn(tester, language: 'fr');
 
-      // Deliberate: these are the words merchants already use on the floor,
-      // so they do not flip with the rest of the app.
       expect(find.text('Réservations'), findsWidgets);
-      expect(find.text('Commandes'), findsOneWidget);
+      expect(find.text('Cuisine'), findsWidgets);
     });
 
     testWidgets('an empty day says so in French', (tester) async {
@@ -4076,23 +4083,25 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.tune_outlined));
+      // Its own destination now, rather than an entry inside Manage.
+      await tester.tap(find.byIcon(Icons.star_outline));
       await tester.pumpAndSettle();
       return backend;
     }
 
     testWidgets('everyone who works there can reach them', (tester) async {
-      // Knowing what customers said is floor knowledge, not a privilege.
+      // Knowing what customers said is floor knowledge, not a privilege —
+      // staff get the destination too.
       await openReviews(tester, role: 'staff');
 
-      expect(find.text('Reviews'), findsOneWidget);
+      expect(find.text('Reviews'), findsWidgets);
     });
 
     testWidgets('a review is shown with its stars and its words',
         (tester) async {
       await openReviews(tester);
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Lovely evening'), findsOneWidget);
@@ -4108,7 +4117,7 @@ void main() {
         distribution: {'1': 0, '2': 1, '3': 0, '4': 2, '5': 12},
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.text('4.2'), findsOneWidget);
@@ -4124,7 +4133,7 @@ void main() {
         average: null,
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.text('No reviews yet'), findsOneWidget);
@@ -4133,7 +4142,7 @@ void main() {
     testWidgets('an owner can report one', (tester) async {
       await openReviews(tester, reviews: [reviewJson(rating: 1)]);
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Report this review'), findsOneWidget);
@@ -4146,7 +4155,7 @@ void main() {
         reviews: [reviewJson(rating: 1)],
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Report this review'), findsNothing);
@@ -4158,7 +4167,7 @@ void main() {
       // believe it just removed a review.
       await openReviews(tester, reviews: [reviewJson(rating: 1)]);
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Report this review'));
       await tester.pumpAndSettle();
@@ -4176,7 +4185,7 @@ void main() {
         reviews: [reviewJson(rating: 1)],
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Report this review'));
       await tester.pumpAndSettle();
@@ -4198,7 +4207,7 @@ void main() {
         reviewJson(rating: 1, isFlagged: true),
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Report this review'));
       await tester.pumpAndSettle();
@@ -4224,7 +4233,7 @@ void main() {
         reviews: [reviewJson(rating: 1, isFlagged: true)],
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('waiting to be looked at'), findsOneWidget);
@@ -4238,7 +4247,7 @@ void main() {
         reviews: [reviewJson(rating: 1, isHidden: true)],
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Taken down'), findsOneWidget);
@@ -4247,7 +4256,7 @@ void main() {
     testWidgets('it reads in French', (tester) async {
       await openReviews(tester, language: 'fr');
 
-      await tester.tap(find.text('Avis'));
+      await tester.tap(find.text('Avis').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Signaler cet avis'), findsOneWidget);
@@ -4265,7 +4274,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Reviews'));
+      await tester.tap(find.text('Reviews').last);
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
@@ -4351,7 +4360,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -4679,7 +4688,7 @@ void main() {
         MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Commandes'));
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
       await tester.pumpAndSettle();
 
       final built = find.byType(OrderTicket).evaluate().length;
@@ -4900,14 +4909,15 @@ void main() {
       expectNotClipped(tester, '7 prochains jours');
     });
 
-    testWidgets('and so is the desk switcher', (tester) async {
+    testWidgets('and so are the navigation labels', (tester) async {
+      // The desk switcher this used to check is gone — the kitchen has its
+      // own destination — so the same question now applies to the rail and
+      // bottom bar, where "Réservations" is the longest word.
       await openDesk(tester, language: 'fr');
 
-      // The bar's bottom slot, not the bar: its title is "Réservations"
-      // too, and so is the navigation destination behind it.
-      final switcher = find.byType(PreferredSize);
-      expectNotClipped(tester, 'Réservations', within: switcher);
-      expectNotClipped(tester, 'Commandes', within: switcher);
+      expect(find.text('Réservations'), findsWidgets);
+      expect(find.text('Cuisine'), findsWidgets);
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -5249,6 +5259,111 @@ void main() {
       // Side by side, not stacked.
       expect((collected.top - failed.top).abs(), lessThan(4));
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('five destinations, one owner each', () {
+    Future<FakeBackend> openShell(
+      WidgetTester tester, {
+      Size size = phoneSize,
+      String role = 'owner',
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/merchant/establishments/7/reviews/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+        'average_rating': null,
+        'distribution': {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0},
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('the design file names five, and there are five',
+        (tester) async {
+      await openShell(tester, size: const Size(1280, 800));
+
+      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect(rail.destinations.length, 5);
+    });
+
+    testWidgets('the kitchen is one of them', (tester) async {
+      await openShell(tester);
+
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nothing in the queue'), findsOneWidget);
+    });
+
+    testWidgets('so are the reviews', (tester) async {
+      await openShell(tester);
+
+      await tester.tap(find.byIcon(Icons.star_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reviews'), findsWidgets);
+    });
+
+    testWidgets('the queue is fetched once, not twice', (tester) async {
+      // **The reason the desk lost its Orders tab.** OrdersView polls on a
+      // timer; a second copy of it living on the desk fetched the same list
+      // every cycle, forever, on a connection paid for by the megabyte.
+      final backend = await openShell(tester);
+
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests
+            .where((r) => r.url.path == '/api/merchant/orders/')
+            .length,
+        1,
+      );
+    });
+
+    testWidgets('Manage no longer offers what the rail already does',
+        (tester) async {
+      // Reviews had an entry there as well. Two doors to one room is two
+      // places to keep in step.
+      await openShell(tester);
+
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What customers said about you'), findsNothing);
+    });
+
+    testWidgets('the kitchen wears the venue own colours, like the desk',
+        (tester) async {
+      await openShell(tester);
+
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
+      await tester.pumpAndSettle();
+
+      final scheme = Theme.of(
+        tester.element(find.text('Nothing in the queue')),
+      ).colorScheme;
+      expect(scheme.primary, themePresetFor('ember').accent);
     });
   });
 }

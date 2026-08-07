@@ -13,6 +13,7 @@ import 'package:merchant_app/src/token_store.dart';
 import 'package:merchant_app/src/screens/orders_screen.dart';
 import 'package:merchant_app/src/screens/reservation_detail_screen.dart';
 import 'package:merchant_app/src/widgets/reservation_card.dart';
+import 'package:merchant_app/src/widgets/role_pill.dart';
 import 'package:merchant_app/src/widgets/reservation_detail_pane.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -5081,6 +5082,173 @@ void main() {
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.text('Pick a booking from the list'), findsNothing);
+    });
+  });
+
+  group('the merchant tablet wears the design system', () {
+    Future<FakeBackend> openManageAt(
+      WidgetTester tester, {
+      required Size size,
+      String role = 'owner',
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('Manage is a grid of tiles on a tablet', (tester) async {
+      await openManageAt(tester, size: const Size(1280, 800));
+
+      expect(find.byType(GridView), findsOneWidget);
+      expect(find.text('Menu'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('and a list of rows on a phone', (tester) async {
+      await openManageAt(tester, size: phoneSize);
+
+      expect(find.byType(GridView), findsNothing);
+      expect(find.text('Menu'), findsOneWidget);
+    });
+
+    testWidgets('a staff account gets strictly fewer entries than an owner',
+        (tester) async {
+      // **The rule this slice must not loosen.** Same gating at both widths:
+      // the layout chooses rows or tiles, the role chooses what is in them.
+      await openManageAt(tester, size: phoneSize, role: 'owner');
+      final ownerEntries = find.byType(ListTile).evaluate().length;
+
+      // Tear the first app down before the second. The desk polls for new
+      // bookings, and two live apps in one test means a timer that never
+      // settles.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+
+      await openManageAt(tester, size: phoneSize, role: 'staff');
+      final staffEntries = find.byType(ListTile).evaluate().length;
+
+      expect(staffEntries, lessThan(ownerEntries));
+    });
+
+    testWidgets('and the missing ones are absent, not disabled',
+        (tester) async {
+      // A visible control that refuses invites somebody to try it and then
+      // feel refused. These are gone.
+      await openManageAt(tester, size: phoneSize, role: 'staff');
+
+      for (final entry in [
+        'Opening hours',
+        'Venue details',
+        'Who has access',
+        'Look and feel',
+      ]) {
+        expect(find.text(entry), findsNothing, reason: entry);
+      }
+    });
+
+    testWidgets('the same entries are hidden on a tablet', (tester) async {
+      // The width must not be a way around the role.
+      await openManageAt(tester, size: const Size(1280, 800), role: 'staff');
+
+      expect(find.text('Who has access'), findsNothing);
+      expect(find.text('Opening hours'), findsNothing);
+    });
+
+    testWidgets('a role wears its own colour, not a status colour',
+        (tester) async {
+      // Roles and statuses are different questions. Owner must not borrow
+      // the green that means "paid".
+      expect(
+        RolePill.backgroundOf(MerchantRole.owner),
+        isNot(StatusBadge.backgroundOf(StatusTone.paid)),
+      );
+      expect(
+        RolePill.backgroundOf(MerchantRole.owner),
+        isNot(RolePill.backgroundOf(MerchantRole.manager)),
+      );
+      expect(
+        RolePill.backgroundOf(MerchantRole.manager),
+        isNot(RolePill.backgroundOf(MerchantRole.staff)),
+      );
+    });
+
+    testWidgets('the three payment figures read as one row on a tablet',
+        (tester) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: const Size(1280, 800),
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      // Inlined rather than reusing the payments group's fixture: that one
+      // is scoped to its own group.
+      backend.on('GET', '/api/dashboard/payments/', {
+        'period': {'from': '2026-07-01', 'to': '2026-07-30'},
+        'establishments': [
+          {'id': 7, 'name': 'Le Petit Baobab'},
+        ],
+        'reservations': {'total': 10},
+        'payments': {
+          'collected': '150000.00',
+          'awaiting': '0.00',
+          'failed': '0.00',
+          'completed_count': 3,
+          'pending_count': 0,
+          'failed_count': 0,
+        },
+        'by_provider': <Map<String, dynamic>>[],
+        'needs_attention': <Map<String, dynamic>>[],
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.payments_outlined));
+      await tester.pumpAndSettle();
+
+      final collected = tester.getRect(find.text('Collected'));
+      final failed = tester.getRect(find.text('Failed'));
+      // Side by side, not stacked.
+      expect((collected.top - failed.top).abs(), lessThan(4));
+      expect(tester.takeException(), isNull);
     });
   });
 }

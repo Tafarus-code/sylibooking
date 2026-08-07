@@ -160,41 +160,87 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Collected first and largest: it is the number a merchant opens this
-        // screen to see.
-        _MoneyCard(
-          label: l.collected,
-          amount: dashboard.collected,
-          detail: l.paymentCount(dashboard.completedCount),
-          icon: Icons.check_circle,
-          tone: _Tone.good,
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _MoneyCard(
-                label: l.awaiting,
-                amount: dashboard.awaiting,
-                detail: l.pendingCount(dashboard.pendingCount),
-                icon: Icons.hourglass_top,
-                tone: dashboard.pendingCount > 0 ? _Tone.warn : _Tone.neutral,
-                compact: true,
+        // Three figures across, once there is room. On a phone the one a
+        // merchant opens this screen for gets the full width and the other
+        // two share the line below; on a tablet they read as one row, which
+        // is what the design's metric row is for.
+        if (LayoutSize.of(context).isCompact) ...[
+          _MoneyCard(
+            label: l.collected,
+            amount: dashboard.collected,
+            detail: l.paymentCount(dashboard.completedCount),
+            icon: Icons.check_circle,
+            tone: _Tone.good,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _MoneyCard(
+                  label: l.awaiting,
+                  amount: dashboard.awaiting,
+                  detail: l.pendingCount(dashboard.pendingCount),
+                  icon: Icons.hourglass_top,
+                  tone: dashboard.pendingCount > 0 ? _Tone.warn : _Tone.neutral,
+                  compact: true,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _MoneyCard(
-                label: l.failed,
-                amount: dashboard.failed,
-                detail: l.failedCount(dashboard.failedCount),
-                icon: Icons.error_outline,
-                tone: dashboard.failedCount > 0 ? _Tone.bad : _Tone.neutral,
-                compact: true,
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MoneyCard(
+                  label: l.failed,
+                  amount: dashboard.failed,
+                  detail: l.failedCount(dashboard.failedCount),
+                  icon: Icons.error_outline,
+                  tone: dashboard.failedCount > 0 ? _Tone.bad : _Tone.neutral,
+                  compact: true,
+                ),
               ),
+            ],
+          ),
+        ] else
+          // IntrinsicHeight so the three cards match, rather than
+          // CrossAxisAlignment.stretch — stretch inside a ListView asks for
+          // infinite height and throws before anything is painted.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              Expanded(
+                child: _MoneyCard(
+                  label: l.collected,
+                  amount: dashboard.collected,
+                  detail: l.paymentCount(dashboard.completedCount),
+                  icon: Icons.check_circle,
+                  tone: _Tone.good,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MoneyCard(
+                  label: l.awaiting,
+                  amount: dashboard.awaiting,
+                  detail: l.pendingCount(dashboard.pendingCount),
+                  icon: Icons.hourglass_top,
+                  tone: dashboard.pendingCount > 0 ? _Tone.warn : _Tone.neutral,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MoneyCard(
+                  label: l.failed,
+                  amount: dashboard.failed,
+                  detail: l.failedCount(dashboard.failedCount),
+                  icon: Icons.error_outline,
+                  tone: dashboard.failedCount > 0 ? _Tone.bad : _Tone.neutral,
+                  compact: true,
+                ),
+              ),
+              ],
             ),
-          ],
-        ),
+          ),
 
         // Of what was collected, what the venue is actually better off by.
         // A deposit taken off a bill arrived and was handed straight back as

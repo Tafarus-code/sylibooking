@@ -879,7 +879,7 @@ class LEn extends L {
   }
 
   @override
-  String get spaceRetired => 'Out of service';
+  String get spaceRetiredKeepsBookings => 'Retired — its bookings are kept';
 
   @override
   String spaceSaved(String name) {

@@ -3019,8 +3019,12 @@ void main() {
         find.textContaining('past bookings are kept'),
         findsOneWidget,
       );
-      // And it is still on the list, marked, so it can be brought back.
-      expect(find.text('Out of service'), findsOneWidget);
+      // And it is still on the list, saying on the row itself what retiring
+      // did and did not do, so it can be brought back.
+      expect(
+        find.text('Retired — its bookings are kept'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a retired table can be brought back', (tester) async {
@@ -5364,6 +5368,117 @@ void main() {
         tester.element(find.text('Nothing in the queue')),
       ).colorScheme;
       expect(scheme.primary, themePresetFor('ember').accent);
+    });
+  });
+
+  group('a retired space still reads as part of the room', () {
+    /// Inlined: the spaces group keeps its own copy, scoped to itself.
+    Map<String, dynamic> spaceJson({
+      int id = 1,
+      String name = 'Table 4',
+      String type = 'table',
+      int capacity = 4,
+      bool isActive = true,
+    }) =>
+        {
+          'id': id,
+          'name': name,
+          'type': type,
+          'type_display': switch (type) {
+            'vip_room' => 'VIP room',
+            'terrace' => 'Terrace',
+            _ => 'Table',
+          },
+          'capacity': capacity,
+          'is_active': isActive,
+        };
+
+    Future<FakeBackend> openSpaceList(
+      WidgetTester tester, {
+      required List<Map<String, dynamic>> spaces,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/merchant/establishments/7/spaces/', {
+        'results': spaces,
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tables and rooms'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('it is dimmed rather than hidden', (tester) async {
+      // Hiding it would leave a merchant unable to bring it back, and its
+      // bookings are still on the books either way.
+      await openSpaceList(tester, spaces: [spaceJson(isActive: false)]);
+
+      final dimmed = tester.widget<Opacity>(
+        find
+            .ancestor(
+              of: find.text('Retired — its bookings are kept'),
+              matching: find.byType(Opacity),
+            )
+            .first,
+      );
+      expect(dimmed.opacity, lessThan(1));
+    });
+
+    testWidgets('an active one is not dimmed', (tester) async {
+      await openSpaceList(tester, spaces: [spaceJson()]);
+
+      final row = tester.widget<Opacity>(
+        find
+            .ancestor(of: find.text('Table 4'), matching: find.byType(Opacity))
+            .first,
+      );
+      expect(row.opacity, 1);
+    });
+
+    testWidgets('the row says what retiring did to the bookings',
+        (tester) async {
+      // The confirmation says it before the tap; the row says it afterwards,
+      // when the merchant is looking at the result and wondering.
+      await openSpaceList(tester, spaces: [spaceJson(isActive: false)]);
+
+      expect(
+        find.text('Retired — its bookings are kept'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a retired space offers the way back, not a menu',
+        (tester) async {
+      await openSpaceList(tester, spaces: [spaceJson(isActive: false)]);
+
+      expect(find.text('Bring back'), findsOneWidget);
+      expect(find.byIcon(Icons.more_vert), findsNothing);
+    });
+
+    testWidgets('the kind is said once, by the heading', (tester) async {
+      // The design file tags each card with its kind because its list is
+      // flat. Ours is grouped, and the same word twice on one row is noise.
+      await openSpaceList(tester, spaces: [
+        spaceJson(id: 1, name: 'Table 4'),
+        spaceJson(id: 2, name: 'Table 5', capacity: 2),
+      ]);
+
+      expect(find.text('Table'), findsOneWidget);
     });
   });
 }

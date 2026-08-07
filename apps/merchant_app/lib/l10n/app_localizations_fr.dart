@@ -887,7 +887,7 @@ class LFr extends L {
   }
 
   @override
-  String get spaceRetired => 'Hors service';
+  String get spaceRetiredKeepsBookings => 'Désactivé — réservations conservées';
 
   @override
   String spaceSaved(String name) {

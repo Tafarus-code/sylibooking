@@ -1615,11 +1615,11 @@ abstract class L {
   /// **'{count, plural, =1{1 seat} other{{count} seats}}'**
   String spaceSeats(int count);
 
-  /// No description provided for @spaceRetired.
+  /// No description provided for @spaceRetiredKeepsBookings.
   ///
   /// In en, this message translates to:
-  /// **'Out of service'**
-  String get spaceRetired;
+  /// **'Retired — its bookings are kept'**
+  String get spaceRetiredKeepsBookings;
 
   /// No description provided for @spaceSaved.
   ///

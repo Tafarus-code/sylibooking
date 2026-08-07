@@ -253,7 +253,7 @@
   "spaceCapacity": "Places",
   "spaceCapacityHint": "Nombre maximum de clients",
   "spaceSeats": "{count, plural, =1{1 place} other{{count} places}}",
-  "spaceRetired": "Hors service",
+  "spaceRetiredKeepsBookings": "Désactivé — réservations conservées",
   "spaceSaved": "{name} enregistrée.",
   "removeSpaceTitle": "Supprimer {name} ?",
   "removeSpaceDetail": "Elle cesse immédiatement d’être réservable.",

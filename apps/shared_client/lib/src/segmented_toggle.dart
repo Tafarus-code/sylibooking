@@ -23,6 +23,14 @@ class SegmentedToggle extends StatelessWidget {
     this.margin = const EdgeInsets.fromLTRB(16, 10, 16, 0),
   });
 
+  /// Below this height the toggle trims its own padding.
+  ///
+  /// A phone held sideways has about 360dp of height, and the fixed chrome
+  /// above a list — greeting, search, filters, this — has to fit inside it
+  /// before the list gets any. Losing a few pixels of padding is a better
+  /// answer than a striped overflow bar across the screen.
+  static const _shortViewport = 420.0;
+
   /// Two, in practice. The widget does not forbid three, but the design's
   /// pill only reads as a choice at two or three; past that it wants tabs.
   final List<String> options;
@@ -32,10 +40,14 @@ class SegmentedToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dense = MediaQuery.sizeOf(context).height < _shortViewport;
+
     return Padding(
-      padding: margin,
+      padding: dense
+          ? EdgeInsets.fromLTRB(margin.left, 0, margin.right, 0)
+          : margin,
       child: Container(
-        padding: const EdgeInsets.all(4),
+        padding: EdgeInsets.all(dense ? 2 : 4),
         decoration: BoxDecoration(
           color: SylibookingTokens.deepwoodSoft,
           borderRadius: BorderRadius.circular(12),
@@ -48,6 +60,7 @@ class SegmentedToggle extends StatelessWidget {
                 child: _Option(
                   label: label,
                   selected: index == selectedIndex,
+                  dense: dense,
                   onTap: () => onSelected(index),
                 ),
               ),
@@ -63,11 +76,13 @@ class _Option extends StatelessWidget {
   const _Option({
     required this.label,
     required this.selected,
+    required this.dense,
     required this.onTap,
   });
 
   final String label;
   final bool selected;
+  final bool dense;
   final VoidCallback onTap;
 
   @override
@@ -84,7 +99,10 @@ class _Option extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+            padding: EdgeInsets.symmetric(
+              vertical: dense ? 5 : 8,
+              horizontal: 6,
+            ),
             child: Center(
               // Shrinks rather than clips: "7 prochains jours" losing its last
               // letter reads as a typo, and a merchant cannot tell whether the

@@ -17,6 +17,7 @@ from .customer_views import (
     ReservationByReferenceView,
 )
 from .dashboard import PaymentDashboardView
+from .featured import FeaturedItemsView
 from .merchant import (
     MerchantEstablishmentProfileView,
     MerchantEstablishmentsView,
@@ -201,6 +202,11 @@ urlpatterns = [
         'merchant/establishments/<int:pk>/staff/<int:membership_id>/',
         MerchantStaffMemberView.as_view(),
         name='merchant-staff-member',
+    ),
+    path(
+        'featured-items/',
+        FeaturedItemsView.as_view(),
+        name='featured-items',
     ),
     # Before the router, so these are not taken for viewset detail routes.
     path(

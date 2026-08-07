@@ -269,6 +269,13 @@ class MenuItem(models.Model):
         default=True,
         help_text='Unavailable items are hidden from customers, not deleted.',
     )
+    is_featured = models.BooleanField(
+        default=False,
+        help_text=(
+            "Shown on the customer app's dishes feed, across all venues. "
+            'A venue puts its best few here; it is a shop window, not a menu.'
+        ),
+    )
 
     class Meta:
         ordering = ['category', 'name']

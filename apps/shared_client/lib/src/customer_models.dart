@@ -95,3 +95,44 @@ class PasswordResetRequest {
         sentTo: json['sent_to'] as String?,
       );
 }
+/// One dish in the cross-venue feed, carrying the venue it came from.
+///
+/// Not a [MenuItem]: that model belongs to a venue already on screen and has
+/// no need to name it. This one is read the other way round — the dish is
+/// what caught the eye and the venue is the answer to "where do I get it".
+class FeaturedItem {
+  const FeaturedItem({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.establishmentId,
+    required this.establishmentName,
+    this.description = '',
+    this.imageUrl,
+    this.city = '',
+  });
+
+  final int id;
+  final String name;
+  final String description;
+
+  /// A string, not a number: it is set in the mono face and shown exactly as
+  /// the server sent it, like every other price in these apps.
+  final String price;
+  final String? imageUrl;
+
+  final int establishmentId;
+  final String establishmentName;
+  final String city;
+
+  factory FeaturedItem.fromJson(Map<String, dynamic> json) => FeaturedItem(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        price: json['price'] as String? ?? '',
+        imageUrl: json['image'] as String?,
+        establishmentId: json['establishment'] as int,
+        establishmentName: json['establishment_name'] as String? ?? '',
+        city: json['city'] as String? ?? '',
+      );
+}

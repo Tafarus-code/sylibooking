@@ -46,6 +46,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
 
   Establishment? _detail;
   List<TimeOption> _options = const [];
+  List<SlotTime> _slots = const [];
   bool _loading = true;
   String? _error;
 
@@ -101,6 +102,7 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
       setState(() {
         _detail = detail;
         _options = bookableTimes(grid, partySize: _partySize);
+        _slots = slotTimes(grid, partySize: _partySize);
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -392,18 +394,91 @@ class _EstablishmentScreenState extends State<EstablishmentScreen> {
         spacing: 8,
         runSpacing: 8,
         children: [
-          for (final option in _options)
-            ActionChip(
-              label: Text(DateFormat.Hm().format(option.start)),
-              avatar: option.isLastSpace
-                  ? const Icon(Icons.priority_high, size: 16)
-                  : null,
-              tooltip: option.isLastSpace
-                  ? l.lastSpaceFree
-                  : l.spacesFree(option.freeSpaceCount),
-              onPressed: () => _openBooking(option),
+          for (final slot in _slots)
+            _Slot(
+              label: DateFormat.Hm().format(slot.start),
+              taken: slot.isTaken,
+              lastSpace: slot.option?.isLastSpace ?? false,
+              tooltip: slot.isTaken
+                  ? l.slotTaken
+                  : slot.option!.isLastSpace
+                      ? l.lastSpaceFree
+                      : l.spacesFree(slot.option!.freeSpaceCount),
+              onTap: slot.isTaken ? null : () => _openBooking(slot.option!),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// One time, bookable or gone.
+///
+/// A taken slot is struck through rather than removed: the shape of the
+/// evening is information the customer wants, and a short list of free times
+/// with the busy ones deleted reads as an empty venue rather than a full one.
+class _Slot extends StatelessWidget {
+  const _Slot({
+    required this.label,
+    required this.taken,
+    required this.lastSpace,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool taken;
+  final bool lastSpace;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: !taken,
+        enabled: !taken,
+        label: taken ? '$label — $tooltip' : label,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: taken
+                  ? const Color(0xFFF4F1E7)
+                  : theme.colorScheme.surface,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (lastSpace) ...[
+                  Icon(
+                    Icons.priority_high,
+                    size: 15,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 3),
+                ],
+                Text(
+                  label,
+                  style: sylibookingPriceStyle(context, fontSize: 13).copyWith(
+                    color: taken
+                        ? const Color(0xFFC7C0AC)
+                        : theme.colorScheme.onSurface,
+                    decoration: taken ? TextDecoration.lineThrough : null,
+                    decorationColor: const Color(0xFFC7C0AC),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

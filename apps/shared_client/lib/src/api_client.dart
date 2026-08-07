@@ -701,6 +701,18 @@ class SylibookingApi {
   ///
   /// Only what an account may change about itself: not the username, which
   /// is what they sign in with.
+  /// Featured dishes across every venue, for the browse screen's other half.
+  ///
+  /// Same ceiling as the venue list — it is the same catalogue seen from a
+  /// different angle, and it should not be a cheaper door for a scraper.
+  Future<Page<FeaturedItem>> featuredItems({String? city, String? type}) async {
+    final json = await _get('/featured-items/', {
+      'city': ?city,
+      'type': ?type,
+    });
+    return Page.fromJson(json as Map<String, dynamic>, FeaturedItem.fromJson);
+  }
+
   Future<CustomerAccount> updateCustomerProfile({
     String? name,
     String? phone,

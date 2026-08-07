@@ -199,6 +199,30 @@ abstract class L {
   /// **'Show distances'**
   String get filterShowDistances;
 
+  /// No description provided for @browseVenues.
+  ///
+  /// In en, this message translates to:
+  /// **'Places'**
+  String get browseVenues;
+
+  /// No description provided for @browseDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Dishes'**
+  String get browseDishes;
+
+  /// No description provided for @noFeaturedDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'No dishes featured yet'**
+  String get noFeaturedDishes;
+
+  /// No description provided for @noFeaturedDishesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Venues put their best few here. Check back, or browse the places.'**
+  String get noFeaturedDishesDetail;
+
   /// No description provided for @statusOpenUntil.
   ///
   /// In en, this message translates to:
@@ -216,6 +240,36 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Hours not listed'**
   String get statusHoursNotListed;
+
+  /// No description provided for @resStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get resStatusPending;
+
+  /// No description provided for @resStatusConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get resStatusConfirmed;
+
+  /// No description provided for @resStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get resStatusCancelled;
+
+  /// No description provided for @resStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get resStatusCompleted;
+
+  /// No description provided for @resStatusMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get resStatusMissed;
 
   /// No description provided for @typeAndCity.
   ///
@@ -354,6 +408,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Last space free at this time'**
   String get lastSpaceFree;
+
+  /// No description provided for @slotTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'Already taken'**
+  String get slotTaken;
 
   /// No description provided for @spacesFree.
   ///
@@ -1459,12 +1519,6 @@ abstract class L {
   /// **'We will hold your table for {minutes} minutes after your booking time.'**
   String tableHeldFor(int minutes);
 
-  /// No description provided for @bookingMissed.
-  ///
-  /// In en, this message translates to:
-  /// **'Missed'**
-  String get bookingMissed;
-
   /// No description provided for @bookingMissedDetail.
   ///
   /// In en, this message translates to:
@@ -1476,6 +1530,18 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Your {amount} GNF deposit comes off the bill when you arrive. If nobody arrives in that time, the venue keeps it.'**
   String depositTerms(String amount);
+
+  /// No description provided for @depositHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit {amount} GNF.'**
+  String depositHeadline(String amount);
+
+  /// No description provided for @depositDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It comes off your bill when you arrive. If the table isn\'t taken {minutes} minutes after the booked time, the venue keeps it.'**
+  String depositDetail(int minutes);
 
   /// No description provided for @tooManyAttempts.
   ///

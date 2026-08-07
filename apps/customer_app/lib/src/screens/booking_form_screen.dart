@@ -298,33 +298,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
             if (_paymentProvider != PaymentProvider.cashOnArrival &&
                 widget.establishment.depositAmount != null) ...[
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 18,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l.depositTerms(
-                          widget.establishment.depositAmount!,
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              // The window is the venue's own — 30 minutes at a restaurant,
+              // 90 at a lounge — and the server captures it on the booking at
+              // the moment it is made. The old copy said "in that time"
+              // without ever saying how long that was, which is the half of
+              // the sentence a dispute turns on.
+              DepositDisclosure(
+                deposit: widget.establishment.depositAmount!,
+                windowMinutes: widget.establishment.noShowWindowMinutes ?? 30,
+                headline: (deposit, _) => l.depositHeadline(deposit),
+                detail: (_, minutes) => l.depositDetail(minutes),
+                margin: EdgeInsets.zero,
               ),
             ],
             const SizedBox(height: 24),

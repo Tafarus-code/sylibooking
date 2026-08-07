@@ -150,6 +150,11 @@ void main() {
     });
 
     testWidgets('the selected half is filled ember', (tester) async {
+      // Reads the Material that actually paints, not a decoration that might
+      // be handed to an ancestor. The first version of this test asserted an
+      // `Ink`'s declared decoration and passed while the fill was being drawn
+      // underneath the toggle's own dark background, invisible — dark brown
+      // text on dark green, and the test still green.
       await tester.pumpWidget(
         host(
           SegmentedToggle(
@@ -161,14 +166,55 @@ void main() {
       );
 
       Color? fillUnder(String label) {
-        final ink = tester.widget<Ink>(
-          find.ancestor(of: find.text(label), matching: find.byType(Ink)).first,
+        final material = tester.widget<Material>(
+          find
+              .ancestor(of: find.text(label), matching: find.byType(Material))
+              .first,
         );
-        return (ink.decoration! as BoxDecoration).color;
+        return material.color;
       }
 
       expect(fillUnder('Commandes'), SylibookingTokens.ember);
       expect(fillUnder('Réservations'), Colors.transparent);
+    });
+
+    testWidgets("the fill is in front of the toggle's own background",
+        (tester) async {
+      // **The bug this pair exists to catch.** The ember has to be painted
+      // by something inside the deepwood pill; painted by an ancestor it
+      // lands behind it and the selected label becomes unreadable.
+      await tester.pumpWidget(
+        host(
+          SegmentedToggle(
+            options: const ['Réservations', 'Commandes'],
+            selectedIndex: 0,
+            onSelected: (_) {},
+          ),
+        ),
+      );
+
+      final fill = find
+          .ancestor(
+            of: find.text('Réservations'),
+            matching: find.byWidgetPredicate(
+              (w) => w is Material && w.color == SylibookingTokens.ember,
+            ),
+          )
+          .first;
+      final pill = find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.decoration is BoxDecoration &&
+            (w.decoration! as BoxDecoration).color ==
+                SylibookingTokens.deepwoodSoft,
+      );
+
+      // The ember Material is a descendant of the dark pill, so it paints
+      // over it rather than under it.
+      expect(
+        find.descendant(of: pill, matching: fill),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a long French label keeps all its letters', (tester) async {

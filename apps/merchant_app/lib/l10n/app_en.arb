@@ -25,6 +25,8 @@
   "hidePassword": "Hide",
   "wrongUsernameOrPassword": "Wrong username or password.",
   "navReservations": "Reservations",
+  "navKitchen": "Kitchen",
+  "navReviews": "Reviews",
   "navPayments": "Payments",
   "navManage": "Manage",
   "tabReservations": "Réservations",

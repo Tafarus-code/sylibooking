@@ -84,6 +84,12 @@ class LEn extends L {
   String get navReservations => 'Reservations';
 
   @override
+  String get navKitchen => 'Kitchen';
+
+  @override
+  String get navReviews => 'Reviews';
+
+  @override
   String get navPayments => 'Payments';
 
   @override

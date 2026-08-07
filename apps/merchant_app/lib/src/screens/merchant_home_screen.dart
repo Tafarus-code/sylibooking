@@ -5,7 +5,9 @@ import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../image_source.dart';
 import 'manage_screen.dart';
+import 'orders_screen.dart';
 import 'payments_dashboard_screen.dart';
+import 'reviews_screen.dart';
 import 'venue_desk_screen.dart';
 
 /// The signed-in shell: tonight's bookings, and the money behind them.
@@ -35,6 +37,11 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
     return AdaptiveScaffold(
       selectedIndex: _index,
       onDestinationSelected: (index) => setState(() => _index = index),
+      // Five, matching the design system's rail. The kitchen queue and the
+      // reviews used to be reached through the desk's own toggle and through
+      // Manage — one tap deeper than the two jobs deserve, given a cook
+      // watches the queue all evening and a merchant checks reviews the way
+      // they check takings.
       destinations: [
         AdaptiveDestination(
           label: l.navReservations,
@@ -42,9 +49,19 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
           selectedIcon: Icons.event_note,
         ),
         AdaptiveDestination(
+          label: l.navKitchen,
+          icon: Icons.local_fire_department_outlined,
+          selectedIcon: Icons.local_fire_department,
+        ),
+        AdaptiveDestination(
           label: l.navPayments,
           icon: Icons.payments_outlined,
           selectedIcon: Icons.payments,
+        ),
+        AdaptiveDestination(
+          label: l.navReviews,
+          icon: Icons.star_outline,
+          selectedIcon: Icons.star,
         ),
         AdaptiveDestination(
           label: l.navManage,
@@ -58,7 +75,25 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
         index: _index,
         children: [
           VenueDeskScreen(auth: widget.auth),
+          // The queue on its own, with its own app bar. The desk keeps its
+          // Reservations/Orders toggle as well: a phone in a waiter's pocket
+          // flips between the two far more often than it changes tab, and
+          // the design's staff screen draws both.
+          // Inside the venue's theme scope like the desk beside it: a cook
+          // and a host are looking at the same venue, and only one of their
+          // screens wearing its colours would read as two different apps.
+          ListenableBuilder(
+            listenable: widget.auth,
+            builder: (context, _) => EstablishmentThemeScope(
+              presetKey: widget.auth.selectedVenue?.themePreset,
+              child: Scaffold(
+                appBar: AppBar(title: Text(l.navKitchen)),
+                body: OrdersView(auth: widget.auth),
+              ),
+            ),
+          ),
           PaymentsDashboardScreen(auth: widget.auth),
+          ReviewsScreen(auth: widget.auth),
           ManageScreen(
             auth: widget.auth,
             imageSource: widget.imageSource,

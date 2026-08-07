@@ -5481,4 +5481,126 @@ void main() {
       expect(find.text('Table'), findsOneWidget);
     });
   });
+
+  group('the shape behind the average', () {
+    Future<void> openReviewSummary(
+      WidgetTester tester, {
+      required Map<String, int> distribution,
+      double? average,
+    }) async {
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/merchant/establishments/7/reviews/', {
+        'count': distribution.values.fold(0, (a, b) => a + b),
+        'next': null,
+        // At least one review, or the screen shows its empty state and the
+        // summary never renders.
+        'results': distribution.values.fold(0, (a, b) => a + b) == 0
+            ? <Map<String, dynamic>>[]
+            : [
+                {
+                  'id': 1,
+                  'rating': 5,
+                  'comment': 'Lovely evening',
+                  'author_display_name': 'Mariama',
+                  'visit_date': '2026-08-01T19:00:00Z',
+                  'created_at': '2026-08-02T09:00:00Z',
+                  'is_flagged': false,
+                  'is_hidden': false,
+                },
+              ],
+        'average_rating': average,
+        'distribution': distribution,
+      });
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.star_outline));
+      await tester.pumpAndSettle();
+    }
+
+    List<double?> barValues(WidgetTester tester) => tester
+        .widgetList<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator),
+        )
+        .map((bar) => bar.value)
+        .toList();
+
+    testWidgets('a bar is that star share of every review', (tester) async {
+      await openReviewSummary(
+        tester,
+        distribution: {'5': 3, '4': 0, '3': 0, '2': 0, '1': 1},
+        average: 4.0,
+      );
+
+      // Five first, then four down to one.
+      final bars = barValues(tester);
+      expect(bars.first, closeTo(0.75, 0.001));
+      expect(bars.last, closeTo(0.25, 0.001));
+    });
+
+    testWidgets('an even split does not show two full bars', (tester) async {
+      // **The reason this changed.** Scaled to the biggest bucket, three
+      // fives and three ones both filled the bar — everybody loving it and
+      // everybody hating it at once.
+      await openReviewSummary(
+        tester,
+        distribution: {'5': 3, '4': 0, '3': 0, '2': 0, '1': 3},
+        average: 3.0,
+      );
+
+      final bars = barValues(tester);
+      expect(bars.first, closeTo(0.5, 0.001));
+      expect(bars.last, closeTo(0.5, 0.001));
+    });
+
+    testWidgets('one score only fills its own bar and empties the rest',
+        (tester) async {
+      await openReviewSummary(
+        tester,
+        distribution: {'5': 4, '4': 0, '3': 0, '2': 0, '1': 0},
+        average: 5.0,
+      );
+
+      final bars = barValues(tester);
+      expect(bars.first, closeTo(1.0, 0.001));
+      expect(bars.skip(1).every((v) => v == 0), isTrue);
+    });
+
+    testWidgets('a venue with no reviews gets the empty state, not bars',
+        (tester) async {
+      // Five empty bars and a dash where the average goes says less than a
+      // sentence explaining that reviews arrive after visits do.
+      await openReviewSummary(
+        tester,
+        distribution: {'5': 0, '4': 0, '3': 0, '2': 0, '1': 0},
+      );
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('all five scores are shown, including the empty ones',
+        (tester) async {
+      // A missing row reads as a missing score rather than as none of them.
+      await openReviewSummary(
+        tester,
+        distribution: {'5': 2, '4': 0, '3': 0, '2': 0, '1': 0},
+        average: 5.0,
+      );
+
+      expect(find.byType(LinearProgressIndicator), findsNWidgets(5));
+    });
+  });
 }

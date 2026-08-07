@@ -192,7 +192,12 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = L.of(context);
-    final most = page.distribution.values.fold(0, (a, b) => a > b ? a : b);
+    // Each bar is that star's share of all the reviews, not its share of the
+    // biggest bucket. Scaling to the biggest makes a full bar mean "the most
+    // common score" rather than "all of them" — so a venue with three fives
+    // and three ones showed two full bars, which reads as everybody loving it
+    // and everybody hating it at the same time.
+    final total = page.distribution.values.fold(0, (a, b) => a + b);
 
     return Card(
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
@@ -244,12 +249,12 @@ class _Summary extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
-                          value: most == 0
+                          value: total == 0
                               ? 0
-                              : (page.distribution[star] ?? 0) / most,
-                          minHeight: 8,
+                              : (page.distribution[star] ?? 0) / total,
+                          minHeight: 6,
                           backgroundColor:
                               theme.colorScheme.surfaceContainerHighest,
                         ),

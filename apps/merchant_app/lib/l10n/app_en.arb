@@ -515,7 +515,7 @@
       }
     }
   },
-  "spaceRetired": "Out of service",
+  "spaceRetiredKeepsBookings": "Retired — its bookings are kept",
   "spaceSaved": "{name} saved.",
   "@spaceSaved": {
     "placeholders": {

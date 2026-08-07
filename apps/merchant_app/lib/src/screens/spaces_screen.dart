@@ -293,49 +293,67 @@ class _SpaceRow extends StatelessWidget {
     final theme = Theme.of(context);
     final l = L.of(context);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: ListTile(
-        title: Text(
-          space.name,
-          style: TextStyle(
-            decoration: space.isActive ? null : TextDecoration.lineThrough,
+    // Dimmed rather than struck through or hidden. A retired space is still
+    // part of the room — its bookings are still on the books — and the
+    // merchant who retired it needs to find it again to bring it back.
+    //
+    // No type tag on the card, though the design file draws one: its list is
+    // flat, so the tag is the only thing saying what kind of space this is.
+    // Ours is grouped under a heading that already says it, and the same
+    // word twice on one row is noise rather than reassurance.
+    return Opacity(
+      opacity: space.isActive ? 1 : 0.45,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(13, 11, 8, 11),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      space.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      space.isActive
+                          ? l.spaceSeats(space.capacity)
+                          // Says what retiring actually did, on the row
+                          // itself: the bookings did not go anywhere.
+                          : l.spaceRetiredKeepsBookings,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (space.isActive)
+                PopupMenuButton<String>(
+                  enabled: !busy,
+                  onSelected: (choice) =>
+                      choice == 'edit' ? onEdit() : onRemove(),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(value: 'edit', child: Text(l.editSpace)),
+                    PopupMenuItem(value: 'remove', child: Text(l.remove)),
+                  ],
+                )
+              else
+                TextButton(
+                  onPressed: busy ? null : onBringBack,
+                  child: Text(l.bringSpaceBack),
+                ),
+            ],
           ),
         ),
-        // Stacked rather than joined on one line: at 360dp the seat count,
-        // the status and a "Bring back" button do not fit across, and a
-        // status that has to ellipsise is not a status.
-        isThreeLine: !space.isActive,
-        subtitle: space.isActive
-            ? Text(l.spaceSeats(space.capacity))
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l.spaceSeats(space.capacity)),
-                  Text(
-                    l.spaceRetired,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-        trailing: space.isActive
-            ? PopupMenuButton<String>(
-                enabled: !busy,
-                onSelected: (choice) =>
-                    choice == 'edit' ? onEdit() : onRemove(),
-                itemBuilder: (context) => [
-                  PopupMenuItem(value: 'edit', child: Text(l.editSpace)),
-                  PopupMenuItem(value: 'remove', child: Text(l.remove)),
-                ],
-              )
-            : TextButton(
-                onPressed: busy ? null : onBringBack,
-                child: Text(l.bringSpaceBack),
-              ),
       ),
     );
   }

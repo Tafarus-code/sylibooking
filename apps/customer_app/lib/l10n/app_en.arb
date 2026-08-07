@@ -27,6 +27,10 @@
   "filterOpenNow": "Open now",
   "filterNearest": "Nearest",
   "filterShowDistances": "Show distances",
+  "browseVenues": "Places",
+  "browseDishes": "Dishes",
+  "noFeaturedDishes": "No dishes featured yet",
+  "noFeaturedDishesDetail": "Venues put their best few here. Check back, or browse the places.",
   "statusOpenUntil": "Open until {time}",
   "@statusOpenUntil": {
     "placeholders": {

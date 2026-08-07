@@ -11,6 +11,7 @@ import '../image_source.dart';
 import '../location_source.dart';
 import '../widgets/browse_header.dart';
 import '../widgets/establishment_card.dart';
+import '../widgets/featured_grid.dart';
 import 'establishment_screen.dart';
 
 /// Discovery: what is open near me, and what kind of place is it.
@@ -41,6 +42,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Timer? _debounce;
 
   List<Establishment> _establishments = const [];
+
+  /// The other half of discovery. Loaded lazily: somebody who never taps
+  /// Dishes should not pay for the request.
+  List<FeaturedItem> _dishes = const [];
+  bool _dishesLoading = false;
+  bool _showDishes = false;
+
   bool _loading = true;
   String? _error;
   EstablishmentType? _typeFilter;
@@ -292,15 +300,98 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 }
               },
             ),
+            SegmentedToggle(
+              options: [l.browseVenues, l.browseDishes],
+              selectedIndex: _showDishes ? 1 : 0,
+              onSelected: (index) {
+                setState(() => _showDishes = index == 1);
+                if (_showDishes && _dishes.isEmpty) _loadDishes();
+              },
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            ),
             const SizedBox(height: 4),
             Expanded(
-              child: RefreshIndicator(onRefresh: _load, child: _body()),
+              child: RefreshIndicator(
+                onRefresh: _showDishes ? _loadDishes : _load,
+                child: _showDishes ? _dishesBody() : _body(),
+              ),
             ),
           ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _loadDishes() async {
+    setState(() => _dishesLoading = true);
+    try {
+      final page = await widget.api.featuredItems(
+        type: switch (_typeFilter) {
+          EstablishmentType.lounge => 'lounge',
+          EstablishmentType.restaurant => 'restaurant',
+          _ => null,
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _dishes = page.results;
+        _dishesLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.messageOr(whenThrottled: L.of(context).browsingTooFast);
+        _dishesLoading = false;
+      });
+    } on ApiUnreachableException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _dishesLoading = false;
+      });
+    }
+  }
+
+  Widget _dishesBody() {
+    if (_dishesLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return FeaturedGrid(items: _dishes, onTap: _openDish);
+  }
+
+  /// A dish is a way into its venue, so the tap lands where booking happens —
+  /// under that venue's own branding, like any other route in.
+  ///
+  /// The feed carries only enough of the venue to name it, so the full record
+  /// is fetched on the way. One round trip on a deliberate tap is fair; doing
+  /// it for every card in the grid up front would not be.
+  Future<void> _openDish(FeaturedItem item) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final l = L.of(context);
+
+    try {
+      final establishment = await widget.api.establishment(item.establishmentId);
+      if (!mounted) return;
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (context) => EstablishmentScreen(
+            api: widget.api,
+            store: widget.store,
+            establishment: establishment,
+            directionsLauncher: widget.directionsLauncher,
+            here: _here,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.messageOr(whenThrottled: l.browsingTooFast))),
+      );
+    } on ApiUnreachableException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   Widget _body() {

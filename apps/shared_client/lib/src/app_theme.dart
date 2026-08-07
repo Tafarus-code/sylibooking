@@ -93,7 +93,14 @@ ColorScheme sylibookingColorScheme() => const ColorScheme.light(
 ///
 /// Establishment branding is layered over the top of this by
 /// `EstablishmentThemeScope`, and only on the screens that belong to a venue.
-ThemeData sylibookingAppTheme() {
+///
+/// [darkAppBar] is the one place the two apps legitimately differ. The design
+/// system puts the customer's app bar in deepwood — it is the top of a phone
+/// held in one hand at night, and the dark band is what makes the ivory list
+/// below it read as the content. The merchant's tablet header is white in the
+/// same document, because it sits under a navigation rail that is already
+/// deepwood and two dark bands meeting would just look like a mistake.
+ThemeData sylibookingAppTheme({bool darkAppBar = false}) {
   final scheme = sylibookingColorScheme();
   final base = ThemeData(colorScheme: scheme, useMaterial3: true);
 
@@ -101,10 +108,15 @@ ThemeData sylibookingAppTheme() {
     textTheme: sylibookingTextTheme(base.textTheme),
     scaffoldBackgroundColor: scheme.surface,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface,
-      foregroundColor: scheme.onSurface,
+      backgroundColor:
+          darkAppBar ? SylibookingTokens.deepwood : scheme.surface,
+      foregroundColor:
+          darkAppBar ? SylibookingTokens.onDeepwood : scheme.onSurface,
       elevation: 0,
-      scrolledUnderElevation: 1,
+      scrolledUnderElevation: darkAppBar ? 0 : 1,
+      iconTheme: darkAppBar
+          ? const IconThemeData(color: SylibookingTokens.onDeepwood)
+          : null,
     ),
     cardTheme: CardThemeData(
       color: scheme.surface,

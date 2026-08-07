@@ -199,6 +199,30 @@ abstract class L {
   /// **'Show distances'**
   String get filterShowDistances;
 
+  /// No description provided for @browseVenues.
+  ///
+  /// In en, this message translates to:
+  /// **'Places'**
+  String get browseVenues;
+
+  /// No description provided for @browseDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Dishes'**
+  String get browseDishes;
+
+  /// No description provided for @noFeaturedDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'No dishes featured yet'**
+  String get noFeaturedDishes;
+
+  /// No description provided for @noFeaturedDishesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Venues put their best few here. Check back, or browse the places.'**
+  String get noFeaturedDishesDetail;
+
   /// No description provided for @statusOpenUntil.
   ///
   /// In en, this message translates to:

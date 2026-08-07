@@ -5019,4 +5019,177 @@ void main() {
       expect(find.textContaining('Something specific'), findsOneWidget);
     });
   });
+
+  group('dishes, the other half of discovery', () {
+    Map<String, dynamic> dishJson({
+      int id = 1,
+      String name = 'Poulet yassa',
+      String venue = 'Le Baobab Doré',
+      String price = '45000.00',
+      int establishment = 7,
+    }) =>
+        {
+          'id': id,
+          'name': name,
+          'description': '',
+          'price': price,
+          'image': null,
+          'category': 'food',
+          'establishment': establishment,
+          'establishment_name': venue,
+          'establishment_type': 'restaurant',
+          'city': 'Conakry',
+        };
+
+    Future<FakeBackend> openBrowse(
+      WidgetTester tester, {
+      List<Map<String, dynamic>>? dishes,
+      String? language,
+      Size size = phoneSize,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        size: size,
+        localeStore: InMemoryLocaleStore(language),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/featured-items/', {
+        'count': (dishes ?? [dishJson()]).length,
+        'next': null,
+        'results': dishes ?? [dishJson()],
+      });
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('the venues half is what opens first', (tester) async {
+      // Discovery by place is still the default; dishes are the other angle,
+      // not the new front door.
+      await openBrowse(tester);
+
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+      expect(find.text('Poulet yassa'), findsNothing);
+    });
+
+    testWidgets('nothing is fetched until the toggle is tapped',
+        (tester) async {
+      // Somebody who never looks at dishes should not pay for the request.
+      final backend = await openBrowse(tester);
+
+      expect(
+        backend.requests.where((r) => r.url.path == '/api/featured-items/'),
+        isEmpty,
+      );
+    });
+
+    testWidgets('tapping Dishes shows them, with venue and price',
+        (tester) async {
+      await openBrowse(tester);
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poulet yassa'), findsOneWidget);
+      expect(find.text('Le Baobab Doré'), findsOneWidget);
+      expect(find.textContaining('45000.00'), findsOneWidget);
+    });
+
+    testWidgets('they come two to a row', (tester) async {
+      await openBrowse(
+        tester,
+        dishes: [
+          dishJson(),
+          dishJson(id: 2, name: 'Chicha pomme', venue: 'LaParisienne'),
+        ],
+      );
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+
+      final first = tester.getRect(find.text('Poulet yassa'));
+      final second = tester.getRect(find.text('Chicha pomme'));
+      // Side by side, not stacked.
+      expect(second.left, greaterThan(first.left));
+      expect((second.top - first.top).abs(), lessThan(4));
+    });
+
+    testWidgets('an empty feed explains itself', (tester) async {
+      await openBrowse(tester, dishes: []);
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No dishes featured yet'), findsOneWidget);
+    });
+
+    testWidgets('tapping a dish opens its venue', (tester) async {
+      final backend = await openBrowse(tester);
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Poulet yassa'));
+      await tester.pumpAndSettle();
+
+      // The venue's own screen, reached from the dish.
+      expect(find.text('Kaloum, Conakry'), findsOneWidget);
+    });
+
+    testWidgets('going back to Places does not refetch the venues',
+        (tester) async {
+      final backend = await openBrowse(tester);
+      final before =
+          backend.requests.where((r) => r.url.path == '/api/establishments/').length;
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Places'));
+      await tester.pumpAndSettle();
+
+      expect(
+        backend.requests.where((r) => r.url.path == '/api/establishments/').length,
+        before,
+      );
+    });
+
+    testWidgets('the French labels fit the toggle', (tester) async {
+      await openBrowse(tester, language: 'fr');
+
+      // "Établissements" is long and this is exactly where SegmentedButton
+      // used to eat a letter.
+      expect(find.text('Établissements'), findsOneWidget);
+      expect(find.text('Plats'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the grid holds up on a tablet', (tester) async {
+      await openBrowse(tester, size: tabletSize);
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poulet yassa'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('and on a short landscape phone', (tester) async {
+      await openBrowse(tester, size: const Size(900, 360));
+
+      await tester.tap(find.text('Dishes'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

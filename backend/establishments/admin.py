@@ -146,10 +146,20 @@ class PhotoAdmin(admin.ModelAdmin):
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ['name', 'establishment', 'category', 'price', 'is_available']
-    list_filter = ['category', 'is_available', 'establishment']
+    list_display = [
+        'name',
+        'establishment',
+        'category',
+        'price',
+        'is_available',
+        'is_featured',
+    ]
+    list_filter = ['category', 'is_available', 'is_featured', 'establishment']
     search_fields = ['name', 'description']
-    list_editable = ['is_available']
+    # Both editable in the list: curating a shop window means ticking a few
+    # boxes across several venues, and opening each item to do it is the sort
+    # of friction that ends with nobody curating anything.
+    list_editable = ['is_available', 'is_featured']
 
 
 @admin.register(Space)

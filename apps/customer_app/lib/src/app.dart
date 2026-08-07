@@ -81,7 +81,10 @@ class _CustomerAppState extends State<CustomerApp> {
         debugShowCheckedModeBanner: false,
         // The app's own look. Establishment branding is layered on top of
         // this by EstablishmentThemeScope, and only on a venue's own screens.
-        theme: sylibookingAppTheme(),
+        //
+        // Dark app bar: the design system's customer screens all wear the
+        // deepwood band at the top. The merchant app asks for the light one.
+        theme: sylibookingAppTheme(darkAppBar: true),
         // Null follows the phone, which in this market is usually already
         // French. The toggle is for when the phone is wrong, not a first step.
         locale: _locale.locale,

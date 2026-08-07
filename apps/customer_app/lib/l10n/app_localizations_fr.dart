@@ -62,6 +62,19 @@ class LFr extends L {
   String get filterShowDistances => 'Voir les distances';
 
   @override
+  String get browseVenues => 'Établissements';
+
+  @override
+  String get browseDishes => 'Plats';
+
+  @override
+  String get noFeaturedDishes => 'Aucun plat en vedette';
+
+  @override
+  String get noFeaturedDishesDetail =>
+      'Les établissements mettent ici leurs meilleurs plats. Revenez plus tard, ou parcourez les établissements.';
+
+  @override
   String statusOpenUntil(String time) {
     return 'Ouvert jusqu\'à $time';
   }

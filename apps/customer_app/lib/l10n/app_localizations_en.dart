@@ -62,6 +62,19 @@ class LEn extends L {
   String get filterShowDistances => 'Show distances';
 
   @override
+  String get browseVenues => 'Places';
+
+  @override
+  String get browseDishes => 'Dishes';
+
+  @override
+  String get noFeaturedDishes => 'No dishes featured yet';
+
+  @override
+  String get noFeaturedDishesDetail =>
+      'Venues put their best few here. Check back, or browse the places.';
+
+  @override
   String statusOpenUntil(String time) {
     return 'Open until $time';
   }

@@ -55,22 +55,15 @@ class _MyActivityScreenState extends State<MyActivityScreen> {
         title: Text(l.myBookings),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: SegmentedButton<ActivityTab>(
-              segments: [
-                for (final tab in ActivityTab.values)
-                  ButtonSegment(
-                    value: tab,
-                    // A segment is a fixed-height pill: a wrapped label loses
-                    // its second line.
-                    label: Text(tab.label(l), maxLines: 1, softWrap: false),
-                  ),
-              ],
-              selected: {_tab},
-              onSelectionChanged: (selection) =>
-                  setState(() => _tab = selection.first),
-            ),
+          // The shared toggle rather than SegmentedButton: the latter sizes
+          // itself from its labels and clips the longer French one, which is
+          // the defect the audit found on the merchant's desk.
+          child: SegmentedToggle(
+            options: [for (final tab in ActivityTab.values) tab.label(l)],
+            selectedIndex: _tab.index,
+            onSelected: (index) =>
+                setState(() => _tab = ActivityTab.values[index]),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           ),
         ),
       ),

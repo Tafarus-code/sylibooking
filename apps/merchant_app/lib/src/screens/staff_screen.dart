@@ -4,6 +4,7 @@ import 'package:shared_client/shared_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
 import '../labels.dart';
+import '../widgets/role_pill.dart';
 
 /// Who has access to this venue, and in what capacity.
 ///
@@ -230,9 +231,18 @@ class _StaffScreenState extends State<StaffScreen> {
                           vertical: 4,
                         ),
                         child: ListTile(
-                          title: Text(member.fullName),
+                          title: Row(
+                            children: [
+                              Flexible(child: Text(member.fullName)),
+                              const SizedBox(width: 8),
+                              // The role beside the name rather than buried in
+                              // the subtitle: it is the reason this list is
+                              // being read.
+                              RolePill(role: member.role),
+                            ],
+                          ),
                           subtitle: Text(
-                            '${member.username} · ${member.role.name(l)}',
+                            member.username,
                             style: theme.textTheme.bodySmall,
                           ),
                           trailing: PopupMenuButton<String>(

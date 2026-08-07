@@ -462,69 +462,29 @@ class OrderStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    // Drawn from the scheme rather than from fixed colours, so a venue's
-    // preset recolours these with the rest of its screens — but from roles
-    // that stay distinct: secondaryContainer and primaryContainer resolve to
-    // the same colour under a seeded scheme, which would leave two stages
-    // looking identical.
+    // The shared vocabulary rather than the venue's own scheme. A kitchen
+    // ticket and a booking are read on the same tablet minutes apart, and a
+    // seeded brand colour could make "ready" here and "paid" there the same
+    // green by accident — or two stages the same colour as each other.
     //
-    // Neutral for waiting, warm for cooking, the accent for done.
-    final (icon, background, foreground) = switch (status) {
-      OrderStatus.placed => (
-        Icons.fiber_new,
-        scheme.surfaceContainerHighest,
-        scheme.onSurfaceVariant,
-      ),
+    // The icon stays: colour alone fails anyone with a colour vision
+    // deficiency, and these are read fast across a counter.
+    final (icon, tone) = switch (status) {
+      OrderStatus.placed => (Icons.fiber_new, StatusTone.orderPlaced),
       OrderStatus.preparing => (
         Icons.local_fire_department,
-        scheme.tertiaryContainer,
-        scheme.onTertiaryContainer,
+        StatusTone.orderPreparing,
       ),
-      OrderStatus.ready => (
-        Icons.check_circle,
-        scheme.primaryContainer,
-        scheme.onPrimaryContainer,
-      ),
-      OrderStatus.completed => (
-        Icons.done_all,
-        scheme.secondaryContainer,
-        scheme.onSecondaryContainer,
-      ),
-      OrderStatus.cancelled => (
-        Icons.cancel,
-        scheme.errorContainer,
-        scheme.onErrorContainer,
-      ),
-      OrderStatus.unknown => (
-        Icons.help_outline,
-        scheme.surfaceContainerHighest,
-        scheme.onSurfaceVariant,
-      ),
+      OrderStatus.ready => (Icons.check_circle, StatusTone.orderReady),
+      OrderStatus.completed => (Icons.done_all, StatusTone.orderCompleted),
+      OrderStatus.cancelled => (Icons.cancel, StatusTone.unpaid),
+      OrderStatus.unknown => (Icons.help_outline, StatusTone.orderPlaced),
     };
-    final label = status.label(L.of(context));
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: foreground),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+    return StatusBadge(
+      label: status.label(L.of(context)),
+      tone: tone,
+      icon: icon,
     );
   }
 }

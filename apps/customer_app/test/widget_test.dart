@@ -597,6 +597,9 @@ void main() {
       await walkTheApp(tester, phoneSize);
       await tester.tap(find.text('Le Petit Baobab').first);
       await tester.pumpAndSettle();
+      // The four sections live behind a tab row now.
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
 
       // Photos wrap downwards like the menu cards. A customer should not have
       // to swipe sideways to find out a venue has eight pictures.
@@ -2050,6 +2053,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Le Petit Baobab').first);
       await tester.pumpAndSettle();
+      // Photos are one of four tabs now, not a strip down the page.
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
     }
 
     /// Taps the thumbnail at [index] in the grid, found by its caption —
@@ -3213,7 +3219,8 @@ void main() {
         ]),
       );
 
-      expect(find.text('Menu'), findsOneWidget);
+      // "Menu" now names both the tab and the section under it.
+      expect(find.text('Menu'), findsWidgets);
       expect(find.text('Food'), findsOneWidget);
       expect(find.text('Chicha flavour'), findsOneWidget);
       expect(find.text('Poulet braisé'), findsOneWidget);
@@ -3240,7 +3247,10 @@ void main() {
         detail: establishmentDetailJson(menu: const []),
       );
 
-      expect(find.text('Menu'), findsNothing);
+      // The tab stays — a venue with no menu still has hours, reviews and
+      // photos — but it says so instead of showing an empty heading.
+      expect(find.text('This venue has not put its menu up yet.'),
+          findsOneWidget);
       expect(find.text('Food'), findsNothing);
       // The rest of the screen is unaffected.
       expect(find.text('Available times'), findsOneWidget);
@@ -3401,6 +3411,9 @@ void main() {
       int reviewCount = 0,
       List<Map<String, dynamic>> reviews = const [],
       List<Map<String, dynamic>> photos = const [],
+      /// Which tab to open. The four sections live behind a tab row now, so
+      /// a test about reviews has to ask for reviews.
+      String tab = 'Reviews',
     }) async {
       final (:app, :backend, :store) = buildApp(tester);
       backend.on('GET', '/api/establishments/', {
@@ -3432,6 +3445,8 @@ void main() {
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(tab));
       await tester.pumpAndSettle();
       return backend;
     }
@@ -3483,13 +3498,17 @@ void main() {
     });
 
     testWidgets('photos render when the venue has them', (tester) async {
-      await openVenue(tester, photos: [photoJson(caption: 'Our terrace')]);
+      await openVenue(
+        tester,
+        photos: [photoJson(caption: 'Our terrace')],
+        tab: 'Photos',
+      );
 
       expect(find.text('Our terrace'), findsOneWidget);
     });
 
     testWidgets('a venue with no photos shows no photo strip', (tester) async {
-      await openVenue(tester);
+      await openVenue(tester, tab: 'Photos');
 
       expect(find.byType(Image), findsNothing);
     });
@@ -5190,6 +5209,130 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the venue tab row', () {
+    Future<FakeBackend> openVenue(
+      WidgetTester tester, {
+      String? language,
+      Size size = phoneSize,
+    }) async {
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        size: size,
+        localeStore: InMemoryLocaleStore(language),
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on('GET', '/api/establishments/7/', establishmentDetailJson());
+      backend.on(
+        'GET',
+        '/api/establishments/7/availability/',
+        availabilityJson(),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Le Petit Baobab'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('it opens on the menu', (tester) async {
+      // What most people open a venue to see.
+      await openVenue(tester);
+
+      expect(find.text('Hours'), findsOneWidget);
+      expect(find.text('Reviews'), findsOneWidget);
+      expect(find.text('Photos'), findsOneWidget);
+    });
+
+    testWidgets('only one section is on screen at a time', (tester) async {
+      // The point of the change: stacked, a venue with a real menu buried
+      // its reviews about a thousand pixels down.
+      await openVenue(tester);
+
+      expect(
+        find.text('No reviews yet — be the first after your visit.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('tapping Reviews swaps the section', (tester) async {
+      await openVenue(tester);
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No reviews yet — be the first after your visit.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('and the booking controls stay put underneath',
+        (tester) async {
+      // Whichever tab is showing, the reason for the screen is still there.
+      await openVenue(tester);
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Available times'), findsOneWidget);
+    });
+
+    testWidgets('the French labels all fit', (tester) async {
+      await openVenue(tester, language: 'fr');
+
+      for (final label in ['Menu', 'Horaires', 'Avis', 'Photos']) {
+        expect(find.text(label), findsWidgets, reason: label);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('it holds up on a tablet', (tester) async {
+      await openVenue(tester, size: tabletSize);
+
+      await tester.tap(find.text('Reviews'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('writing a review says which visit it belongs to', () {
+    testWidgets('the one-per-visit rule is stated before they type',
+        (tester) async {
+      // Better here than as a refusal with a paragraph already written.
+      final (:app, :backend, :store) = buildApp(
+        tester,
+        bookingReferences: [testReference],
+      );
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      backend.on(
+        'GET',
+        '/api/reservations/ref/$testReference/',
+        reservationJson(status: 'completed', canCancel: false),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bookings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Write a review'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Tied to this visit — one review per booking.'),
+        findsOneWidget,
+      );
     });
   });
 }

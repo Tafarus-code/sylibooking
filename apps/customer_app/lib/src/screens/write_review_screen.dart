@@ -94,6 +94,29 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          const SizedBox(height: 10),
+          // Said before they write, not after they try to post a second one.
+          // The server enforces one review per booking; somebody who has
+          // already reviewed this visit should learn that here rather than
+          // from a refusal with a paragraph already typed.
+          Row(
+            children: [
+              Icon(
+                Icons.verified_user_outlined,
+                size: 15,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l.oneReviewPerVisit,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           Text(
             l.howWasIt,

@@ -198,6 +198,16 @@ class LFr extends L {
   String get menu => 'Menu';
 
   @override
+  String get tabHours => 'Horaires';
+
+  @override
+  String get tabPhotos => 'Photos';
+
+  @override
+  String get noMenuYet =>
+      'Cet établissement n\'a pas encore mis son menu en ligne.';
+
+  @override
   String get orderAhead => 'Commander à l\'avance';
 
   @override
@@ -220,6 +230,10 @@ class LFr extends L {
 
   @override
   String get writeAReview => 'Écrire un avis';
+
+  @override
+  String get oneReviewPerVisit =>
+      'Lié à cette visite — un avis par réservation.';
 
   @override
   String get partySize => 'Nombre de personnes';

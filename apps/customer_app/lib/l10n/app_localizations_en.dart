@@ -198,6 +198,15 @@ class LEn extends L {
   String get menu => 'Menu';
 
   @override
+  String get tabHours => 'Hours';
+
+  @override
+  String get tabPhotos => 'Photos';
+
+  @override
+  String get noMenuYet => 'This venue has not put its menu up yet.';
+
+  @override
   String get orderAhead => 'Order ahead';
 
   @override
@@ -220,6 +229,10 @@ class LEn extends L {
 
   @override
   String get writeAReview => 'Write a review';
+
+  @override
+  String get oneReviewPerVisit =>
+      'Tied to this visit — one review per booking.';
 
   @override
   String get partySize => 'Party size';

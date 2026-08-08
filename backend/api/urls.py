@@ -18,6 +18,7 @@ from .customer_views import (
 )
 from .dashboard import PaymentDashboardView
 from .featured import FeaturedItemsView
+from .health import LivenessView, ReadinessView
 from .merchant import (
     MerchantEstablishmentProfileView,
     MerchantEstablishmentsView,
@@ -32,6 +33,7 @@ from .merchant import (
     ThemePresetsView,
 )
 from .merchant_reviews import MerchantReviewFlagView, MerchantReviewsView
+from .metrics import MetricsView
 from .orders import (
     CustomerOrderView,
     MerchantOrderListView,
@@ -203,6 +205,10 @@ urlpatterns = [
         MerchantStaffMemberView.as_view(),
         name='merchant-staff-member',
     ),
+    # Operability. Liveness touches nothing; readiness names each part.
+    path('health/', LivenessView.as_view(), name='health'),
+    path('health/ready/', ReadinessView.as_view(), name='health-ready'),
+    path('metrics/', MetricsView.as_view(), name='metrics'),
     path(
         'featured-items/',
         FeaturedItemsView.as_view(),

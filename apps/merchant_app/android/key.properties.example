@@ -1,0 +1,15 @@
+# Copy to key.properties and fill in. That file is git-ignored and must stay
+# that way: whoever holds it can publish an update to everyone who installed
+# the app.
+#
+# Generate the keystore once, then back it up somewhere you will still have
+# in five years. Play will not accept a different key later without a reset
+# request, and losing it means losing the ability to update the app at all.
+#
+#   keytool -genkey -v -keystore upload-keystore.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+storeFile=../upload-keystore.jks
+storePassword=
+keyAlias=upload
+keyPassword=

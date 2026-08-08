@@ -1,0 +1,99 @@
+# Render blueprint: the three roles, a database and a broker.
+#
+# Declarative on purpose. A deployment configured by clicking is a deployment
+# nobody can review, and the thing most likely to differ between what is
+# running and what anyone believes is running.
+#
+# Railway and Fly want the same four facts in their own format — one image,
+# three commands, a Postgres URL and a Redis URL — so switching is a
+# translation rather than a rewrite.
+
+services:
+  - type: web
+    name: sylibooking-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    # Render polls this and will not shift traffic to a replica that fails
+    # it. It is the cheap one from Slice 20 that touches nothing.
+    healthCheckPath: /api/health/
+    autoDeploy: true
+    envVars: &shared
+      - key: DJANGO_ENV
+        value: production
+      - key: DEBUG
+        value: 'False'
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sylibooking-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: sylibooking-redis
+          type: redis
+          property: connectionString
+      # Photos live in R2, never on the container's disk.
+      - key: USE_S3_MEDIA
+        value: 'True'
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        value: auto
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: MEDIA_CUSTOM_DOMAIN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: worker
+    name: sylibooking-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    dockerCommand: celery -A config worker --loglevel=info
+    envVars:
+      - *shared
+      # The web role owns migrations. Three services racing one migration is
+      # how a half-applied schema happens.
+      - key: RUN_MIGRATIONS
+        value: 'no'
+
+  - type: worker
+    name: sylibooking-beat
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    dockerCommand: celery -A config beat --loglevel=info
+    envVars:
+      - *shared
+      - key: RUN_MIGRATIONS
+        value: 'no'
+
+  - type: redis
+    name: sylibooking-redis
+    plan: starter
+    # Nothing durable: a lost queue costs a repeated reminder, and every task
+    # is written to be safe to run twice.
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+databases:
+  - name: sylibooking-db
+    plan: basic-256mb
+    postgresMajorVersion: '16'

@@ -327,3 +327,88 @@ class ErrorReporterTests(TestCase):
         # must never happen is no reporter at all.
         self.assertIsNotNone(reporter)
         self.assertTrue(hasattr(reporter, 'capture'))
+
+
+class DeployabilityTests(SimpleTestCase):
+    """The contract an orchestrator relies on.
+
+    A health check is only useful if the thing polling it can actually reach
+    it — no token, no session, and not behind the throttle that would start
+    refusing a probe running every few seconds.
+    """
+
+    def test_the_probe_needs_no_credentials(self):
+        response = self.client.get(reverse('health'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_the_probe_is_not_throttled(self):
+        """**The one that would fail quietly in production.** A liveness
+        probe runs every few seconds forever; a global rate limit that
+        catches it turns a healthy deployment into a restart loop."""
+        with override_settings(THROTTLING_ENABLED=True):
+            codes = [
+                self.client.get(reverse('health')).status_code
+                for _ in range(120)
+            ]
+
+        self.assertNotIn(status.HTTP_429_TOO_MANY_REQUESTS, codes)
+
+    def test_readiness_is_reachable_the_same_way(self):
+        response = self.client.get(reverse('health-ready'))
+
+        self.assertIn(response.status_code, (200, 503))
+
+
+class DatabaseUrlTests(SimpleTestCase):
+    """The connection string managed hosts hand out.
+
+    Nobody types this value — it is generated and injected — so the only way
+    it goes wrong is in the parsing, and the failure it produces looks like a
+    wrong password rather than a parsing bug.
+    """
+
+    def parse(self, url):
+        from config.settings import _database_from_url
+
+        return _database_from_url(url)
+
+    def test_the_ordinary_shape(self):
+        parsed = self.parse('postgres://sylibooking:secret@db.internal:5432/syli')
+
+        self.assertEqual(parsed['NAME'], 'syli')
+        self.assertEqual(parsed['USER'], 'sylibooking')
+        self.assertEqual(parsed['PASSWORD'], 'secret')
+        self.assertEqual(parsed['HOST'], 'db.internal')
+        self.assertEqual(parsed['PORT'], '5432')
+
+    def test_a_percent_encoded_password_is_decoded(self):
+        """**The one that costs an afternoon.** A generated password
+        routinely contains characters that must be encoded in a URL, and
+        passing them through still encoded fails authentication while
+        looking exactly like a wrong password."""
+        parsed = self.parse('postgres://user:p%40ss%3Aword@db.internal:5432/syli')
+
+        self.assertEqual(parsed['PASSWORD'], 'p@ss:word')
+
+    def test_an_encoded_username_too(self):
+        parsed = self.parse('postgres://a%40b:secret@db.internal:5432/syli')
+
+        self.assertEqual(parsed['USER'], 'a@b')
+
+    def test_a_missing_port_falls_back_to_the_default(self):
+        parsed = self.parse('postgres://user:secret@db.internal/syli')
+
+        self.assertEqual(parsed['PORT'], '5432')
+
+    def test_managed_postgres_is_reached_over_tls(self):
+        parsed = self.parse('postgres://user:secret@db.internal/syli')
+
+        self.assertEqual(parsed['OPTIONS']['sslmode'], 'require')
+
+    def test_connections_are_reused(self):
+        """These hosts cap connections tightly, and Celery holds its own
+        alongside the web workers."""
+        parsed = self.parse('postgres://user:secret@db.internal/syli')
+
+        self.assertGreater(parsed['CONN_MAX_AGE'], 0)

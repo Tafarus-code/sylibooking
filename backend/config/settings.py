@@ -67,6 +67,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves the collected static files — the admin's CSS and the browsable
+    # API's — without a separate web server in front. There is no public
+    # website here, so a whole nginx to serve a few hundred kilobytes of
+    # admin assets would be a second thing to deploy and keep patched.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     # Must sit above CommonMiddleware so preflight OPTIONS requests get their
     # headers even when another middleware would short-circuit the response.
     'corsheaders.middleware.CorsMiddleware',
@@ -105,19 +110,59 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 #
 # DJANGO_ENV=local (the default) needs no configuration at all: SQLite in
-# backend/db.sqlite3. DJANGO_ENV=production reads the DB_* variables.
+# backend/db.sqlite3. DJANGO_ENV=production reads DATABASE_URL if the host
+# provides one, and the discrete DB_* variables otherwise.
+
+
+def _database_from_url(url):
+    """Parse the single connection string managed hosts hand out.
+
+    Render, Railway and Fly all inject one DATABASE_URL rather than five
+    variables, and it is generated — nobody types it, so nobody can split it
+    into DB_NAME and friends without a step that will eventually be skipped.
+
+    Hand-parsed rather than adding dj-database-url: it is a URL, the stdlib
+    parses URLs, and a dependency whose whole job is six lines is a
+    dependency to keep updated forever.
+    """
+    from urllib.parse import unquote, urlparse
+
+    parsed = urlparse(url)
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': parsed.path.lstrip('/'),
+        'USER': unquote(parsed.username or ''),
+        # Unquoted: a generated password routinely contains characters that
+        # have to be percent-encoded in a URL, and passing them through
+        # still encoded is an authentication failure that reads like a wrong
+        # password.
+        'PASSWORD': unquote(parsed.password or ''),
+        'HOST': parsed.hostname or 'localhost',
+        'PORT': str(parsed.port or 5432),
+        # Managed Postgres is reached over the network and expects TLS.
+        'OPTIONS': {'sslmode': config('DB_SSLMODE', default='require')},
+        # One connection reused for a minute rather than a fresh one per
+        # request. These hosts cap connections tightly and Celery holds its
+        # own alongside the web workers.
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+    }
+
 
 if DJANGO_ENV == 'production':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME'),
-            'USER': config('DB_USER'),
-            'PASSWORD': config('DB_PASSWORD'),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
+    _database_url = config('DATABASE_URL', default='')
+    if _database_url:
+        DATABASES = {'default': _database_from_url(_database_url)}
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': config('DB_NAME'),
+                'USER': config('DB_USER'),
+                'PASSWORD': config('DB_PASSWORD'),
+                'HOST': config('DB_HOST', default='localhost'),
+                'PORT': config('DB_PORT', default='5432'),
+            }
         }
-    }
 else:
     DATABASES = {
         'default': {
@@ -173,6 +218,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+#: Where collectstatic writes. Baked into the image at build time rather than
+#: collected at boot — see the Dockerfile.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Uploaded files (establishment photos)
 #
@@ -181,6 +229,60 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Photos go to object storage in production, and have to.
+#
+# backend/media/ is inside the container: a redeploy replaces the container,
+# and every photo a merchant uploaded goes with it. That is not a performance
+# consideration, it is data loss on an ordinary Tuesday deploy — and the
+# people who lose it are venues who spent an evening photographing their room.
+#
+# Any S3-compatible bucket. Written that way on purpose: the endpoint is a
+# setting, so a regional provider can be used instead of AWS if that is what
+# is actually payable from Guinea.
+USE_S3_MEDIA = config('USE_S3_MEDIA', default=False, cast=bool)
+
+if USE_S3_MEDIA:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3.S3Storage',
+            'OPTIONS': {
+                'bucket_name': config('AWS_STORAGE_BUCKET_NAME'),
+                # R2 wants 'auto'; AWS wants a real region.
+                'region_name': config('AWS_S3_REGION_NAME', default='auto'),
+                # Blank for AWS itself; set for anyone else.
+                'endpoint_url': config('AWS_S3_ENDPOINT_URL', default='') or None,
+                'access_key': config('AWS_ACCESS_KEY_ID', default=''),
+                'secret_key': config('AWS_SECRET_ACCESS_KEY', default=''),
+                # No ACL. S3 has per-object ACLs and Cloudflare R2 does
+                # not — it rejects the header outright, so asking for
+                # 'public-read' fails every upload rather than making
+                # anything public. On R2 a bucket is served publicly by
+                # attaching a domain to it, which is what the custom domain
+                # below is for; on S3 use a bucket policy.
+                'default_acl': None,
+                # Unsigned URLs. Photos are shown to anyone browsing a venue,
+                # and a signed URL would expire in the middle of a gallery.
+                'querystring_auth': False,
+                # The public hostname in front of the bucket. Without it
+                # django-storages builds URLs against the S3 API endpoint,
+                # which on R2 is not publicly readable — every photo would
+                # 401 while looking perfectly configured.
+                'custom_domain': config('MEDIA_CUSTOM_DOMAIN', default='') or None,
+                # A photo never changes once uploaded — the filename carries a
+                # uuid — so it can be cached hard. On the connections this
+                # market runs on, that is the difference between a venue's
+                # gallery loading and not.
+                'object_parameters': {'CacheControl': 'max-age=86400'},
+                # Never silently overwrite: two venues uploading terrasse.jpg
+                # must not become one photo shown to both.
+                'file_overwrite': False,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
 
 # Largest photo a customer or merchant may upload. Phones here produce large
 # files on poor connections, so the limit is enforced rather than hoped for.
@@ -457,3 +559,48 @@ LOGGING = logging_config(structured=STRUCTURED_LOGGING, level=LOG_LEVEL)
 #: reporter writes to the log, which is a real destination rather than a
 #: silent one.
 SENTRY_DSN = config('SENTRY_DSN', default='')
+
+
+# --- Production hardening -------------------------------------------------
+#
+# Only in production. Turning these on locally would mean a redirect to https
+# on a development server that does not speak it, which reads as the app
+# being broken.
+
+if DJANGO_ENV == 'production':
+    # TLS is terminated by the platform in front of this process, so Django
+    # has to be told to believe the header rather than the socket — without
+    # this it sees http, decides the request is insecure, and redirects
+    # forever.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+
+    # Six months. Deliberately not preloaded: preload is close to
+    # irreversible, and committing every future subdomain to https before
+    # there is a domain at all is a decision made too early.
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=15552000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = False
+
+    # Django warns about the line above (security.W021), and the warning is
+    # right in general and wrong here. Preloading is close to irreversible —
+    # browsers ship the list — and it commits every future subdomain to https
+    # before this project has a domain at all. Silenced rather than obeyed,
+    # so the rest of the deployment checklist can fail the build.
+    SILENCED_SYSTEM_CHECKS = ['security.W021']
+
+    # The session cookie is only used by /admin/ and the browsable API — the
+    # apps carry a token in a header — but /admin/ is the account that can
+    # read every booking on the platform.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+
+    # Trusted origins for CSRF, which /admin/ needs once it is behind a
+    # domain rather than localhost.
+    CSRF_TRUSTED_ORIGINS = config(
+        'CSRF_TRUSTED_ORIGINS', default='', cast=Csv()
+    )

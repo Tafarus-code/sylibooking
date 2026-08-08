@@ -6,3 +6,11 @@ psycopg2-binary==2.9.10
 python-decouple==3.8
 celery==5.5.3
 redis==6.4.0
+
+# Deployment. Only exercised when DJANGO_ENV=production, but installed
+# everywhere so the production path is importable in CI rather than being
+# discovered on the day it first runs.
+gunicorn==23.0.0
+whitenoise==6.9.0
+django-storages==1.14.6
+boto3==1.40.11

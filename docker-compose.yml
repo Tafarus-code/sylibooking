@@ -4,11 +4,19 @@
 #   docker compose up -d
 #   cd backend && celery -A config worker --loglevel=info
 #
-# Deliberately not the application itself — that is Slice 21, and packaging
-# Django before there is anywhere to deploy it would be guessing. This file
-# exists now because the task queue needs a broker to be worth running at
-# all, and it grows into the deployment story rather than being replaced by
-# it.
+# It now also runs the application, which is what Slice 21 added. The three
+# app services are one image with three commands: they are the same code and
+# differ only in what they are told to do, and three images built from one
+# tree is three chances to drift apart by a deploy.
+#
+# This is the local production rehearsal, not the deployment itself. The host
+# is still undecided — see deploy/README.md — but everything that does not
+# depend on which host is here and runnable:
+#
+#   docker compose up --build
+#
+# Postgres runs here too, so the production database engine is the one being
+# developed against rather than SQLite standing in for it.
 
 services:
   redis:
@@ -23,3 +31,74 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sylibooking
+      POSTGRES_USER: sylibooking
+      POSTGRES_PASSWORD: sylibooking
+    ports:
+      - '5432:5432'
+    volumes:
+      # Durable, unlike Redis above: losing the queue costs a repeated
+      # reminder, losing this costs every booking ever made.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sylibooking']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    command:
+      - gunicorn
+      - config.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=3
+      - --access-logfile=-
+    environment: &app_env
+      DJANGO_ENV: production
+      SECRET_KEY: local-rehearsal-only-not-a-secret
+      DEBUG: 'False'
+      ALLOWED_HOSTS: localhost,127.0.0.1,web
+      # The rehearsal runs without TLS in front of it, so the redirect that
+      # production wants would bounce every request to a port nothing is
+      # listening on.
+      SECURE_SSL_REDIRECT: 'False'
+      DB_NAME: sylibooking
+      DB_USER: sylibooking
+      DB_PASSWORD: sylibooking
+      DB_HOST: db
+      CELERY_BROKER_URL: redis://redis:6379/0
+    ports:
+      - '8000:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: [celery, -A, config, worker, --loglevel=info]
+    environment:
+      <<: *app_env
+      # The web role owns migrations. Three replicas racing the same
+      # migration is how a half-applied schema happens.
+      RUN_MIGRATIONS: 'no'
+    depends_on:
+      - web
+
+  beat:
+    build: .
+    command: [celery, -A, config, beat, --loglevel=info]
+    environment:
+      <<: *app_env
+      RUN_MIGRATIONS: 'no'
+    depends_on:
+      - web
+
+volumes:
+  pgdata:

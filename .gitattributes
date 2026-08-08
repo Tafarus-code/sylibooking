@@ -3,3 +3,12 @@
 # guess would rewrite line endings inside it and the app would silently fall
 # back to English — so say it outright.
 *.mo binary
+
+# Anything the Linux container executes must keep LF endings, whatever the
+# machine that checked it out prefers. A shell script with CRLF fails with
+# "no such file or directory" pointing at the interpreter — the shebang line
+# ends in a carriage return, so the kernel looks for `/bin/sh\r` — which is
+# among the least informative error messages in circulation.
+*.sh text eol=lf
+Dockerfile text eol=lf
+deploy/entrypoint.sh text eol=lf

@@ -240,6 +240,7 @@
   "detailsSaved": "Détails enregistrés.",
   "tablesAndRooms": "Tables et salons",
   "tablesAndRoomsSubtitle": "Où vos clients s’assoient vraiment",
+  "tablesAndRoomsSubtitleStaff": "Lecture seule pour le personnel",
   "noSpacesYet": "Aucune table",
   "noSpacesDetail": "Un établissement a besoin de places assises avant de pouvoir prendre une réservation. Ajoutez votre première table pour commencer.",
   "addSpace": "Ajouter une table",

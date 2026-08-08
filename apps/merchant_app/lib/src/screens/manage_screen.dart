@@ -73,16 +73,24 @@ class ManageScreen extends StatelessWidget {
           ),
 
 
+          // Above the hours on purpose: a venue is defined by its rooms
+          // before it is defined by when they are open.
+          //
+          // Staff see this too, read-only. Knowing which tables exist and how
+          // many they seat is floor knowledge — a waiter seating a party of
+          // six needs it — and the screen itself hides the controls they may
+          // not use rather than refusing them afterwards.
+          _Entry(
+            tile: asTiles,
+            icon: Icons.table_restaurant_outlined,
+            title: l.tablesAndRooms,
+            subtitle: role.canEditProfile
+                ? l.tablesAndRoomsSubtitle
+                : l.tablesAndRoomsSubtitleStaff,
+            onTap: () => _open(context, SpacesScreen(auth: auth)),
+          ),
+
           if (role.canEditProfile) ...[
-            // Above the hours on purpose: a venue is defined by its rooms
-            // before it is defined by when they are open.
-            _Entry(
-              tile: asTiles,
-              icon: Icons.table_restaurant_outlined,
-              title: l.tablesAndRooms,
-              subtitle: l.tablesAndRoomsSubtitle,
-              onTap: () => _open(context, SpacesScreen(auth: auth)),
-            ),
             _Entry(
               tile: asTiles,
               icon: Icons.schedule,

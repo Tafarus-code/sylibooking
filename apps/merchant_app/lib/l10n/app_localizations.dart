@@ -1537,6 +1537,12 @@ abstract class L {
   /// **'Where your guests actually sit'**
   String get tablesAndRoomsSubtitle;
 
+  /// No description provided for @tablesAndRoomsSubtitleStaff.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only for staff'**
+  String get tablesAndRoomsSubtitleStaff;
+
   /// No description provided for @noSpacesYet.
   ///
   /// In en, this message translates to:

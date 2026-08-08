@@ -10,7 +10,7 @@ blanks in it: no phone, no account, no pickup time in the future, and it goes
 straight into the same kitchen queue as everything else.
 """
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -369,7 +369,16 @@ class QueuePaginationTests(WalkInTestBase):
     """
 
     def orders(self, howMany):
-        pickup = timezone.now() + timedelta(minutes=30)
+        # Pinned to midday, not "half an hour from now". The queue shows
+        # today's tickets, and a pickup half an hour after 23:55 in Conakry
+        # is tomorrow's — so this whole class failed for the last thirty
+        # minutes of every day and passed for the other twenty-three and a
+        # half hours.
+        today = timezone.localdate()
+        pickup = timezone.make_aware(
+            datetime.combine(today, time(12, 0)),
+            timezone.get_current_timezone(),
+        )
         Order.objects.bulk_create(
             [
                 Order(

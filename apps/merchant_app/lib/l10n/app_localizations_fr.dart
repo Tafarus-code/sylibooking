@@ -839,6 +839,9 @@ class LFr extends L {
   String get tablesAndRoomsSubtitle => 'Où vos clients s’assoient vraiment';
 
   @override
+  String get tablesAndRoomsSubtitleStaff => 'Lecture seule pour le personnel';
+
+  @override
   String get noSpacesYet => 'Aucune table';
 
   @override

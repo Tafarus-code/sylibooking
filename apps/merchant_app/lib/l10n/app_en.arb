@@ -495,6 +495,7 @@
   "detailsSaved": "Details saved.",
   "tablesAndRooms": "Tables and rooms",
   "tablesAndRoomsSubtitle": "Where your guests actually sit",
+  "tablesAndRoomsSubtitleStaff": "Read-only for staff",
   "noSpacesYet": "No tables yet",
   "noSpacesDetail": "A venue needs somewhere to sit before it can take a booking. Add your first table to start.",
   "addSpace": "Add a table",

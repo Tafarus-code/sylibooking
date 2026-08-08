@@ -831,6 +831,9 @@ class LEn extends L {
   String get tablesAndRoomsSubtitle => 'Where your guests actually sit';
 
   @override
+  String get tablesAndRoomsSubtitleStaff => 'Read-only for staff';
+
+  @override
   String get noSpacesYet => 'No tables yet';
 
   @override

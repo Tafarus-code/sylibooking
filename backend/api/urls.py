@@ -17,6 +17,7 @@ from .customer_views import (
     ReservationByReferenceView,
 )
 from .dashboard import PaymentDashboardView
+from .devices import DeviceRegistrationView
 from .featured import FeaturedItemsView
 from .health import LivenessView, ReadinessView
 from .merchant import (
@@ -204,6 +205,11 @@ urlpatterns = [
         'merchant/establishments/<int:pk>/staff/<int:membership_id>/',
         MerchantStaffMemberView.as_view(),
         name='merchant-staff-member',
+    ),
+    path(
+        'devices/',
+        DeviceRegistrationView.as_view(),
+        name='device-registration',
     ),
     # Operability. Liveness touches nothing; readiness names each part.
     path('health/', LivenessView.as_view(), name='health'),

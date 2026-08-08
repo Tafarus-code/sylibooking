@@ -92,3 +92,8 @@ class Notification(models.Model):
 
     def __str__(self):
         return f'{self.get_kind_display()} → {self.destination} ({self.status})'
+
+
+# Push tokens live in their own module for readability; imported here so
+# Django's app registry finds them where it expects to.
+from .devices import DeviceToken  # noqa: E402,F401

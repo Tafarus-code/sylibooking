@@ -604,3 +604,10 @@ if DJANGO_ENV == 'production':
     CSRF_TRUSTED_ORIGINS = config(
         'CSRF_TRUSTED_ORIGINS', default='', cast=Csv()
     )
+
+
+#: How a push is actually sent. The console sender runs everywhere until a
+#: Firebase project exists; swapping this is configuration, not a rewrite.
+PUSH_SENDER = config(
+    'PUSH_SENDER', default='notifications.push.ConsolePushSender'
+)

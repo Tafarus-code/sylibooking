@@ -436,3 +436,24 @@ REMINDER_QUIET_END = config('REMINDER_QUIET_END', default='07:00')
 PAYMENT_ABANDON_AFTER_MINUTES = config(
     'PAYMENT_ABANDON_AFTER_MINUTES', default=30, cast=int
 )
+
+
+# --- Observability --------------------------------------------------------
+#
+# When something breaks in Conakry, the point is to find out from a dashboard
+# rather than from a merchant on the phone.
+
+#: JSON log lines in production, plain text where a person is reading them.
+STRUCTURED_LOGGING = config(
+    'STRUCTURED_LOGGING', default=DJANGO_ENV == 'production', cast=bool
+)
+LOG_LEVEL = config('LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO')
+
+from config.logging import logging_config  # noqa: E402
+
+LOGGING = logging_config(structured=STRUCTURED_LOGGING, level=LOG_LEVEL)
+
+#: Empty everywhere but production. See config/errors.py: with no DSN the
+#: reporter writes to the log, which is a real destination rather than a
+#: silent one.
+SENTRY_DSN = config('SENTRY_DSN', default='')

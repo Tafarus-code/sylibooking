@@ -163,3 +163,66 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: python manage.py test --verbosity=2
+  # The deployment path, checked on every push rather than on the day it is
+  # first used. A Dockerfile that has never been built is a guess.
+  deploy-checks:
+    name: Deployability (image + production settings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Django's own deployment checklist, run against production settings.
+      # It is the difference between finding out about a missing HSTS header
+      # here and finding out from somebody else's scanner.
+      - name: Django deployment checks
+        working-directory: backend
+        env:
+          DJANGO_ENV: production
+          DEBUG: 'False'
+          SECRET_KEY: ci-only-long-enough-to-satisfy-the-check-0123456789
+          ALLOWED_HOSTS: example.invalid
+          DB_NAME: sylibooking
+          DB_USER: sylibooking
+          DB_PASSWORD: sylibooking
+          DB_HOST: localhost
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: Build the image
+        run: docker build -t sylibooking-backend:ci .
+
+      # It has to start, migrate and answer — a build that succeeds and a
+      # container that cannot boot are different things.
+      - name: The image boots and answers its health check
+        run: |
+          # Booted as local on purpose. This step asks whether the image
+          # starts, migrates and answers; production settings would drag
+          # in a database and a TLS terminator that prove nothing about
+          # the image itself. The step above is what checks those.
+          docker run -d --name api \
+            -e DEBUG=False \
+            -e SECRET_KEY=ci-only-long-enough-to-satisfy-the-check-0123456789 \
+            -e ALLOWED_HOSTS='*' \
+            -e DJANGO_ENV=local \
+            -p 8000:8000 \
+            sylibooking-backend:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/health/ > /dev/null; then
+              echo "up"
+              curl -s http://localhost:8000/api/health/
+              docker rm -f api
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "never came up:"
+          docker logs api
+          exit 1

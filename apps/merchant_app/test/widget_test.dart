@@ -142,9 +142,21 @@ Map<String, dynamic> booking({
   bool? canConfirm,
   Map<String, dynamic>? payment,
   String reference = '11111111-2222-3333-4444-555555555555',
+  DateTime? when,
 }) {
-  final now = DateTime.now();
-  final when = DateTime(now.year, now.month, now.day, 19).toUtc();
+  // A sitting already under way, not a fixed hour of the clock.
+  //
+  // This used to be today at 19:00, which made every test that reads it
+  // depend on what time the suite ran: "Mark arrived" only appears once a
+  // booking is due (see reservation_card.dart), so the whole file passed
+  // between 19:00 and midnight and failed the other nineteen hours. CI runs
+  // in UTC, so it failed there on any push before 19:00.
+  //
+  // A test that needs a booking still ahead of its time passes `when`
+  // explicitly, which makes that requirement part of the test rather than an
+  // accident of the wall clock.
+  final at = (when ?? DateTime.now().subtract(const Duration(hours: 1)))
+      .toUtc();
   return {
     'id': id,
     'reference': reference,
@@ -154,7 +166,7 @@ Map<String, dynamic> booking({
     'establishment_name': 'Le Petit Baobab',
     'customer_name': customer,
     'customer_phone': '+224 620 00 00 00',
-    'datetime': when.toIso8601String(),
+    'datetime': at.toIso8601String(),
     'party_size': 2,
     'status': status,
     'status_display': status[0].toUpperCase() + status.substring(1),
@@ -5800,6 +5812,63 @@ void main() {
       await openEmptyDesk(tester, size: const Size(1280, 800));
 
       expect(find.text('Pick a booking from the list'), findsOneWidget);
+    });
+  });
+
+  group('"Mark arrived" follows the booking, not the clock', () {
+    // These pin the rule that made the suite time-dependent.
+    //
+    // "Mark arrived" appears only once a sitting has begun. That was always
+    // correct, but no test said so — the only coverage was a fixture pinned
+    // to 19:00, which meant the rule was asserted between 19:00 and midnight
+    // and contradicted the rest of the day.
+    //
+    // Both states are named here and both carry an explicit time, so these
+    // pass at any hour, in any zone, and a change to the rule fails a test
+    // that is about the rule rather than one that happens to notice.
+    Future<void> openDeskWith(WidgetTester tester, DateTime when) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: phoneSize,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: 'owner')],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [booking(status: 'confirmed', when: when)],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a sitting already under way can be marked arrived',
+        (tester) async {
+      await openDeskWith(
+        tester,
+        DateTime.now().subtract(const Duration(hours: 1)),
+      );
+
+      expect(find.text('Mark arrived'), findsWidgets);
+    });
+
+    testWidgets('a booking still ahead of its time cannot', (tester) async {
+      // Nobody has arrived for a table that is not due yet, and the server
+      // refuses it anyway — so offering the button would be a lie the API
+      // then corrects.
+      await openDeskWith(tester, DateTime.now().add(const Duration(hours: 3)));
+
+      expect(find.text('Mark arrived'), findsNothing);
+      // Still workable otherwise: the point is that one control is withheld,
+      // not that the booking is inert.
+      expect(find.text('Cancel'), findsWidgets);
     });
   });
 }

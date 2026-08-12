@@ -76,6 +76,19 @@ jobs:
   flutter:
     name: Flutter (${{ matrix.package }})
     runs-on: ubuntu-latest
+    # A deliberately unlikely zone, fourteen hours ahead of the runner's UTC.
+    #
+    # A test that quietly depends on the hour used to fail here and nowhere
+    # else: the merchant suite pinned a fixture to 19:00 and so passed on a
+    # developer's evening machine while failing every CI run before 19:00 UTC.
+    # Running the suites somewhere nobody would hardcode around makes that
+    # class of bug fail loudly and immediately rather than by time of day.
+    #
+    # Note this only bites on Linux — the Dart VM on Windows reads the OS
+    # timezone and ignores TZ, so a developer there cannot reproduce a zone
+    # failure locally. CI is the place this is enforced.
+    env:
+      TZ: Pacific/Kiritimati
     strategy:
       fail-fast: false
       matrix:

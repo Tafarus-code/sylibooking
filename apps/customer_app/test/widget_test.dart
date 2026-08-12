@@ -240,8 +240,17 @@ Map<String, dynamic> reservationJson({
   String customer = 'Mariama Diallo',
   bool canCancel = true,
   Map<String, dynamic>? payment,
+  DateTime? when,
 }) {
-  final now = DateTime.now();
+  // A booking still ahead of its time, stated rather than inherited.
+  //
+  // This used to be today at 19:00, which meant the fixture described an
+  // upcoming booking in the morning and a past one in the evening — the same
+  // test reading a different state depending on when it ran. The merchant app
+  // had the identical fixture and it failed there for nineteen hours a day.
+  //
+  // A test that needs a visit that already happened passes `when` explicitly.
+  final at = (when ?? DateTime.now().add(const Duration(days: 1))).toUtc();
   return {
     'id': id,
     'reference': reference,
@@ -251,8 +260,7 @@ Map<String, dynamic> reservationJson({
     'establishment_name': 'Le Petit Baobab',
     'customer_name': customer,
     'customer_phone': '+224 620 00 00 00',
-    'datetime': DateTime(now.year, now.month, now.day, 19).toUtc()
-        .toIso8601String(),
+    'datetime': at.toIso8601String(),
     'party_size': 2,
     'status': status,
     'status_display': status[0].toUpperCase() + status.substring(1),

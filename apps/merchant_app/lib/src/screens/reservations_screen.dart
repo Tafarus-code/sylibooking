@@ -545,13 +545,19 @@ class _Message extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListView(
+    // LayoutBuilder, because this message is shown both across the whole
+    // screen and inside the desk's 44% list pane. Measuring the window
+    // instead gave it a gutter wider than the pane it was sitting in, and
+    // the text came out one character per line down the middle.
+    return LayoutBuilder(
+      builder: (context, constraints) => ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Padding(
           padding: contentInsets(
             context,
             minHorizontal: 32,
+            available: constraints.maxWidth,
           ).copyWith(top: 80, bottom: 32),
           child: Column(
             children: [
@@ -575,6 +581,7 @@ class _Message extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }

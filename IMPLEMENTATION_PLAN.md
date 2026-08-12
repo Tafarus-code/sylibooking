@@ -4,6 +4,11 @@
 Covers everything that document marks 🟡 stubbed, 🔶 backend-only, ❌ missing,
 or listed as a defect — plus the improvement suggestions, sequenced.
 
+**Continued 12 August 2026** from [`PLATFORM_ASSESSMENT.md`](PLATFORM_ASSESSMENT.md).
+Slices 1–22 are built and merged; slices 23–45 are the new plan and begin at
+["Continuation"](#continuation--written-12-august-2026). Read that section for
+current work — everything before it is a record of what was done.
+
 ---
 
 ## How to use this
@@ -49,15 +54,26 @@ only flag them (Slice 14), and where this is hosted (Slice 21).
 ## Sequencing at a glance
 
 ```
+DONE — merged to dev
 Phase 0  Unblock the MVP          Slices 1–3    ← nothing real can happen without this
 Phase 1  Close the lifecycle      Slices 4–5    ← stops the data telling a lie
 Phase 2  The async layer          Slices 6–8    ← retrofitting later touches every write path
-Phase 3  Real money               Slices 9–13   ← throttles (10) land before the gateway (11)
+Phase 3  Real money               Slice 10 only ← 9, 11, 12, 13 never built: blocked on credentials
 Phase 4  Merchant completeness    Slices 14–16
 Phase 5  Correctness and polish   Slices 17–19
 Phase 6  Operability              Slices 20–22
-Phase 7  Beyond the MVP           Slices 23+
+
+NEXT — planned 12 August, from PLATFORM_ASSESSMENT.md
+Phase 7  Stop the bleeding        Slices 23–28  ← one week; 23 repairs CI, which the rest is measured with
+Phase 8  Real money, real push    Slices 29–33  ← every slice blocked on credentials, not engineering
+Phase 9  What a merchant asks for Slices 34–36
+Phase 10 Fit for this market      Slices 37–39
+Phase 11 Growth                   Slices 40–45
 ```
+
+Phases 7 and 8 are **parallel, not sequential**: Phase 8 waits on paperwork you
+have to chase, and Phase 7 is a week of engineering that needs nobody's
+permission. Start both.
 
 The order is not arbitrary. Phase 0 is the difference between "demo" and
 "a merchant can use this". Phase 1 fixes a model that grows more wrong every
@@ -745,33 +761,615 @@ better host you cannot pay for is not a better host.
 
 ---
 
-# Phase 7 — Beyond the MVP
+# Continuation — written 12 August 2026
 
-Phase 3+ of the market report. Listed in the order the earlier work makes them
-cheapest, not in order of appeal.
+**Slices 1–22 above are built and merged to `dev`.** Everything from here is
+new, and comes from the audit in
+[`PLATFORM_ASSESSMENT.md`](PLATFORM_ASSESSMENT.md) rather than from
+`PROJECT_STATUS.md`, which that audit supersedes.
 
-| Slice | Feature | Why it is cheap now |
+This section **replaces the earlier Phase 7 sketch** (a six-row table that
+claimed slices 23–28). The topics survive; the sequence does not. The audit
+found four defects and one red test that outrank every growth feature, so those
+come first and the growth work moves back.
+
+**On Phase 3.** Slices 9, 11, 12 and 13 above were written but never built —
+they need payment sandbox credentials and an SMS aggregator, which are outside
+the repository. Only Slice 10 (throttles) shipped. Those four are re-planned
+here as **Slices 29–32** against what the code actually looks like today, which
+has moved since August 2. Where the old slice and the new one disagree, the new
+one is current; the old text is left in place as the record of what was
+intended.
+
+## Decisions needed from you — second round
+
+| # | Decision | Blocks | My recommendation |
+|---|---|---|---|
+| D4 | **Which SMS aggregator.** Still open from the first round. | 32 | Unchanged: a commercial choice needing a local quote. The `Notifier` interface means one adapter whichever you pick. |
+| D5 | **Which third language.** Susu, Pular or Malinké first? | 37 | **Susu**, as Conakry's lingua franca — the pilot city decides this, not national numbers. Pular follows with Labé. |
+| D6 | **What "no-show rate" counts.** Lapsed bookings only, or lapsed + late cancellations? | 34 | **Both, shown separately.** A merchant reads them differently: one is a stranger who never came, the other is a customer who warned them. |
+| D7 | **May a merchant hide a review, or only flag it?** Carried over, still unanswered. | 34 | **Flag only.** A venue that can delete criticism produces ratings nobody believes, which costs more than the bad review. |
+| D8 | **Does loyalty reward money or status?** A discount, or priority booking? | 40 | **Priority booking and a held table**, not a discount. Margin in this market is thin, and a guaranteed table on a Friday is worth more to a regular than 5% off. |
+
+---
+
+# Phase 7 — Stop the bleeding
+
+*Four defects and two pieces of housekeeping. None is large; all of them make
+everything after them cheaper or more trustworthy. This phase should be one
+week's work and should not be reordered — Slice 23 in particular blocks the
+signal every later slice depends on.*
+
+## Slice 23 — A test suite that does not depend on the hour ❌ → ✅
+
+**Goal.** `flutter test` passes at 03:00 and at 20:00, and a red CI job means
+something is actually broken.
+
+**Why here.** `PLATFORM_ASSESSMENT.md` §7.1. The merchant suite has one failing
+test — *"staff can still work the day"* — and it fails not intermittently but
+**for nineteen hours of every day**. The fixture books today at 19:00
+(`widget_test.dart:146`), while the button under test only appears once the
+sitting has started (`reservation_card.dart:51`). CI runs `ubuntu-latest` in
+UTC with no `TZ` set, so the merchant job fails on any push before 19:00 UTC.
+
+Everything else in this plan is verified by CI. Fixing CI first is not
+housekeeping — it is the instrument the rest of the work is measured with.
+
+**Client.**
+- `apps/merchant_app/test/widget_test.dart` — give `booking()` a `when`
+  parameter defaulting to a time already under way
+  (`DateTime.now().subtract(const Duration(hours: 1))`). The tests that care
+  about a *future* booking pass an explicit future time, so each test states
+  the state it needs instead of inheriting a wall-clock accident.
+- **Sweep for siblings.** Grep both apps' tests for fixed hours —
+  `DateTime(now.year, now.month, now.day, <n>)` — and give each the same
+  treatment. The repo has met this bug before (`Stop the queue pagination tests
+  failing after 23:30 in Conakry`), which means the pattern recurs and a
+  one-test fix will not hold.
+- `.github/workflows/ci.yml` — add a deliberately awkward `TZ` to the Flutter
+  job (`Pacific/Kiritimati`, UTC+14) so a test that secretly depends on the
+  clock fails in CI rather than at 01:00 on someone's laptop.
+
+**Tests.** The suite itself is the test. Prove the fix by running the merchant
+suite with `TZ` forced to at least three zones spanning the day.
+
+**Done when.** All four suites pass under any `TZ`, and CI carries a
+non-UTC timezone so this class of bug cannot come back unnoticed.
+
+**Size:** S
+
+---
+
+## Slice 24 — The network layer survives a bad network ❌ → ✅
+
+**Goal.** No request can hang forever. A slow network says so, and a read that
+failed once is retried before the user is told anything.
+
+**Why here.** §7.2. `grep '\.timeout('` across all three Dart packages returns
+nothing, and `package:http` has no default. On a Conakry mobile connection the
+common failure is a stall, not a refusal — so today the app shows a spinner
+that never resolves and offers no way out. This is the most user-visible
+weakness in the product and it is fixed in one file.
+
+**Client.**
+- `shared_client/lib/src/api_client.dart` — a `timeout` on every request
+  (suggest 15s for reads, 30s for writes; writes are longer because a payment
+  initiation legitimately takes longer than a list). Map `TimeoutException` to a
+  distinct `ApiException` kind so callers can tell "slow" from "broken".
+- **Retry reads, never writes.** Two retries with backoff on GET only. A
+  retried POST is a double booking or a double charge — the one thing this
+  codebase must not do. Write the reason in the comment; it is the kind of rule
+  someone will otherwise "improve" later.
+- Both apps — a "the connection is slow, we are still trying" message distinct
+  from the existing error state, and a retry affordance on the screens that
+  currently dead-end.
+- New l10n keys in both catalogues, EN and FR.
+
+**Tests.** ~15 in `shared_client/test/`:
+- A request that never completes raises the timeout kind, not a generic error.
+- A GET that fails once then succeeds returns the success, and made exactly two
+  calls.
+- A POST that fails is **not** retried — asserted explicitly, with the call
+  count.
+- Backoff is respected (fake clock, not a real sleep).
+- Widget tests in both apps: the slow-network message appears and the retry
+  affordance re-issues the request.
+
+**Done when.** No code path can wait on the network indefinitely, and a flaky
+connection produces a message a user can act on.
+
+**Size:** M
+
+---
+
+## Slice 25 — Images sized for the network they cross ❌ → ✅
+
+**Goal.** A browse list of twenty venues pulls tens of kilobytes of thumbnail,
+not tens of megabytes of original photograph.
+
+**Why here.** §7.5. Uploads are stored and served at original resolution.
+Storage is correctly on R2, so this is not a cost problem — it is the first
+impression of the customer app on mobile data, and it undoes the work already
+spent making browse feel fast.
+
+**Backend.**
+- Generate derivatives on upload: a card thumbnail (~400px wide), a detail
+  image (~1200px), keeping the original. Pillow is already a dependency —
+  `seed_demo` uses it — so this adds no new runtime dependency.
+- Serialize a `thumbnail_url` alongside `image_url` on `Photo` and `MenuItem`.
+  Additive: existing clients keep working, which matters because a released
+  build cannot be forced to update.
+- A management command to backfill derivatives for existing rows, idempotent in
+  the house style.
+- Cap upload dimensions and re-encode: a 12MP phone photo should not be stored
+  as-is.
+
+**Client.**
+- Browse cards, menu cards and the dishes feed request `thumbnail_url`; the
+  photo viewer and venue header request the full image. The viewer is the one
+  place the original is the point.
+
+**Tests.** ~12 backend:
+- Uploading generates both derivatives; dimensions are as configured.
+- An upload larger than the cap is downscaled, and the stored file is smaller
+  than what arrived.
+- The backfill command is idempotent and skips rows that already have
+  derivatives.
+- A row without a derivative still serializes without a 500 — the migration
+  window has to be survivable.
+
+**Done when.** The browse list's image payload drops by an order of magnitude,
+measured before and after on the seeded database.
+
+**Size:** M
+
+---
+
+## Slice 26 — One status document, and comments that are true ❌ → ✅
+
+**Goal.** A person reading this repository is not misled by it.
+
+**Why here.** §2 and §7.4. `PROJECT_STATUS.md` lists ten priorities of which
+**eight have shipped**; anyone planning from it rebuilds finished work. Two
+customer-app docstrings state the opposite of what the code now does — *"There
+are no customer accounts yet"* and *"Payment is on arrival in the MVP"* — on two
+of the most-edited screens. In a codebase whose comments are otherwise reliable,
+a false comment does more damage than no comment.
+
+**Repo.**
+- Reduce `PROJECT_STATUS.md` to a pointer at `PLATFORM_ASSESSMENT.md`, or delete
+  it. Do not maintain both.
+- Fix the two stale docstrings (`my_bookings_screen.dart`,
+  `booking_form_screen.dart`).
+- `README.md` — check its feature list against the audit; it predates six
+  phases of work.
+- Note the seeded customer logins in the README's testing section, so the next
+  person does not have to rediscover them.
+
+**Tests.** None. This is prose.
+
+**Done when.** No document in the repository contradicts the code, and there is
+exactly one status document.
+
+**Size:** S
+
+---
+
+## Slice 27 — `main` means what is deployed ❌ → ✅
+
+**Goal.** `main` is a branch someone can deploy from without asking what it is.
+
+**Why here.** §7.6. `main` is **113 commits behind `dev` and 2 commits ahead** —
+it has diverged, so the next promotion is a reconciliation rather than a
+fast-forward. The release process built in Slice 22 targets `main`, so it
+currently targets something 113 slices stale. The divergence only grows.
+
+**Repo.**
+- Find out what those two commits are and decide deliberately: cherry-pick onto
+  `dev`, or discard them with a note saying why.
+- Merge `dev` into `main` and tag it. Per Slice 22's definition, `main` is what
+  is deployed.
+- Write the promotion ritual into `RELEASE.md` — when `main` moves, who decides,
+  and what must be green first.
+
+**Done when.** `git rev-list --count dev..main` is 0, and `main` carries a tag
+matching a real deployment.
+
+**Size:** S
+
+---
+
+## Slice 28 — Throttle rates sized on evidence ❌ → ✅
+
+**Goal.** The rate limits reflect observed traffic instead of a guess.
+
+**Why here.** The rates were set deliberately loose and their tuning was
+deferred *until throttle-hit metrics existed*. Slice 20 built those metrics, so
+this is unblocked and is now a configuration change with a test.
+
+**Backend.**
+- Read the throttle-hit counters from the metrics endpoint over a period of
+  real use — including a seeded load run if a pilot has not started.
+- Tighten `DEFAULT_THROTTLE_RATES` where the ceiling is orders of magnitude
+  above observed peak. `booking_phone` and `register` are the two worth being
+  strict about: they are where abuse costs money rather than cycles.
+- Record the reasoning in the settings comment, in the house style — the next
+  person to widen a limit should have to argue with a stated reason.
+
+**Tests.** Extend `test_throttling.py` so each tightened scope has a test
+asserting the new boundary. A rate changed without a test is a rate that drifts.
+
+**Done when.** Every rate has either an observation or a stated argument behind
+it.
+
+**Size:** S
+
+---
+
+# Phase 8 — Real money, real messages, real push
+
+*Every slice here is **⛔ blocked on something you must obtain**, not on
+engineering. The backend for all five is written and tested against stubs. Work
+this phase in whatever order the credentials arrive — the slices are independent
+of each other apart from 31, which needs 29 or 30.*
+
+**Do not start these before Phase 7.** They are the slices where a bug costs
+real money, and Slice 23 is what makes the test suite trustworthy enough to
+catch one.
+
+## Slice 29 — Orange Money, for real ⛔ → ✅
+
+**Blocked on:** sandbox credentials and API documentation from Orange Guinea.
+
+**Goal.** A customer pays a deposit with Orange Money and the money arrives.
+
+**Why here.** §8.1. This is the single largest gap between the product and a
+pilot that earns. `MockPaymentProvider` already implements the full interface —
+`initiate_payment`, `check_status`, `refund` — so the shape of the work is
+known: one adapter, one callback endpoint, and the operational care that real
+money needs.
+
+**Backend.**
+- `payments/providers.py` — `OrangeMoneyProvider(PaymentProvider)`. Auth token
+  acquisition and refresh, request signing, their status vocabulary mapped onto
+  `Payment.Status`.
+- **A callback endpoint**, which the mock never needed: verify the signature,
+  treat it as untrusted input, and make it idempotent — a provider will deliver
+  the same callback twice and both must be safe.
+- Reconcile callback against poll. `poll_pending_payments` already runs every
+  30s; a callback should short-circuit it, never contradict it. Where they
+  disagree, **the provider's ledger wins and the disagreement is logged loudly**.
+- Timeouts and a circuit breaker: a provider outage must not hold a request
+  thread or hang a booking.
+- Settings: real credentials via `config()`, never committed. `PAYMENT_PROVIDERS`
+  maps `orange_money` to the real class in production and the mock everywhere
+  else — the switch stays a settings change, as designed.
+
+**Tests.** ~30, all against recorded fixtures, never the live sandbox:
+- Each provider status maps to the right `Payment.Status`.
+- A duplicate callback is a no-op.
+- A callback with a bad signature is refused and logged.
+- Provider timeout leaves the payment `pending`, not `failed` — the money may
+  still be moving, and calling it failed is how a customer gets charged for a
+  booking they were told they did not get.
+- A payment completing between two polls confirms the booking exactly once.
+- Manual sandbox verification is a checklist in the PR, not an automated test.
+
+**Done when.** A real sandbox payment moves a booking to confirmed without
+anyone watching, and the same flow still works against the mock in tests.
+
+**Size:** L
+
+---
+
+## Slice 30 — MTN Mobile Money ⛔ → ✅
+
+**Blocked on:** MTN sandbox credentials.
+
+**Goal.** The same, for the other half of the market.
+
+**Why here.** Second because the first adapter discovers the shape of the
+abstraction, and the second either confirms it or corrects it cheaply. Doing
+both at once means designing the interface twice with no feedback.
+
+**Backend.** `MtnMoneyProvider` behind the same ABC. Expect the differences to
+be in status vocabulary and callback authentication; expect to adjust the
+`PaymentProvider` interface once, and let that adjustment be the deliverable of
+this slice as much as the adapter is.
+
+**Tests.** ~25, mirroring Slice 29, plus one asserting both providers satisfy
+the same contract — a shared test body run against each.
+
+**Size:** M
+
+---
+
+## Slice 31 — Reconciliation a merchant can argue with ⛔ → ✅
+
+**Blocked on:** 29 or 30.
+
+**Goal.** When a customer says "I paid" and the dashboard says otherwise,
+someone can settle it in a minute.
+
+**Why here.** The payments dashboard was built for this argument, and
+`reservation_detail_screen.dart` already exposes copyable references. What is
+missing is the provider's side of the ledger to compare against.
+
+**Backend.**
+- A daily reconciliation task: fetch the provider's settled transactions, match
+  on `provider_reference`, and record the mismatches rather than silently
+  correcting them. **A mismatch is a fact to be reviewed, not a bug to be
+  auto-fixed** — the auto-fix is how money quietly disappears.
+- A `PaymentDiscrepancy` record: what we hold, what they hold, when it was
+  noticed, whether it was resolved.
+- Surface unresolved discrepancies on the payments dashboard.
+- Refunds end to end: the interface exists and the mock implements it; make it
+  real, and decide who may trigger one (owner only, matching staff CRUD).
+
+**Tests.** ~20: a missing local payment, a missing remote payment, an amount
+mismatch, a duplicate reference, and a refund that the provider refuses.
+
+**Done when.** A merchant can be told, with evidence, where a specific 50,000
+GNF is.
+
+**Size:** M
+
+---
+
+## Slice 32 — SMS that leaves the machine ⛔ → ✅
+
+**Blocked on:** D4 — which aggregator.
+
+**Goal.** A reminder and a reset code reach a phone.
+
+**Why here.** §8.1. `ConsoleSmsNotifier` prints; `NOTIFIERS['sms']` is one
+setting away from a real class. Reminders, no-show warnings and password resets
+are all written and all currently shout into a terminal.
+
+**Backend.**
+- One `Notifier` implementation for the chosen aggregator.
+- Delivery receipts where the aggregator offers them, recorded on
+  `Notification` — which already has `status` and `error` fields waiting.
+- Retry with backoff on transient failures; give up loudly, never silently.
+- **Cost control**: a per-recipient daily cap. SMS costs money per message, and
+  a retry loop with a bug is a bill.
+
+**Tests.** ~15 against a fake gateway: success, hard failure, transient failure
+then success, cap enforcement, and a code that is never logged in plaintext.
+
+**Done when.** A booking made now produces a reminder on a real handset at the
+right time, and never at 04:00 — `reminders.py` already guarantees the second
+part.
+
+**Size:** M
+
+---
+
+## Slice 33 — Push on the phone ⛔ → ✅
+
+**Blocked on:** a Firebase project and a service account.
+
+**Goal.** A merchant learns about a booking without opening the app.
+
+**Why here.** §7.3. This is the most lopsided item in the repository: the
+server half is **complete** — `DeviceToken`, `POST /api/devices/`,
+`FirebasePushSender` behind a setting, `ConsolePushSender` keeping the path
+exercised — and the client half does not exist at all. Neither app carries a
+Firebase dependency; `venue_desk_screen.dart:46` says so in a comment.
+
+**Client.**
+- Firebase to both apps; request permission at a moment that makes sense (after
+  the first booking, not on first launch — a permission prompt before any value
+  is refused and never asked again).
+- Register the token against `POST /api/devices/`, re-register on refresh, and
+  unregister on sign-out. A stale token pushes a merchant's bookings to a phone
+  they no longer use.
+- Foreground, background and cold-start handling, with a tap opening the booking
+  or order it names.
+
+**Backend.** Flip `PUSH_SENDER` to `FirebasePushSender`; prune tokens Firebase
+reports as unregistered — `push.py` already distinguishes rejected from failed
+for exactly this.
+
+**Tests.** Client: registration on sign-in, unregistration on sign-out, tap
+routing. Backend push tests exist already.
+
+**Done when.** A booking made in the customer app raises a notification on the
+merchant's phone with the app closed.
+
+**Size:** M
+
+---
+
+# Phase 9 — What a merchant will ask for next
+
+*The first pilot venue will ask for these in roughly this order. All three are
+unblocked, and every number they need is already in the database.*
+
+## Slice 34 — Analytics a merchant recognises ❌ → ✅
+
+**Goal.** A merchant opens the app and learns something about their business
+they did not already know.
+
+**Why here.** §9. The highest-value new merchant feature, and the payments
+dashboard is the pattern to copy — including its discipline of showing money as
+strings and never inventing precision.
+
+**Backend.** A `merchant/establishments/<pk>/insights/` endpoint:
+- **Covers per service**, by day and by day-of-week — the number a restaurant
+  actually plans staff against.
+- **No-show rate**, lapsed and late-cancelled shown separately (**D6**).
+- **Popular dishes** by quantity and by revenue — they rank differently, and the
+  difference is the insight.
+- **Repeat customers**: how many bookings come from someone who has been before.
+  `Reservation.customer` makes this a query now that accounts exist.
+- **Peak hours** from booking datetimes.
+- All windowed (7 / 30 / 90 days), all scoped by membership like every other
+  merchant route.
+
+**Client.** An Insights destination in the merchant app. Charts must survive
+being read on a phone in a dark lounge: large type, few series, no colour-only
+encoding. Empty states that say *why* a number is empty — a venue with no
+completed sittings has no no-show rate, and that is not an error.
+
+**Tests.** ~25 backend, covering the arithmetic against a known fixture, the
+window boundaries, and membership scoping. Widget tests at 360×900 and tablet.
+
+**Done when.** A merchant can answer "which night is worth opening for" from the
+app.
+
+**Size:** L
+
+---
+
+## Slice 35 — Kitchen tickets on paper ❌ → ✅
+
+**Goal.** An order prints in the kitchen.
+
+**Why here.** The queue, the stages and the walk-in flow all exist; this is a
+printer adapter and a layout. It moves down the order because a screen in the
+kitchen works, and paper is a preference until a venue says otherwise.
+
+**Client.** ESC/POS over Bluetooth or network, behind an interface with a
+console implementation — the same shape as `Notifier`, `PushSender` and
+`PaymentProvider`, and for the same reason. Ticket layout: order reference,
+time, items, quantities, notes. Reprint, because tickets are lost.
+
+**Backend.** Nothing, unless auto-print on placement is wanted, which needs a
+per-venue setting.
+
+**Tests.** Layout rendering against a fake printer; reprint produces the same
+bytes.
+
+**Size:** M
+
+---
+
+## Slice 36 — Getting the numbers out ❌ → ✅
+
+**Goal.** A merchant can hand their accountant a file.
+
+**Why here.** Cheap once Slice 34 exists — the queries are written; this is a
+serializer and a share sheet.
+
+**Client / Backend.** CSV export of payments and bookings for a date range,
+delivered through the platform share sheet. Owner and manager only.
+
+**Tests.** ~8: correct rows, correct scoping, a range with no data, and
+characters that break naive CSV (a venue called "Chez Sory, Kaloum").
+
+**Size:** S
+
+---
+
+# Phase 10 — Fit for the market it is built for
+
+*These are the slices that distinguish a product built for Conakry from one
+built anywhere and shipped there.*
+
+## Slice 37 — A third language ❌ → ✅
+
+**Blocked on:** D5, and a translator.
+
+**Goal.** The app speaks the language its users speak at home.
+
+**Why here.** §8.2. EN and FR are done and the machinery is proven with two
+complete catalogues — `compile_po`, `msgctxt` contexts, a test that fails if the
+`.mo` drifts from the `.po`. A third catalogue is translation work, not
+engineering, and it is a genuine differentiator against anything imported.
+
+**Repo.** A third `.arb` per app and a third Django catalogue. Budget for the
+fact that status words need contexts in any language, and that a translator will
+need the same context notes the French catalogue carries.
+
+**Tests.** The existing catalogue-completeness tests extend to the third
+language for free — they are written against the key set, not against French.
+
+**Size:** M — mostly waiting on translation.
+
+---
+
+## Slice 38 — Usable on a bad connection ❌ → ✅
+
+**Goal.** A merchant on the floor with one bar can still see tonight's list.
+
+**Why here.** §8.3. Slice 24 stops the app hanging; this one lets it still be
+useful. Favourites already prove the pattern — optimistic, offline-tolerant,
+reconciled later. Deliberately after Phase 8: caching a payment state is a
+harder question than caching a list, and it should be designed once the real
+provider's timing is known.
+
+**Client.**
+- Cache the merchant's day and the customer's bookings locally; show them with a
+  visible "last updated" rather than pretending they are live.
+- Queue confirm/cancel actions taken offline and replay them on reconnect, with
+  an explicit conflict rule: **the server wins, and the merchant is told what
+  changed under them.**
+- Never queue a payment. Same rule as retrying a POST, same reason.
+
+**Tests.** ~20: cache hit renders with its timestamp, a queued action replays
+once, a conflict surfaces rather than silently losing, and a payment is never
+queued.
+
+**Size:** L
+
+---
+
+## Slice 39 — Links that open the right thing ❌ → ✅
+
+**Goal.** The reminder SMS from Slice 32 contains a link that opens the booking.
+
+**Why here.** Directly after SMS becomes real, because that is what makes deep
+links worth having.
+
+**Client.** Deep links to a booking, an order and a venue. The reference is
+already the credential, so a link carrying one needs no new auth model — but it
+does need the same care: a link is shoulder-surfable, so it opens a booking, not
+an account.
+
+**Backend.** Include the link in reminder and confirmation messages. A shareable
+venue link for merchants to post is a small addition here.
+
+**Tests.** ~10: each link type routes correctly, an unknown reference fails
+gracefully, and a link never signs anyone in.
+
+**Size:** M
+
+---
+
+# Phase 11 — Growth
+
+*Market-report Phase 3+. Reorder freely against what pilot venues actually ask
+for — that feedback is worth more than this ordering.*
+
+| Slice | Feature | Notes |
 |---|---|---|
-| 23 | **Kitchen tickets / printing** | The queue and stages exist; this is a printer adapter and a layout |
-| 24 | **Analytics for merchants** — covers per night, turnover, popular dishes, repeat customers | The data is all there; the payments dashboard is the pattern to copy |
-| 25 | **Loyalty** | Needs Slice 18's stable customer identity, which is why it is not earlier |
-| 26 | **Inventory** | Extends `MenuItem` availability from a boolean to a count |
-| 27 | **WhatsApp fallback** | Another `Notifier` implementation; the interface already fits |
-| 28 | **Waiting lists / overbooking** | Needs the availability engine, which is the best-tested code in the repo |
+| 40 | **Loyalty** — priority booking for regulars (**D8**) | Needs the stable customer identity from Slice 18 and the repeat-customer query from Slice 34 |
+| 41 | **Inventory** | Extends `MenuItem.is_available` from a boolean to a count; the sold-out flow already exists as the UI |
+| 42 | **WhatsApp fallback** | Another `Notifier` implementation — the interface fits, which is the whole argument for having built it that way |
+| 43 | **Waiting lists / overbooking** | Touches `availability.py`, the best-tested code in the repository. Do not attempt before Phase 7 restores CI |
+| 44 | **Map view of results** | Distance is already computed and sortable; venues are simply never plotted |
+| 45 | **Receipts** | A customer-facing artefact for a booking or order; trivial once Slice 36's export exists |
 
 ---
 
 ## What this adds up to
 
-Phases 0 and 1 — five slices — are the difference between what exists and a
-product a real merchant in Conakry can use with real customers, on mock money.
-That is the shortest path to something worth showing.
+**Phase 7 is one week and should start now.** It costs less than any other phase
+and it repairs the instrument — a CI pipeline that is red most of the day — that
+every later phase is verified with. Slices 24 and 25 also happen to be the two
+most user-visible improvements available at any price.
 
-Phases 2 and 3 — eight more — are the difference between that and taking
-actual payments reliably, with the exposure that opens closed before it opens
-rather than after.
+**Phase 8 is the pilot.** Nothing in it can start until credentials arrive, and
+nothing else in this plan needs them. The correct move is to chase those
+credentials in parallel with Phase 7 rather than sequentially — the engineering
+is ready and waiting on paperwork.
 
-Everything from Phase 4 on improves a working, earning product, and can be
-reordered freely against what the first pilot venues actually complain about.
-That feedback is worth more than this document's guesses, and this plan should
-be rewritten the day it arrives.
+**Phase 9 is what keeps a pilot venue.** A merchant who can see their own
+numbers renews; one who cannot compares the app to a notebook and finds the
+notebook cheaper.
+
+**Phases 10 and 11 are the product's second year.** They are listed so the
+shape is visible, not because the order is settled. Rewrite them the day a real
+venue in Conakry tells you what they actually want — as the first version of
+this plan said, and it was right.

@@ -16,6 +16,7 @@ from datetime import time, timedelta
 from decimal import Decimal
 from io import BytesIO
 
+from accounts.models import CustomerProfile
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
@@ -24,6 +25,7 @@ from django.utils import timezone
 from orders.models import Order, OrderItem
 from PIL import Image, ImageDraw
 
+from establishments.favourites import Favourite
 from establishments.models import (
     Establishment,
     MenuItem,
@@ -127,6 +129,20 @@ SURNAMES = [
     'Sylla', 'Baldé', 'Soumah', 'Doumbouya',
 ]
 
+# Customer accounts, one per contact-details case. An account is optional in
+# this product, so what varies between these is not the bookings — it is what
+# the account could be recovered with, which is the thing the profile screen
+# talks about and the only way to see all of its states without editing rows by
+# hand.
+CUSTOMERS = [
+    ('mariama', 'Mariama', 'Diallo', '+224620111222', 'mariama.diallo@example.gn'),
+    ('sekou', 'Sékou', 'Camara', '+224621333444', ''),
+    ('kadiatou', 'Kadiatou', 'Barry', '', 'kadiatou.barry@example.gn'),
+    # Neither, deliberately: this is the account the app warns would be lost
+    # if the password went with the phone.
+    ('binta', 'Binta', 'Sow', '', ''),
+]
+
 REVIEW_LINES = [
     ('Excellent accueil, on reviendra.', 5),
     ("Le poisson était parfait, service un peu lent mais ça valait l'attente.", 4),
@@ -184,7 +200,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.rng = random.Random(SEED)
         self.password = options['password']
-        self.created = {'venues': 0, 'skipped': 0}
+        self.created = {
+            'venues': 0,
+            'skipped': 0,
+            'customers': 0,
+            'customers_skipped': 0,
+        }
 
         with transaction.atomic():
             venues = self.seed_venues()
@@ -196,8 +217,9 @@ class Command(BaseCommand):
                 self.seed_photos(venue)
             self.seed_reservations(venues)
             self.seed_orders(venues)
+            customers = self.seed_customers(venues)
 
-        self.report(venues)
+        self.report(venues, customers)
 
     # --- Venues -----------------------------------------------------------
 
@@ -591,9 +613,160 @@ class Command(BaseCommand):
                             provider_reference=f'SEED-O{order.pk:07d}',
                         )
 
+    # --- Customers --------------------------------------------------------
+
+    def seed_customers(self, venues):
+        """Signed-in customers, with a history attached to the account.
+
+        Everything above books under a name and a phone number and no account,
+        which is how most of this market will use it — but it leaves the
+        customer app's signed-in half with nothing in it. Bookings, Favourites
+        and Profile all read from the account, so without this they open empty
+        and a demo cannot tell "nothing saved yet" from "this screen is
+        broken".
+
+        Bookings are made fresh rather than reassigned from the crowd above: a
+        booking already sitting on a merchant's list belongs to whoever made
+        it, and quietly moving it under an account would change what that
+        merchant sees.
+        """
+        bookable = [v for v in venues if v.spaces.exists()]
+        restaurants = [
+            v
+            for v in bookable
+            if v.type == Establishment.Type.RESTAURANT
+            and v.menu_items.filter(is_available=True).exists()
+        ]
+        if not bookable:
+            return []
+
+        accounts = []
+        for username, first, last, phone, email in CUSTOMERS:
+            user, made = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    'first_name': first,
+                    'last_name': last,
+                    'email': email,
+                },
+            )
+            accounts.append((username, user))
+            if not made:
+                # Already seeded, or a name someone took by hand. Either way,
+                # not ours to overwrite.
+                self.created['customers_skipped'] += 1
+                continue
+
+            user.set_password(self.password)
+            user.save(update_fields=['password'])
+            CustomerProfile.objects.create(user=user, phone=phone)
+            self.created['customers'] += 1
+
+            self.seed_customer_history(user, phone, bookable, restaurants)
+
+        return accounts
+
+    def seed_customer_history(self, user, phone, bookable, restaurants):
+        now = timezone.now()
+        name = f'{user.first_name} {user.last_name}'.strip()
+
+        # Saved venues, so Favourites opens on a list rather than on its empty
+        # state. Half the value of an account is that this list is portable.
+        for venue in self.rng.sample(bookable, min(len(bookable), 4)):
+            Favourite.objects.get_or_create(user=user, establishment=venue)
+
+        # One booking per state the Bookings tab groups by, so both its
+        # sections and every status chip are populated for one account.
+        plan = [
+            (-self.rng.randint(8, 40), Reservation.Status.COMPLETED, True),
+            (-self.rng.randint(2, 7), Reservation.Status.COMPLETED, False),
+            (self.rng.randint(1, 3), Reservation.Status.CONFIRMED, False),
+            (self.rng.randint(4, 9), Reservation.Status.PENDING, False),
+            (self.rng.randint(2, 6), Reservation.Status.CANCELLED, False),
+        ]
+
+        for offset, status, reviewed in plan:
+            venue = self.rng.choice(bookable)
+            spaces = list(venue.spaces.all())
+            when = (now + timedelta(days=offset)).replace(
+                minute=0, second=0, microsecond=0
+            )
+            # Inside opening hours either way — a lounge at 20:00 and a
+            # kitchen at 20:00 are both open.
+            when = when.replace(hour=self.rng.choice([19, 20, 21]))
+
+            booking = Reservation.objects.create(
+                space=self.rng.choice(spaces),
+                customer=user,
+                customer_name=name,
+                customer_phone=phone,
+                datetime=when,
+                party_size=self.rng.randint(2, 6),
+                status=status,
+            )
+
+            # A confirmed booking paid ahead is what the payment card on the
+            # booking detail screen is for.
+            if status == Reservation.Status.CONFIRMED:
+                Payment.objects.create(
+                    reservation=booking,
+                    provider=Payment.Provider.ORANGE_MONEY,
+                    amount=Decimal('50000.00'),
+                    status=Payment.Status.COMPLETED,
+                    provider_reference=f'SEED-C{booking.pk:07d}',
+                )
+
+            # Reviews hang off a visit that happened, which is the rule the
+            # app enforces — so only a completed one can carry one.
+            if reviewed and not hasattr(booking, 'review'):
+                comment, rating = self.rng.choice(REVIEW_LINES)
+                Review.objects.create(
+                    establishment=venue,
+                    reservation=booking,
+                    rating=rating,
+                    comment=comment,
+                )
+
+        if not restaurants:
+            return
+
+        # Orders, restaurants only — and one still cooking, so the account has
+        # something live to follow rather than only receipts.
+        for status, hours in (
+            (Order.Status.COMPLETED, -self.rng.randint(24, 200)),
+            (Order.Status.PREPARING, self.rng.randint(1, 4)),
+        ):
+            venue = self.rng.choice(restaurants)
+            menu = list(venue.menu_items.filter(is_available=True))
+            order = Order.objects.create(
+                establishment=venue,
+                customer=user,
+                customer_name=name,
+                customer_phone=phone,
+                pickup_time=now + timedelta(hours=hours),
+                status=status,
+            )
+            for item in self.rng.sample(menu, min(len(menu), 2)):
+                OrderItem.objects.create(
+                    order=order,
+                    menu_item=item,
+                    quantity=self.rng.randint(1, 2),
+                    unit_price_at_order=item.price,
+                )
+
     # --- Report -----------------------------------------------------------
 
-    def report(self, venues):
+    def slug_for(self, venue):
+        return (
+            venue.name.lower()
+            .replace(' ', '')
+            .replace("'", '')
+            .replace('é', 'e')
+            .replace('è', 'e')
+            .replace('&', '')[:14]
+        )
+
+    def report(self, venues, customers):
         out = self.stdout
         restaurants = sum(
             1 for v in venues if v.type == Establishment.Type.RESTAURANT
@@ -613,19 +786,28 @@ class Command(BaseCommand):
         out.write(f'  orders        {Order.objects.count()}')
         out.write(f'  reviews       {Review.objects.count()}')
         out.write(f'  payments      {Payment.objects.count()}')
+        out.write(
+            f'  customers     {len(customers)} — '
+            f'{self.created["customers"]} new, '
+            f'{self.created["customers_skipped"]} already there'
+        )
+        out.write('')
+        out.write(f'Password for every seeded account: {self.password}')
         out.write('')
         out.write('Merchant logins — <venue>, <venue>.mgr, <venue>.staff')
-        out.write(f'Password for all of them: {self.password}')
+        out.write('  Restaurants (these have the kitchen queue):')
+        for venue in venues:
+            if venue.type == Establishment.Type.RESTAURANT:
+                out.write(f'    {venue.name:24} {self.slug_for(venue)}')
+        out.write('  Lounges (no orders — restaurants only, by rule):')
+        for venue in venues:
+            if venue.type == Establishment.Type.LOUNGE:
+                out.write(f'    {venue.name:24} {self.slug_for(venue)}')
         out.write('')
-        for venue in venues[:6]:
-            slug = (
-                venue.name.lower()
-                .replace(' ', '')
-                .replace("'", '')
-                .replace('é', 'e')
-                .replace('è', 'e')
-                .replace('&', '')[:14]
+        out.write('Customer logins')
+        for username, user in customers:
+            profile = getattr(user, 'customer_profile', None)
+            contact = ', '.join(
+                filter(None, [profile.phone if profile else '', user.email])
             )
-            out.write(f'  {venue.name:24} {slug}')
-        if len(venues) > 6:
-            out.write(f'  … and {len(venues) - 6} more')
+            out.write(f'    {username:12} {contact or "no contact details"}')

@@ -5753,6 +5753,55 @@ void main() {
       expect(find.byType(FloatingActionButton), findsOneWidget);
     });
   });
+
+  group('an empty desk reads as a sentence, not a column of letters', () {
+    Future<void> openEmptyDesk(WidgetTester tester, {required Size size}) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the message gets the width of the pane it sits in',
+        (tester) async {
+      // **The bug.** The empty state sized its gutters from the window, so
+      // inside the desk's 44% list pane it was handed a gutter wider than
+      // the pane itself and rendered one character per line down the middle.
+      await openEmptyDesk(tester, size: const Size(1280, 800));
+
+      final text = tester.getSize(find.text('Nothing booked today'));
+      // A line of text, not a totem pole. Anything near one glyph's width
+      // means the gutters have eaten the pane again.
+      expect(text.width, greaterThan(120));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('and it still reads on a phone', (tester) async {
+      await openEmptyDesk(tester, size: phoneSize);
+
+      final text = tester.getSize(find.text('Nothing booked today'));
+      expect(text.width, greaterThan(120));
+    });
+
+    testWidgets('the detail pane keeps its own invitation', (tester) async {
+      await openEmptyDesk(tester, size: const Size(1280, 800));
+
+      expect(find.text('Pick a booking from the list'), findsOneWidget);
+    });
+  });
 }
 
 bool _always(MerchantRole role) => true;

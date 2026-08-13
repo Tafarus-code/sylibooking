@@ -224,12 +224,19 @@ cd backend && python manage.py runserver
 cd apps/customer_app && flutter run
 ```
 
-There are no customer accounts: a booking is a name and a phone number. Every
-reservation gets a **reference** (a UUID) at creation, and holding it is what
-proves the booking is yours — it is how **My bookings** reads the live status
-and how a customer cancels. The app stores references on the device; clearing
-app data loses that list, but the booking still stands at the venue, and staff
-can find it by reference in `/admin/`.
+**A customer account is optional, and nothing in the booking flow requires
+one.** A booking is a name and a phone number. Every reservation gets a
+**reference** (a UUID) at creation, and holding it is what proves the booking is
+yours — it is how **My bookings** reads the live status and how a customer
+cancels. The app stores references on the device; clearing app data loses that
+list, but the booking still stands at the venue, and staff can find it by
+reference in `/admin/`.
+
+An account buys exactly two things: the list survives a lost phone, and
+favourites become portable. Signing in *claims* whatever references are on the
+device into the account, so nothing made while signed out is stranded. Register,
+sign in, profile editing, password reset by SMS or email, and account closure
+all exist — see `api/customer_accounts.py`.
 
 Reservations are *not* reachable by their sequential id without merchant
 credentials. They were once, which meant counting `1, 2, 3…` returned other
@@ -443,6 +450,38 @@ applies the result, which is how the app learns a payment settled after the
 customer approved it on their handset. A completed payment never reinstates a
 booking that was cancelled in the meantime.
 
+## Demo data and test logins
+
+```bash
+cd backend
+python manage.py seed_demo              # 22 venues across Conakry and Labé
+python manage.py backfill_image_copies  # only needed for data seeded before
+                                        # image derivatives existed
+```
+
+Additive and idempotent — running it twice changes nothing, and it never
+touches rows you created by hand. It tops up today's bookings on every run, so
+a database seeded last week still opens on a day with something in it.
+
+**Every seeded account uses the password `sylibooking`.**
+
+| Who | Username |
+|---|---|
+| Restaurant owner (has a kitchen queue) | `chezmariama`, `ledamier`, `lapaillote`, `lewharf`, … |
+| Lounge owner (no orders — restaurants only, by rule) | `lepetitbaobab`, `kaloumnights`, `lenimba`, … |
+| Manager / staff at any venue | `<venue>.mgr`, `<venue>.staff` |
+| Customer | `mariama`, `sekou`, `kadiatou`, `binta` |
+
+The venue slug is its name lowercased with spaces and accents removed, cut to
+14 characters — `seed_demo` prints the full list when it finishes.
+
+To exercise the **kitchen queue, log in as a restaurant**: a lounge has no
+orders, and that is the rule working rather than a bug. The four customers
+differ only in contact details — phone and email, phone only, email only, and
+neither — because that is what the profile screen and password reset behave
+differently about. `binta` is the account the app warns would be lost with the
+phone.
+
 ## Tests and linting
 
 ```bash
@@ -457,7 +496,9 @@ nothing if you run it from the repo root — `cd backend` first.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push and pull request against `main`:
+`.github/workflows/ci.yml` runs on every push to `main`, `dev` and any
+`feat/**`, `fix/**` or `chore/**` branch, and on pull requests into `main` or
+`dev` — so a branch is green before it is merged, not after:
 
 | Job | What it guards |
 | --- | --- |
@@ -470,8 +511,16 @@ Running the suite on both backends means the environment split in `settings.py`
 is exercised, not just assumed, and `makemigrations --check --dry-run` fails the
 build if a model changes without a matching migration.
 
-No deploy workflow yet — there is no API surface to deploy, so CD gets added
-once endpoints exist and a host is chosen.
+The Flutter jobs run in `TZ=Pacific/Kiritimati`, fourteen hours from the
+runner's UTC. That is deliberate: a test that quietly depends on the hour used
+to pass on a developer's evening machine and fail every CI run before 19:00
+UTC, and an unlikely zone makes that class of bug fail on the first run instead
+of by time of day. Note the Dart VM on Windows ignores `TZ` and reads the OS
+zone, so this is enforced in CI rather than reproducible locally.
+
+There is still no deploy workflow. The container images and
+[`deploy/render.yaml`](deploy/README.md) exist, but promotion is a deliberate
+act — see [`RELEASE.md`](RELEASE.md).
 
 ## Branching
 
@@ -501,12 +550,21 @@ apps/
 
 ## Current state
 
-- Models + admin for Establishment, Space, Reservation
-- Read API for establishments, availability for a date, and reservation
-  create/confirm/cancel
-- **No real auth yet.** "Merchant" endpoints require any authenticated Django
-  user, which today means a superuser. There is no customer/merchant user model
-  and no per-establishment scoping, so any logged-in user can see and act on
-  every establishment's reservations. That lands with the merchant app.
-- `payments/` is still an empty app; payment/deposit fields are deliberately off
+**Read [`PLATFORM_ASSESSMENT.md`](PLATFORM_ASSESSMENT.md) for the current
+picture**, and [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) for what is
+being built next. In short, as of 12 August 2026:
+
+- 16 models, 61 API routes, both Flutter apps, English and French throughout.
+- Token auth with per-venue membership and roles (owner / manager / staff).
+  Every merchant route checks membership against the venue in its URL.
+- Payments work end to end **against a mock provider**. Orange Money and MTN
+  are the one substantial gap, and they are blocked on sandbox credentials
+  rather than on code — the adapter interface is already in place.
+- Celery and beat run reminders, no-show sweeps and payment polling.
+- Containers, `deploy/render.yaml`, media on Cloudflare R2, and a signed
+  release process.
+
+The section this replaces described a state from before merchant auth,
+payments and both apps existed. It is kept in the history rather than
+corrected in place: see `git show 170a0a0:README.md`.
   Reservation until then

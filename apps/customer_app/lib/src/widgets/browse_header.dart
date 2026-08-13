@@ -20,7 +20,8 @@ class BrowseHeader extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
 
-  /// From the last booking made on this device; customers have no accounts.
+  /// From the last booking made on this device, so the greeting knows a
+  /// name without an account — most customers here will never make one.
   final String? customerName;
 
   String _greeting(L l) {

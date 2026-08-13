@@ -1,6 +1,7 @@
 """Customer-facing reservation endpoints, keyed by reference.
 
-Customers have no accounts. The reference issued when a booking is created is
+A customer account is optional and most will not have one. The reference
+issued when a booking is created is
 what proves it is theirs, so these endpoints look up by that UUID and never by
 the sequential id — which anyone could guess.
 """

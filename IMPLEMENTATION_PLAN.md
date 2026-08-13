@@ -49,6 +49,10 @@ early keeps the plan moving.
 Two more will come up later and can wait: whether merchants may hide reviews or
 only flag them (Slice 14), and where this is hosted (Slice 21).
 
+**Both were since decided by building them.** Reviews are flag-only — a
+merchant sets `flagged_at` and a reason, and only an admin can hide one.
+Hosting is containers plus `deploy/render.yaml`, with media on Cloudflare R2.
+
 ---
 
 ## Sequencing at a glance
@@ -788,7 +792,7 @@ intended.
 | D4 | **Which SMS aggregator.** Still open from the first round. | 32 | Unchanged: a commercial choice needing a local quote. The `Notifier` interface means one adapter whichever you pick. |
 | D5 | **Which third language.** Susu, Pular or Malinké first? | 37 | **Susu**, as Conakry's lingua franca — the pilot city decides this, not national numbers. Pular follows with Labé. |
 | D6 | **What "no-show rate" counts.** Lapsed bookings only, or lapsed + late cancellations? | 34 | **Both, shown separately.** A merchant reads them differently: one is a stranger who never came, the other is a customer who warned them. |
-| D7 | **May a merchant hide a review, or only flag it?** Carried over, still unanswered. | 34 | **Flag only.** A venue that can delete criticism produces ratings nobody believes, which costs more than the bad review. |
+| ~~D7~~ | ~~**May a merchant hide a review, or only flag it?**~~ **Resolved — already shipped as flag-only.** | — | Listing it as open was this document's error, not an open question. `MerchantReviewFlagView` sets `flagged_at` and `flagged_reason`; `is_hidden` is readable but not writable by any merchant route, so only an admin can hide one. That is the recommendation, built in Slice 14. |
 | D8 | **Does loyalty reward money or status?** A discount, or priority booking? | 40 | **Priority booking and a held table**, not a discount. Margin in this market is thin, and a guaranteed table on a Friday is worth more to a regular than 5% off. |
 
 ---

@@ -35,8 +35,9 @@ class Reservation(models.Model):
         db_index=True,
         help_text=(
             'Unguessable handle the customer uses to view or cancel their own '
-            'booking. Customers have no accounts, so this is what proves the '
-            'booking is theirs — the sequential id must not be used for that.'
+            'booking. An account is optional and most customers will not have '
+            'one, so this is what proves the booking is theirs — the '
+            'sequential id must not be used for that.'
         ),
     )
     space = models.ForeignKey(

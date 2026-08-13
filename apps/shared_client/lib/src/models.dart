@@ -854,8 +854,8 @@ class Reservation {
 
   final int id;
 
-  /// Unguessable handle proving this booking is the caller's. Customers have
-  /// no accounts, so this is how they read or cancel it later.
+  /// Unguessable handle proving this booking is the caller's. An account is
+  /// optional, so this — not a login — is how it is read or cancelled later.
   final String reference;
 
   final int spaceId;

@@ -45,6 +45,14 @@ class LFr extends L {
   String get tryAgain => 'Réessayer';
 
   @override
+  String get connectionSlow =>
+      'La connexion est lente. Nous essayons toujours.';
+
+  @override
+  String get connectionFailed =>
+      'Impossible de joindre le serveur. Vérifiez votre connexion.';
+
+  @override
   String get refresh => 'Actualiser';
 
   @override

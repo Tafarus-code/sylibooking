@@ -12,6 +12,8 @@
   "add": "Ajouter",
   "edit": "Modifier",
   "tryAgain": "Réessayer",
+  "connectionSlow": "La connexion est lente. Nous essayons toujours.",
+  "connectionFailed": "Impossible de joindre le serveur. Vérifiez votre connexion.",
   "refresh": "Actualiser",
   "required": "Obligatoire",
   "language": "Langue",

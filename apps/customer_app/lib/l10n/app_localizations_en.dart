@@ -112,6 +112,13 @@ class LEn extends L {
   String get tryAgain => 'Try again';
 
   @override
+  String get connectionSlow => 'The connection is slow. We are still trying.';
+
+  @override
+  String get connectionFailed =>
+      'Could not reach the server. Check your connection.';
+
+  @override
   String get nothingFound => 'Nothing found';
 
   @override

@@ -44,12 +44,25 @@ class FakeBackend {
   final Map<String, ({int status, Object? body})> routes = {};
   final List<http.Request> requests = [];
 
+  /// Paths that never answer, for the tests about a stalled connection.
+  ///
+  /// A stall is not a refusal: the request goes out and nothing comes back,
+  /// which is what a weak signal in a basement lounge does and what a 404
+  /// does not.
+  final Set<String> stalling = {};
+
+  /// Stop stalling, so a retry can be shown to succeed.
+  void recover() => stalling.clear();
+
   void on(String method, String path, Object? body, {int status = 200}) {
     routes['$method $path'] = (status: status, body: body);
   }
 
   http.Client get client => MockClient((request) async {
         requests.add(request);
+        if (stalling.contains(request.url.path)) {
+          return Completer<http.Response>().future;
+        }
         final route = routes['${request.method} ${request.url.path}'];
         if (route == null) {
           return http.Response(jsonEncode({'detail': 'not found'}), 404,
@@ -242,6 +255,11 @@ const landscapePhoneSize = Size(900, 360);
   WidgetTester tester, {
   String? storedToken,
   Size size = phoneSize,
+
+  /// Short deadlines, for the tests about a network that stalls. The real
+  /// defaults are seconds long, which a test should never sit through.
+  Duration readTimeout = const Duration(seconds: 15),
+  int readRetries = 2,
 }) {
   // A merchant reads this on a phone in a dim lounge, not on an 800x600
   // desktop surface. Testing at 360x900 is what surfaced two overflow bugs in
@@ -261,6 +279,8 @@ const landscapePhoneSize = Size(900, 360);
     api: SylibookingApi(
       baseUrl: 'http://localhost:8000/api',
       httpClient: backend.client,
+      readTimeout: readTimeout,
+      readRetries: readRetries,
     ),
     tokenStore: InMemoryTokenStore(storedToken),
   );
@@ -5869,6 +5889,76 @@ void main() {
       // Still workable otherwise: the point is that one control is withheld,
       // not that the booking is inert.
       expect(find.text('Cancel'), findsWidgets);
+    });
+  });
+
+  group('a desk on a connection that stalls', () {
+    // Retries are off here: the automatic retry has its own tests in
+    // shared_client, and what matters on the desk is what the merchant is
+    // told and whether they can get out of it.
+    Future<FakeBackend> openStalledDesk(
+      WidgetTester tester, {
+      LocaleStore? localeStore,
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        readTimeout: const Duration(milliseconds: 20),
+        readRetries: 0,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [booking(status: 'confirmed')],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.stalling.add('/api/reservations/');
+
+      await tester.pumpWidget(MerchantApp(
+        auth: auth,
+        localeStore: localeStore ?? InMemoryLocaleStore(),
+      ));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('says the connection is slow rather than that it failed',
+        (tester) async {
+      await openStalledDesk(tester);
+
+      expect(
+        find.text('The connection is slow. We are still trying.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Could not reach the server. Check your connection.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('and the retry brings the day back', (tester) async {
+      final backend = await openStalledDesk(tester);
+      expect(find.text('Try again'), findsOneWidget);
+
+      backend.recover();
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mariama Diallo'), findsWidgets);
+      expect(find.text('Try again'), findsNothing);
+    });
+
+    testWidgets('and says it in French when the app is in French',
+        (tester) async {
+      // The one message in the app the server cannot translate, because the
+      // server never heard the request.
+      await openStalledDesk(tester, localeStore: InMemoryLocaleStore('fr'));
+
+      expect(
+        find.text('La connexion est lente. Nous essayons toujours.'),
+        findsOneWidget,
+      );
     });
   });
 }

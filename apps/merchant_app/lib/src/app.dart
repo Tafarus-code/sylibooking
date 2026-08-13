@@ -81,6 +81,17 @@ class _MerchantAppState extends State<MerchantApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        // The client writes two sentences of its own — a stalled request and
+        // an unreachable one — and has no catalogue to write them from. Handed
+        // down here, where the language is settled, for the same reason the
+        // locale controller hands down `languageCode`.
+        builder: (context, child) {
+          widget.auth.api.networkText = ApiNetworkText(
+            slow: L.of(context).connectionSlow,
+            unreachable: L.of(context).connectionFailed,
+          );
+          return child ?? const SizedBox.shrink();
+        },
         home: !_locale.isLoaded
             ? const _Splash()
             : ListenableBuilder(

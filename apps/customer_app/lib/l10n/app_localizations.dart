@@ -289,6 +289,18 @@ abstract class L {
   /// **'Try again'**
   String get tryAgain;
 
+  /// Shown when a request timed out. Deliberately softer than connectionFailed: on a mobile network here this is the ordinary case, and the request may still be on its way.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection is slow. We are still trying.'**
+  String get connectionSlow;
+
+  /// Shown when a request could not reach the server at all, as opposed to being answered late.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the server. Check your connection.'**
+  String get connectionFailed;
+
   /// No description provided for @nothingFound.
   ///
   /// In en, this message translates to:

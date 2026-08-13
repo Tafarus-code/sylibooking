@@ -59,6 +59,14 @@
   },
   "couldNotLoadPlaces": "Could not load places",
   "tryAgain": "Try again",
+  "connectionSlow": "The connection is slow. We are still trying.",
+  "@connectionSlow": {
+    "description": "Shown when a request timed out. Deliberately softer than connectionFailed: on a mobile network here this is the ordinary case, and the request may still be on its way."
+  },
+  "connectionFailed": "Could not reach the server. Check your connection.",
+  "@connectionFailed": {
+    "description": "Shown when a request could not reach the server at all, as opposed to being answered late."
+  },
   "nothingFound": "Nothing found",
   "nothingFoundDetail": "Try a different name, or clear the filters.",
   "nothingOpenRightNow": "Nothing is open right now. Turn off \"Open now\" to see places you can book for later.",

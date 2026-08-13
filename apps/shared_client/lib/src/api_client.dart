@@ -700,8 +700,9 @@ class SylibookingApi {
 
   /// Leave a review for a completed visit.
   ///
-  /// [reservationReference] is the credential: customers have no accounts, so
-  /// holding the reference is what proves the visit happened. The server
+  /// [reservationReference] is the credential: an account is optional and
+  /// most customers will not have one, so holding the reference is what
+  /// proves the visit happened. The server
   /// rejects anything not completed, not at this venue, or already reviewed.
   Future<Review> createReview({
     required int establishmentId,

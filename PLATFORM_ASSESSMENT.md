@@ -9,7 +9,13 @@ checked against code that was read or a command that was run in this session —
 where something was verified by execution, the evidence is quoted.
 
 It supersedes `PROJECT_STATUS.md`, which is dated 2 August and is now
-materially wrong (see §2).
+materially wrong (see §2). That file has since been reduced to a pointer here.
+
+> **Updated 13 August 2026.** Slices 23–26 of
+> [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) have since been built, so
+> four of the defects below are fixed. Each is marked **✅ Fixed** in place
+> rather than deleted — a fixed defect is worth keeping visible, because the
+> next one of its kind usually rhymes. §1 and §12 carry current numbers.
 
 **Legend**
 
@@ -31,8 +37,10 @@ credentials rather than on engineering. The reservation spine, the kitchen, the
 merchant back office and the customer journey are all built, tested and running.
 
 What stands between this and a Conakry pilot is no longer code the team has to
-design. It is: an Orange Money sandbox, an SMS aggregator contract, a Firebase
-project, and one red test.
+design. It is: an Orange Money sandbox, an MTN sandbox, an SMS aggregator
+contract, and a Firebase project — four things nobody in this repository can
+grant. (The original audit added "and one red test" to that list; Slice 23
+removed it.)
 
 **Measured this session**
 
@@ -43,14 +51,16 @@ project, and one red test.
 | Dart tests | 12,884 lines |
 | Django models | 16 |
 | API routes | 61 |
-| Backend tests | **786 pass**, 1 skipped |
-| `shared_client` tests | **117 pass** |
-| Customer app tests | **248 pass** |
-| Merchant app tests | **276 pass, 1 fail** ← see §7.1 |
-| Localisation keys | 392 customer / 513 merchant, EN + FR |
+| Backend tests | 786 → **804 pass**, 1 skipped |
+| `shared_client` tests | 117 → **134 pass** |
+| Customer app tests | 248 → **251 pass** |
+| Merchant app tests | 276 pass + 1 fail → **282 pass** |
+| Localisation keys | 263 customer / 318 merchant, EN and FR complete |
 | TODO / FIXME / HACK markers | **0** |
 
-Total: **1,428 automated tests** (786 + 117 + 248 + 277), one of them failing.
+Total: **1,471 automated tests, none failing** (804 + 134 + 251 + 282). At the
+time of the original audit this was 1,428 with one failure — see §7.1 for what
+that one was, and why a single red test mattered more than its size suggests.
 
 ---
 
@@ -77,6 +87,10 @@ Still open from that list: **real payment providers** and **merchant analytics**
 
 **Recommendation:** replace `PROJECT_STATUS.md` with this file, or reduce it to
 a pointer. Two status documents that disagree is worse than one that is late.
+
+> ✅ **Done in Slice 26.** `PROJECT_STATUS.md` is now a pointer here, and the
+> README's "Current state" — which still described a build with no merchant
+> auth, no payments app and no Flutter apps — points here too.
 
 ---
 
@@ -175,7 +189,7 @@ the `.po`.
 | Password reset by SMS or email | 🟡 | Codes real, delivery is console |
 | Write a review | ✅ | Server checks the visit happened |
 | Get directions | ✅ | Hands off to a maps app |
-| EN / FR toggle | ✅ | 392 keys |
+| EN / FR toggle | ✅ | 263 keys |
 | Per-venue branding | ✅ | Scoped to venue screens |
 
 **Absent:** push notifications (§7.3), offline cache, deep links, receipt or
@@ -204,7 +218,7 @@ invoice export, map view of results.
 | Staff add / re-role / remove | ✅ | Owner only; server refuses to orphan a venue |
 | Pagination on desk and queue | ✅ | |
 | Role gating throughout | ✅ | Entries a role cannot use are absent, not refused |
-| EN / FR toggle | ✅ | 513 keys |
+| EN / FR toggle | ✅ | 318 keys |
 
 **Absent:** analytics beyond payments, printed kitchen tickets, shift
 scheduling, export of anything, push alerts for new bookings.
@@ -231,7 +245,14 @@ scheduling, export of anything, push alerts for new bookings.
 
 Ordered by consequence. Each was reproduced.
 
-### 7.1 A test that fails for nineteen hours of every day ⛔ *fix first*
+### 7.1 A test that fails for nineteen hours of every day — ✅ Fixed (Slice 23)
+
+> Fixtures now take an explicit time and default to a *state* rather than an
+> hour. Two tests pin the rule itself, one per state, so it holds at any hour.
+> CI runs the Flutter jobs in `TZ=Pacific/Kiritimati`. The sweep found the
+> identical fixture in the customer app, which had not failed yet but described
+> an upcoming booking in the morning and a past one in the evening.
+
 
 `apps/merchant_app/test/widget_test.dart:5721` — *"staff can still work the
 day"* — expects a **Mark arrived** button and finds none:
@@ -264,7 +285,15 @@ repo has met this class of bug before; commit `Stop the queue pagination tests
 failing after 23:30 in Conakry` fixed the same shape elsewhere. Worth a sweep
 for other fixed-hour fixtures.
 
-### 7.2 No request timeouts anywhere in the Dart client 🟡
+### 7.2 No request timeouts anywhere in the Dart client — ✅ Fixed (Slice 24)
+
+> 15s reads, 30s writes. Reads retry twice with backoff; writes never retry,
+> because a write that timed out may already have been acted on. A timeout is
+> its own exception but a *subclass* of the unreachable one, so all 61 existing
+> catch sites kept working untouched. The wording is now localised: it had
+> always been hardcoded English, so French users saw English on every network
+> failure.
+
 
 `grep '\.timeout('` across `shared_client/lib`, `customer_app/lib` and
 `merchant_app/lib` returns **nothing**. `package:http` has no default timeout,
@@ -291,7 +320,15 @@ by pulling to refresh.
 
 Blocked on a Firebase project, but note the backend is ready and waiting.
 
-### 7.4 Docstrings that contradict shipped features 🟡
+### 7.4 Docstrings that contradict shipped features — ✅ Fixed (Slice 26)
+
+> Both corrected. Worth noting what the fix actually was on the first one: the
+> *mechanism* it described was still true — that list really does read local
+> references, deliberately, because a reference is the credential and the list
+> must work signed out. Only its stated *reason* ("there are no customer
+> accounts yet") had gone false. Rewriting it to say the screen reads the
+> account would have replaced a stale comment with a wrong one.
+
 
 - `customer_app/lib/src/screens/my_bookings_screen.dart` — *"There are no
   customer accounts yet, so the ids come from local storage"*. Accounts shipped
@@ -302,7 +339,14 @@ Blocked on a Firebase project, but note the backend is ready and waiting.
 In a codebase this well commented, a comment is treated as true. These two are
 not, and they sit on the customer app's two most-edited screens.
 
-### 7.5 No image resizing or thumbnails 🟡
+### 7.5 No image resizing or thumbnails — ✅ Fixed (Slice 25)
+
+> Every upload now yields a 400px card copy and a 1200px detail copy, and an
+> original over 2000px is shrunk in place. Measured on the seeded database the
+> browse list went from 697KB to 84KB (8.3×); on a real 12MP phone photograph,
+> 7.7MB uploaded becomes 435KB stored and 9KB in a card. Fields are additive,
+> so an installed build that never heard of a thumbnail still works.
+
 
 Uploads are stored and served at original resolution — no thumbnailing in
 `establishments/models.py` or the serializers. The browse list requests a
@@ -380,9 +424,9 @@ Ordered by value per unit of effort.
 
 1. **Tune the throttle rates.** They were set loose on purpose and explicitly
    deferred until throttle-hit metrics existed. Slice 20 built those metrics.
-   This is now unblocked and is a config change.
-2. **Timeouts + retry in `SylibookingApi`** (§7.2). Small, central, high impact.
-3. **Serve resized images** (§7.5). One dependency and an upload hook.
+   This is now unblocked and is a config change. *(Slice 28, next.)*
+2. ~~**Timeouts + retry in `SylibookingApi`**~~ — ✅ done, Slice 24.
+3. ~~**Serve resized images**~~ — ✅ done, Slice 25.
 4. **Merchant analytics.** The highest-value *new* merchant feature, and every
    number it needs is already in the database. Covers per night and no-show rate
    are queries, not new plumbing.
@@ -443,14 +487,14 @@ cannot be recovered; they were left untouched rather than reset.
 
 | Risk | Severity | Note |
 |---|---|---|
-| CI red most of the day (§7.1) | **High** | Erodes trust in the pipeline; masks the next real failure |
 | No payment provider | **High** | Blocked externally; the pilot cannot take money |
-| No request timeouts (§7.2) | **Medium** | Presents as "the app is frozen" on exactly the network this market has |
 | Push undelivered (§7.3) | **Medium** | Merchants must remember to refresh |
-| Two disagreeing status docs (§2) | **Medium** | Already caused stale planning |
-| Image weight (§7.5) | **Medium** | First impression of the customer app on mobile data |
-| Throttle rates unproven | **Low** | Loose by design; metrics now exist to tighten them |
-| `main` diverged from `dev` | **Low** | 113 behind, 2 ahead — reconcile before the next promotion |
+| `main` diverged from `dev` | **Medium** | 113 behind, 2 ahead — reconcile before the next promotion (Slice 27) |
+| Throttle rates unproven | **Low** | Loose by design; metrics now exist to tighten them (Slice 28) |
+| ~~CI red most of the day (§7.1)~~ | ✅ | Fixed, Slice 23 |
+| ~~No request timeouts (§7.2)~~ | ✅ | Fixed, Slice 24 |
+| ~~Image weight (§7.5)~~ | ✅ | Fixed, Slice 25 |
+| ~~Two disagreeing status docs (§2)~~ | ✅ | Fixed, Slice 26 |
 
 ---
 
@@ -464,10 +508,16 @@ real work, and the test suite grew with it rather than after it.
 
 The quality signals are good and not superficial: zero TODO markers in 40,000
 lines, comments that explain *why* rather than *what*, business rules that state
-their own reversibility, and 1,428 tests concentrated on the logic that would
+their own reversibility, and 1,471 tests concentrated on the logic that would
 hurt most if it broke.
 
-The distance to a pilot is now four external dependencies and one red test — not
-a backlog. The most useful engineering work available today is the unglamorous
-kind: fix the clock-dependent test, put timeouts on the network layer, shrink
-the images, and give merchants numbers about their own business.
+The distance to a pilot was four external dependencies and one red test — not a
+backlog. **The red test is gone, and so is the unglamorous work that stood next
+to it**: the network layer no longer hangs, the browse list no longer ships
+full-resolution photographs, and no document here contradicts the code.
+
+What remains is genuinely four pieces of paperwork — an Orange Money sandbox,
+an MTN sandbox, an SMS aggregator, a Firebase project — and one merchant
+feature nobody is blocked on: giving a venue the numbers about its own
+business. Every one of those four has its adapter written and tested against a
+stub, which is the useful place to be while waiting on someone else.

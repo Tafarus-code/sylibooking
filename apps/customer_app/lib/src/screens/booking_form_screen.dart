@@ -6,7 +6,11 @@ import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
 import 'booking_confirmed_screen.dart';
 
-/// Name, phone, confirm. Payment is on arrival in the MVP.
+/// Name, phone, how it is paid, confirm.
+///
+/// Cash on arrival is the default and always available. Mobile money is
+/// offered where the venue takes a deposit, and the deposit is spelled out in
+/// words before anyone commits to it rather than after.
 class BookingFormScreen extends StatefulWidget {
   const BookingFormScreen({
     super.key,

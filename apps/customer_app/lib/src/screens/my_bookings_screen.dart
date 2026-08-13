@@ -9,8 +9,14 @@ import 'write_review_screen.dart';
 
 /// Bookings made on this device, re-read from the server so the status is live.
 ///
-/// There are no customer accounts yet, so the ids come from local storage and
-/// each is fetched by id. A booking made on another phone will not appear here.
+/// The references come from local storage rather than from an account, and
+/// deliberately: a reference is the credential, so this list works signed out,
+/// which is how most of this market will use the app.
+///
+/// Accounts do exist. Signing in claims whatever is on this phone into the
+/// account — see `CustomerAuth._adoptWhatIsOnThisPhone` — so the history
+/// survives a lost phone. This screen still reads the device's own list, so a
+/// booking made on another phone appears here only once it has been claimed.
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({
     super.key,

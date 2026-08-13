@@ -65,7 +65,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   static const _openNowFilter = 'open-now';
   static const _nearestFilter = 'nearest';
 
-  /// From the last booking on this device; there are no customer accounts.
+  /// From the last booking on this device, so the greeting knows a name
+  /// without requiring an account — most customers here will never make one.
   String? _customerName;
 
   /// Cover photo per venue, fetched lazily so the list is not blocked on it.

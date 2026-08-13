@@ -1,6 +1,6 @@
 """Reviews and photos: who may post one, and what the public sees.
 
-Customers have no accounts, so the reservation reference issued at booking is
+A customer account is optional, so the reservation reference issued at booking is
 what proves someone actually visited. Merchants use their token. Both paths end
 up in the same two endpoints.
 """
@@ -106,8 +106,9 @@ class ReviewCreateSerializer(serializers.Serializer):
     reservation_reference = serializers.UUIDField(
         write_only=True,
         help_text=(
-            'The reference issued when the booking was made. Customers have '
-            'no accounts, so this is what proves the visit happened.'
+            'The reference issued when the booking was made. A customer may '
+            'have no account, or have one and not be signed in, so this is '
+            'what proves the visit happened.'
         ),
     )
     rating = serializers.IntegerField(min_value=1, max_value=5)

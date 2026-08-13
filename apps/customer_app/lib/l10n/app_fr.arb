@@ -32,6 +32,8 @@
   "typeAndCity": "{type} · {city}",
   "couldNotLoadPlaces": "Impossible de charger les établissements",
   "tryAgain": "Réessayer",
+  "connectionSlow": "La connexion est lente. Nous essayons toujours.",
+  "connectionFailed": "Impossible de joindre le serveur. Vérifiez votre connexion.",
   "nothingFound": "Aucun résultat",
   "nothingFoundDetail": "Essayez un autre nom, ou retirez les filtres.",
   "nothingOpenRightNow": "Rien n'est ouvert en ce moment. Retirez « Ouvert » pour voir les établissements où réserver plus tard.",

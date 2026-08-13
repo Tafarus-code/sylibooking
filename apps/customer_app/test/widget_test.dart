@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:customer_app/src/app.dart';
@@ -21,12 +22,24 @@ class FakeBackend {
   final Map<String, ({int status, Object? body})> routes = {};
   final List<http.Request> requests = [];
 
+  /// Paths that never answer, for the tests about a stalled connection.
+  ///
+  /// A stall is not a refusal: the request goes out and nothing comes back,
+  /// which is what a weak mobile signal does and what a 404 does not.
+  final Set<String> stalling = {};
+
+  /// Stop stalling, so a retry can be shown to succeed.
+  void recover() => stalling.clear();
+
   void on(String method, String path, Object? body, {int status = 200}) {
     routes['$method $path'] = (status: status, body: body);
   }
 
   http.Client get client => MockClient((request) async {
         requests.add(request);
+        if (stalling.contains(request.url.path)) {
+          return Completer<http.Response>().future;
+        }
         final route = routes['${request.method} ${request.url.path}'];
         if (route == null) {
           return http.Response(jsonEncode({'detail': 'not found'}), 404,
@@ -313,6 +326,11 @@ const landscapePhoneSize = Size(900, 360);
 
   /// A language already chosen on this phone.
   LocaleStore? localeStore,
+
+  /// Short deadlines, for the tests about a network that stalls. The real
+  /// defaults are seconds long, which a test should never sit through.
+  Duration readTimeout = const Duration(seconds: 15),
+  int readRetries = 2,
 }) {
   // The default 800x600 test surface is shorter than any phone, which pushes
   // the bottom of the booking form out of the tree entirely. Use a realistic
@@ -331,6 +349,8 @@ const landscapePhoneSize = Size(900, 360);
       api: SylibookingApi(
         baseUrl: 'http://localhost:8000/api',
         httpClient: backend.client,
+        readTimeout: readTimeout,
+        readRetries: readRetries,
       ),
       store: store,
       tokenStore: InMemoryCustomerTokenStore(storedToken),
@@ -2574,6 +2594,85 @@ void main() {
 
       expect(find.text('Could not load places'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+    });
+  });
+
+  group('a connection that stalls rather than fails', () {
+    // Retries are switched off in these: the automatic retry is covered in
+    // shared_client, and what matters here is what the customer is told and
+    // what they can do about it.
+    ({Widget app, FakeBackend backend, InMemoryBookingStore store}) stalled(
+      WidgetTester tester, {
+      LocaleStore? localeStore,
+    }) {
+      final built = buildApp(
+        tester,
+        readTimeout: const Duration(milliseconds: 20),
+        readRetries: 0,
+        localeStore: localeStore,
+      );
+      built.backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      built.backend.stalling.add('/api/establishments/');
+      return built;
+    }
+
+    testWidgets('says the connection is slow, not that it failed',
+        (tester) async {
+      // A stall is the ordinary case on a mobile network here, and the
+      // request may well still be travelling. Telling someone their
+      // connection failed invites them to redo something already in flight.
+      final (:app, :backend, :store) = stalled(tester);
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('The connection is slow. We are still trying.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Could not reach the server. Check your connection.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('and the retry loads the venues once the network returns',
+        (tester) async {
+      final (:app, :backend, :store) = stalled(tester);
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      expect(find.text('Try again'), findsOneWidget);
+
+      backend.recover();
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le Petit Baobab'), findsWidgets);
+      expect(find.text('Try again'), findsNothing);
+    });
+
+    testWidgets('and says it in French when the app is in French',
+        (tester) async {
+      // The client writes this sentence itself, so it is the one message in
+      // the app that cannot come back translated from the server. This is
+      // the test that the app hands its catalogue down to the client.
+      final (:app, :backend, :store) = stalled(
+        tester,
+        localeStore: InMemoryLocaleStore('fr'),
+      );
+
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('La connexion est lente. Nous essayons toujours.'),
+        findsOneWidget,
+      );
     });
   });
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -57,17 +58,70 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
+/// What to say when the network is at fault, in the reader's language.
+///
+/// These two sentences are the only ones the client produces itself —
+/// everything else a user reads comes from the API, which already answers in
+/// the right language. A transport failure never reaches the server, so there
+/// is nobody to translate it but the app.
+///
+/// Supplied by whoever builds the client rather than read from a catalogue
+/// here: `shared_client` is used by two apps with two catalogues, and it has
+/// no business knowing about either.
+class ApiNetworkText {
+  const ApiNetworkText({required this.slow, required this.unreachable});
+
+  /// Answered too late, or not yet — the request may still be travelling.
+  final String slow;
+
+  /// Never got there at all.
+  final String unreachable;
+}
+
 /// Thrown when the API cannot be reached at all.
 class ApiUnreachableException implements Exception {
-  ApiUnreachableException(this.cause);
+  ApiUnreachableException(this.cause, {String? message}) : _message = message;
 
   final Object cause;
 
+  /// Localised wording, when the client was given any. English otherwise, so
+  /// a caller that never sets it behaves exactly as it did before.
+  final String? _message;
+
   String get message =>
+      _message ??
       'Could not reach the server. Check the connection and the API address.';
 
   @override
   String toString() => 'ApiUnreachableException: $cause';
+}
+
+/// The request was not refused — it was never answered in time.
+///
+/// A subclass rather than a sibling, deliberately: every screen that already
+/// handles "cannot reach the server" keeps working unchanged, and only the
+/// screens that want to say something softer have to know this exists.
+///
+/// The distinction is worth drawing at all because the two mean different
+/// things to the person holding the phone. Unreachable is usually the address
+/// or an aeroplane-mode kind of gone. A timeout on a Conakry mobile network is
+/// the ordinary case — the request may well still be travelling — and telling
+/// someone their connection failed when it is merely slow invites them to
+/// retry something that is already in flight.
+class ApiTimeoutException extends ApiUnreachableException {
+  ApiTimeoutException(super.cause, this.limit, {super.message});
+
+  /// How long was waited before giving up.
+  final Duration limit;
+
+  @override
+  String get message =>
+      _message ??
+      'The server is taking longer than usual to answer. It may just be a '
+      'slow connection.';
+
+  @override
+  String toString() => 'ApiTimeoutException after $limit: $cause';
 }
 
 /// HTTP client for the Sylibooking API, shared by both apps.
@@ -75,12 +129,47 @@ class ApiUnreachableException implements Exception {
 /// Holds an auth token once [login] succeeds, or accepts a stored one via
 /// [token] so a returning user is not asked to sign in again.
 class SylibookingApi {
-  SylibookingApi({required this.baseUrl, http.Client? httpClient, this.token})
-      : _http = httpClient ?? http.Client();
+  SylibookingApi({
+    required this.baseUrl,
+    http.Client? httpClient,
+    this.token,
+    this.readTimeout = const Duration(seconds: 15),
+    this.writeTimeout = const Duration(seconds: 30),
+    this.readRetries = 2,
+    Future<void> Function(Duration)? delay,
+  })  : _http = httpClient ?? http.Client(),
+        _delay = delay ?? _sleep;
+
+  static Future<void> _sleep(Duration d) => Future<void>.delayed(d);
 
   /// Root of the API, e.g. `http://10.0.2.2:8000/api`. No trailing slash.
   final String baseUrl;
   final http.Client _http;
+
+  /// How long a read may take before it is treated as a timeout.
+  ///
+  /// `package:http` has no timeout of its own, so without this a stalled
+  /// connection — the usual failure here, rather than a clean refusal —
+  /// leaves a spinner turning for as long as the app is open.
+  final Duration readTimeout;
+
+  /// Longer than [readTimeout], because a write can legitimately take longer:
+  /// initiating a mobile money payment waits on a provider, where listing
+  /// venues waits on a database.
+  final Duration writeTimeout;
+
+  /// How many times a read is retried after the first attempt fails.
+  ///
+  /// Reads only. See [_send] for why writes are never retried.
+  final int readRetries;
+
+  /// Injected so tests can assert the backoff without waiting through it.
+  final Future<void> Function(Duration) _delay;
+
+  /// Doubling from 400ms: long enough for a blip to pass, short enough that
+  /// three attempts still fit inside someone's patience.
+  Duration _backoff(int attempt) =>
+      Duration(milliseconds: 400 * (1 << (attempt - 1)));
 
   String? token;
 
@@ -90,6 +179,12 @@ class SylibookingApi {
   /// server reads as English — so a client that never sets this behaves
   /// exactly as it did before the API learned any French.
   String? languageCode;
+
+  /// The two sentences the client has to write for itself, localised.
+  ///
+  /// Set alongside [languageCode] — same lifetime, same reason. Null keeps the
+  /// English defaults on the exceptions.
+  ApiNetworkText? networkText;
 
   bool get isAuthenticated => token != null && token!.isNotEmpty;
 
@@ -106,14 +201,51 @@ class SylibookingApi {
         '$baseUrl$path',
       ).replace(queryParameters: query?.isEmpty ?? true ? null : query);
 
-  Future<dynamic> _send(Future<http.Response> Function() request) async {
-    final http.Response response;
-    try {
-      response = await request();
-    } on Object catch (error) {
-      throw ApiUnreachableException(error);
+  /// Perform a request, with a deadline and — for reads only — a retry.
+  ///
+  /// **Reads are retried. Writes are never retried, and must not be.**
+  ///
+  /// A GET that fails is worth trying again: nothing changed on the server, so
+  /// the worst case is a wasted request. A POST is the opposite. When a write
+  /// times out, the request may already have reached the server and been
+  /// acted on — the answer is what went missing, not the work. Retrying it
+  /// books the table twice, or charges the deposit twice, and the customer
+  /// discovers which on arrival.
+  ///
+  /// That is why this takes [idempotent] from the caller rather than
+  /// inspecting the HTTP verb: the decision belongs to whoever knows what the
+  /// call does. If a future change makes writes retryable, it needs an
+  /// idempotency key travelling with the request and agreed with the server —
+  /// not a wider condition here.
+  Future<dynamic> _send(
+    Future<http.Response> Function() request, {
+    bool idempotent = false,
+  }) async {
+    final timeout = idempotent ? readTimeout : writeTimeout;
+    final attempts = idempotent ? readRetries + 1 : 1;
+
+    http.Response? response;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        response = await request().timeout(timeout);
+        break;
+      } on Object catch (error) {
+        final failure = error is TimeoutException
+            ? ApiTimeoutException(error, timeout,
+                message: networkText?.slow)
+            : ApiUnreachableException(error,
+                message: networkText?.unreachable);
+        if (attempt == attempts) throw failure;
+        await _delay(_backoff(attempt));
+      }
     }
 
+    // Decoding sits outside the retry: a 400 is the server answering, not the
+    // network failing, and asking again would get the same refusal.
+    return _decode(response!);
+  }
+
+  dynamic _decode(http.Response response) {
     if (response.statusCode == 204 || response.body.isEmpty) {
       if (response.statusCode >= 400) {
         throw ApiException(response.statusCode, const {});
@@ -142,8 +274,10 @@ class SylibookingApi {
     return decoded;
   }
 
-  Future<dynamic> _get(String path, [Map<String, String>? query]) =>
-      _send(() => _http.get(_uri(path, query), headers: _headers));
+  Future<dynamic> _get(String path, [Map<String, String>? query]) => _send(
+        () => _http.get(_uri(path, query), headers: _headers),
+        idempotent: true,
+      );
 
   Future<dynamic> _post(String path, [Map<String, dynamic>? body]) => _send(
         () => _http.post(

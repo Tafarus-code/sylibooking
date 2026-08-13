@@ -110,7 +110,8 @@ class FeaturedItem {
     this.description = '',
     this.imageUrl,
     this.city = '',
-  });
+    String? thumbnailUrl,
+  }) : _thumbnailUrl = thumbnailUrl;
 
   final int id;
   final String name;
@@ -120,6 +121,12 @@ class FeaturedItem {
   /// the server sent it, like every other price in these apps.
   final String price;
   final String? imageUrl;
+
+  final String? _thumbnailUrl;
+
+  /// Every row in this feed is a photograph, which makes it the most
+  /// image-heavy screen in the product and the one that gains most here.
+  String? get thumbnailUrl => _thumbnailUrl ?? imageUrl;
 
   final int establishmentId;
   final String establishmentName;
@@ -131,6 +138,7 @@ class FeaturedItem {
         description: json['description'] as String? ?? '',
         price: json['price'] as String? ?? '',
         imageUrl: json['image'] as String?,
+        thumbnailUrl: json['thumbnail'] as String?,
         establishmentId: json['establishment'] as int,
         establishmentName: json['establishment_name'] as String? ?? '',
         city: json['city'] as String? ?? '',

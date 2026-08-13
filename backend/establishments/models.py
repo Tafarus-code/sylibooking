@@ -26,6 +26,39 @@ def menu_item_upload_path(instance, filename):
     return _scattered_upload_path('menu', instance.establishment_id, filename)
 
 
+def derivative_upload_path(instance, filename):
+    """Derivatives arrive with their path already decided.
+
+    `images.derivative_name` builds it from the original's, so the small
+    copies sit beside the picture they came from. This exists only to stop
+    `upload_to` scattering them somewhere else.
+    """
+    return filename
+
+
+def _write_image_copies(instance):
+    """Cap the stored original and build its small copies, after a save.
+
+    After rather than before, because a derivative is named from the
+    original's stored path — which Django only decides while writing it. On
+    the first save of a new upload the name is still whatever the phone called
+    the file.
+
+    Anything written goes back with `update_fields`, so this costs one narrow
+    UPDATE and never a second full write. A row whose copies already exist
+    does nothing at all, which is what makes it safe on every save.
+    """
+    # Imported here rather than at module scope: images.py pulls in Pillow,
+    # and models.py is imported by everything.
+    from .images import build_derivatives, cap_original
+
+    cap_original(instance)
+    written = build_derivatives(instance)
+    if written:
+        # A plain save() would recurse through this function.
+        models.Model.save(instance, update_fields=written)
+
+
 class Establishment(models.Model):
     """A venue that takes reservations — a hookah lounge or a restaurant.
 
@@ -265,6 +298,21 @@ class MenuItem(models.Model):
         ],
         help_text='Optional. Most items will not have one, especially at first.',
     )
+    # Built on save from `image`. Empty is a normal state, not a missing one:
+    # a picture already smaller than the derivative gets none, and the
+    # serializers fall back to the original. See establishments/images.py.
+    thumbnail = models.ImageField(
+        upload_to=derivative_upload_path,
+        blank=True,
+        null=True,
+        help_text='Card-sized copy, generated. Empty means use the original.',
+    )
+    detail = models.ImageField(
+        upload_to=derivative_upload_path,
+        blank=True,
+        null=True,
+        help_text='Detail-sized copy, generated. Empty means use the original.',
+    )
     is_available = models.BooleanField(
         default=True,
         help_text='Unavailable items are hidden from customers, not deleted.',
@@ -282,6 +330,10 @@ class MenuItem(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.get_category_display()}) — {self.price}'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        _write_image_copies(self)
 
 
 class MerchantMembership(models.Model):
@@ -485,6 +537,20 @@ class Photo(models.Model):
             )
         ],
     )
+    # As on MenuItem: generated on save, empty when the original is already
+    # small enough. See establishments/images.py.
+    thumbnail = models.ImageField(
+        upload_to=derivative_upload_path,
+        blank=True,
+        null=True,
+        help_text='Card-sized copy, generated. Empty means use the original.',
+    )
+    detail = models.ImageField(
+        upload_to=derivative_upload_path,
+        blank=True,
+        null=True,
+        help_text='Detail-sized copy, generated. Empty means use the original.',
+    )
     caption = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_hidden = models.BooleanField(
@@ -503,6 +569,10 @@ class Photo(models.Model):
             f'{self.get_uploaded_by_role_display()} photo of '
             f'{self.establishment.name}'
         )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        _write_image_copies(self)
 
 
 class Space(models.Model):

@@ -161,7 +161,8 @@ class MenuItem {
     required this.price,
     this.description = '',
     this.imageUrl,
-  });
+    String? thumbnailUrl,
+  }) : _thumbnailUrl = thumbnailUrl;
 
   final int id;
   final String name;
@@ -173,12 +174,19 @@ class MenuItem {
   /// Null for most items; a picture is optional.
   final String? imageUrl;
 
+  final String? _thumbnailUrl;
+
+  /// What a menu row should fetch: the small copy when there is one, the
+  /// original otherwise. Null only when the item has no picture at all.
+  String? get thumbnailUrl => _thumbnailUrl ?? imageUrl;
+
   factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
         id: json['id'] as int,
         name: json['name'] as String? ?? '',
         description: json['description'] as String? ?? '',
         price: '${json['price'] ?? ''}',
         imageUrl: json['image'] as String?,
+        thumbnailUrl: json['thumbnail'] as String?,
       );
 }
 
@@ -376,7 +384,8 @@ class MerchantMenuItem {
     required this.isAvailable,
     this.description = '',
     this.imageUrl,
-  });
+    String? thumbnailUrl,
+  }) : _thumbnailUrl = thumbnailUrl;
 
   final int id;
   final String name;
@@ -389,6 +398,12 @@ class MerchantMenuItem {
 
   /// Null for most items — a picture is optional.
   final String? imageUrl;
+
+  final String? _thumbnailUrl;
+
+  /// What the menu list should fetch. The merchant's own list is as long as
+  /// the customer's and read on the same phone.
+  String? get thumbnailUrl => _thumbnailUrl ?? imageUrl;
 
   String get categoryDisplay => switch (category) {
         'food' => 'Food',
@@ -405,6 +420,7 @@ class MerchantMenuItem {
         price: price,
         isAvailable: isAvailable ?? this.isAvailable,
         imageUrl: imageUrl,
+        thumbnailUrl: _thumbnailUrl,
       );
 
   factory MerchantMenuItem.fromJson(Map<String, dynamic> json) =>
@@ -416,6 +432,7 @@ class MerchantMenuItem {
         price: '${json['price'] ?? ''}',
         isAvailable: json['is_available'] as bool? ?? true,
         imageUrl: json['image_url'] as String?,
+        thumbnailUrl: json['thumbnail_url'] as String?,
       );
 }
 
@@ -480,10 +497,25 @@ class Photo {
     required this.uploadedByRole,
     required this.uploadedByRoleDisplay,
     this.caption = '',
-  });
+    String? thumbnailUrl,
+    String? detailUrl,
+  })  : _thumbnailUrl = thumbnailUrl,
+        _detailUrl = detailUrl;
 
   final int id;
+
+  /// The photograph at full size. What the viewer shows, and nothing else.
   final String imageUrl;
+
+  final String? _thumbnailUrl;
+  final String? _detailUrl;
+
+  /// For a card or a strip. Falls back to the original, which is what a
+  /// server too old to send one is already serving.
+  String get thumbnailUrl => _thumbnailUrl ?? imageUrl;
+
+  /// For a venue header.
+  String get detailUrl => _detailUrl ?? imageUrl;
 
   /// `customer` or `merchant` — a venue's own photo is not a guest snapshot.
   final String uploadedByRole;
@@ -495,6 +527,8 @@ class Photo {
   factory Photo.fromJson(Map<String, dynamic> json) => Photo(
         id: json['id'] as int,
         imageUrl: json['image'] as String? ?? '',
+        thumbnailUrl: json['thumbnail'] as String?,
+        detailUrl: json['detail'] as String?,
         uploadedByRole: json['uploaded_by_role'] as String? ?? '',
         uploadedByRoleDisplay:
             json['uploaded_by_role_display'] as String? ?? '',

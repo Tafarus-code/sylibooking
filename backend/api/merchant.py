@@ -14,6 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from establishments.images import copy_url
 from establishments.models import (
     Establishment,
     MenuItem,
@@ -131,6 +132,9 @@ class MenuItemWriteSerializer(serializers.ModelSerializer):
         validators=[validate_photo_file],
     )
     image_url = serializers.SerializerMethodField()
+    # The merchant's own menu list is as long as the customer's and read on
+    # the same kind of phone, so it gets the small copy too.
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
@@ -143,19 +147,16 @@ class MenuItemWriteSerializer(serializers.ModelSerializer):
             'is_available',
             'image',
             'image_url',
+            'thumbnail_url',
         ]
-        read_only_fields = ['id', 'image_url']
+        read_only_fields = ['id', 'image_url', 'thumbnail_url']
         extra_kwargs = {'image': {'write_only': True}}
 
     def get_image_url(self, item):
-        if not item.image:
-            return None
-        request = self.context.get('request')
-        return (
-            request.build_absolute_uri(item.image.url)
-            if request
-            else item.image.url
-        )
+        return copy_url(item, 'image', self.context.get('request'))
+
+    def get_thumbnail_url(self, item):
+        return copy_url(item, 'thumbnail', self.context.get('request'))
 
 
 class MembershipSerializer(serializers.ModelSerializer):

@@ -340,7 +340,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           PopupMenuItem(
                             value: 'image',
                             child: Text(
-                              item.imageUrl == null
+                              item.thumbnailUrl == null
                                   ? l.addAPicture
                                   : l.replacePicture,
                             ),
@@ -371,7 +371,7 @@ class _Thumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final url = item.imageUrl;
+    final url = item.thumbnailUrl;
 
     return InkWell(
       onTap: onTap,

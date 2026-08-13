@@ -90,7 +90,7 @@ class _PhotoThumb extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               Image.network(
-                photo.imageUrl,
+                photo.thumbnailUrl,
                 fit: BoxFit.cover,
                 // A photo that will not load must not blow up the strip.
                 errorBuilder: (context, _, _) => Container(

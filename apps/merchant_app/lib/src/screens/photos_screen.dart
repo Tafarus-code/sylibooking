@@ -242,7 +242,7 @@ class _PhotoTile extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Image.network(
-            photo.imageUrl,
+            photo.thumbnailUrl,
             fit: BoxFit.cover,
             errorBuilder: (context, _, _) => Container(
               color: theme.colorScheme.surfaceContainerHighest,

@@ -9,6 +9,7 @@ from establishments.hours import (
     todays_hours,
     week_schedule,
 )
+from establishments.images import copy_url
 from establishments.models import Establishment, MenuItem, OpeningHours, Space
 from payments.models import Payment
 from payments.services import deposit_amount
@@ -68,22 +69,23 @@ class OpeningHoursSerializer(serializers.ModelSerializer):
 
 class MenuItemSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    # Additive: `image` still means the original, so a released build that
+    # has never heard of thumbnails keeps working exactly as it did.
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
-        fields = ['id', 'name', 'description', 'price', 'image']
+        fields = ['id', 'name', 'description', 'price', 'image', 'thumbnail']
         read_only_fields = fields
 
     def get_image(self, item):
         """Absolute, or null — most items will have none, especially early."""
-        if not item.image:
-            return None
-        request = self.context.get('request')
-        return (
-            request.build_absolute_uri(item.image.url)
-            if request
-            else item.image.url
-        )
+        return copy_url(item, 'image', self.context.get('request'))
+
+    def get_thumbnail(self, item):
+        """What a menu row should actually fetch. Never null when `image`
+        is not: it falls back to the original."""
+        return copy_url(item, 'thumbnail', self.context.get('request'))
 
 
 class MenuCategorySerializer(serializers.Serializer):

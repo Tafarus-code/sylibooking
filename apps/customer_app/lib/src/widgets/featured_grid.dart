@@ -99,10 +99,10 @@ class _DishCard extends StatelessWidget {
               flex: 4,
               child: SizedBox(
                 width: double.infinity,
-                child: item.imageUrl == null
+                child: item.thumbnailUrl == null
                     ? const _NoPhoto()
                     : Image.network(
-                        item.imageUrl!,
+                        item.thumbnailUrl!,
                         fit: BoxFit.cover,
                         // Most items have no photo and some URLs will be
                         // stale; a broken image must not take the card down.

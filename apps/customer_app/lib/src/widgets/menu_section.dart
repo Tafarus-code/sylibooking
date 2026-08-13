@@ -237,7 +237,7 @@ class _Picture extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final url = item.imageUrl;
+    final url = item.thumbnailUrl;
 
     Widget placeholder(IconData icon) => Container(
           color: theme.colorScheme.secondaryContainer,

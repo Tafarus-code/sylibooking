@@ -156,7 +156,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
     widget.api.photos(establishment.id).then((page) {
       if (!mounted || page.results.isEmpty) return;
-      setState(() => _covers[establishment.id] = page.results.first.imageUrl);
+      setState(() => _covers[establishment.id] = page.results.first.thumbnailUrl);
     }).catchError((Object _) {
       // No cover is a normal state, not an error worth showing.
     });

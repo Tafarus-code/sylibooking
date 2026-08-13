@@ -18,6 +18,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from establishments.images import copy_url
 from establishments.models import (
     Establishment,
     MerchantMembership,
@@ -44,6 +45,11 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class PhotoSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    # Three sizes, because this one payload feeds three very different
+    # surfaces: a browse card, a venue header, and the full-screen viewer
+    # where the photograph itself is what the customer came for.
+    thumbnail = serializers.SerializerMethodField()
+    detail = serializers.SerializerMethodField()
     uploaded_by_role_display = serializers.CharField(
         source='get_uploaded_by_role_display', read_only=True
     )
@@ -53,6 +59,8 @@ class PhotoSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'image',
+            'thumbnail',
+            'detail',
             'caption',
             'uploaded_by_role',
             'uploaded_by_role_display',
@@ -61,11 +69,13 @@ class PhotoSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_image(self, photo):
-        if not photo.image:
-            return None
-        request = self.context.get('request')
-        url = photo.image.url
-        return request.build_absolute_uri(url) if request else url
+        return copy_url(photo, 'image', self.context.get('request'))
+
+    def get_thumbnail(self, photo):
+        return copy_url(photo, 'thumbnail', self.context.get('request'))
+
+    def get_detail(self, photo):
+        return copy_url(photo, 'detail', self.context.get('request'))
 
 
 def validate_photo_file(uploaded):

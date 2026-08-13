@@ -19,6 +19,7 @@ from rest_framework import serializers
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
 
+from establishments.images import copy_url
 from establishments.models import MenuItem
 
 from .throttling import BrowseThrottle
@@ -26,6 +27,9 @@ from .throttling import BrowseThrottle
 
 class FeaturedItemSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    # The dishes feed is the most image-heavy screen in the product — every
+    # row is a photograph — so it is the one that gains most from the copy.
+    thumbnail = serializers.SerializerMethodField()
     establishment_name = serializers.CharField(
         source='establishment.name', read_only=True
     )
@@ -42,6 +46,7 @@ class FeaturedItemSerializer(serializers.ModelSerializer):
             'description',
             'price',
             'image',
+            'thumbnail',
             'category',
             'establishment',
             'establishment_name',
@@ -51,14 +56,10 @@ class FeaturedItemSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_image(self, item):
-        if not item.image:
-            return None
-        request = self.context.get('request')
-        return (
-            request.build_absolute_uri(item.image.url)
-            if request
-            else item.image.url
-        )
+        return copy_url(item, 'image', self.context.get('request'))
+
+    def get_thumbnail(self, item):
+        return copy_url(item, 'thumbnail', self.context.get('request'))
 
 
 class FeaturedItemsView(ListAPIView):

@@ -2208,6 +2208,30 @@ abstract class L {
   /// In en, this message translates to:
   /// **'of {count} bookings'**
   String ofBookings(int count);
+
+  /// No description provided for @printTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get printTicket;
+
+  /// No description provided for @ticketPrinted.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket sent to the printer.'**
+  String get ticketPrinted;
+
+  /// No description provided for @ticketPrintFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not print the ticket.'**
+  String get ticketPrintFailed;
+
+  /// No description provided for @reprintTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Print again'**
+  String get reprintTicket;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

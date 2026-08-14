@@ -10,6 +10,7 @@ import 'package:merchant_app/src/app.dart';
 import 'package:merchant_app/src/auth_controller.dart';
 import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
+import 'package:merchant_app/src/printing/ticket_printer.dart';
 import 'package:merchant_app/src/screens/orders_screen.dart';
 import 'package:merchant_app/src/screens/reservation_detail_screen.dart';
 import 'package:merchant_app/src/widgets/reservation_card.dart';
@@ -6204,6 +6205,126 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('a ticket the kitchen can hold', () {
+    /// Records what would have reached a printer.
+    ///
+    /// A fake rather than the console printer: what matters here is that the
+    /// button sends a ticket at all, and that a printer refusing it is said
+    /// out loud rather than swallowed.
+    Future<_SpyPrinter> openQueueWithPrinter(
+      WidgetTester tester, {
+      bool failing = false,
+    }) async {
+      final printer = _SpyPrinter(failing: failing);
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson()],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {
+        'results': [
+          {
+            'id': 1,
+            'reference': 'a1b2c3d4-1111-2222-3333-444444444444',
+            'establishment': 7,
+            'establishment_name': 'Le Petit Baobab',
+            'customer_name': 'Mariama Diallo',
+            'customer_phone': '+224 620 00 00 00',
+            'pickup_time': '2026-08-14T20:30:00Z',
+            'status': 'placed',
+            'status_display': 'Placed',
+            'items': [
+              {
+                'id': 1,
+                'menu_item': 3,
+                'menu_item_name': 'Poulet yassa',
+                'quantity': 2,
+                'unit_price_at_order': '75000.00',
+                'line_total': '150000.00',
+              },
+            ],
+            'total': '150000.00',
+          },
+        ],
+      });
+
+      await tester.pumpWidget(MerchantApp(
+        auth: auth,
+        localeStore: InMemoryLocaleStore(),
+        printer: printer,
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.local_fire_department_outlined));
+      await tester.pumpAndSettle();
+      return printer;
+    }
+
+    testWidgets('the queue offers a print button on a ticket', (tester) async {
+      await openQueueWithPrinter(tester);
+
+      expect(find.text('Print'), findsWidgets);
+    });
+
+    testWidgets('pressing it sends the ticket to the printer',
+        (tester) async {
+      final printer = await openQueueWithPrinter(tester);
+
+      await tester.tap(find.text('Print').first);
+      await tester.pumpAndSettle();
+
+      expect(printer.sent, hasLength(1));
+      final text = String.fromCharCodes(
+        printer.sent.single.where((b) => b == 0x0A || (b >= 0x20 && b < 0x7F)),
+      );
+      expect(text, contains('TICKET'));
+      expect(text, contains('Mariama Diallo'));
+    });
+
+    testWidgets('pressing it twice prints the very same ticket',
+        (tester) async {
+      // Losing a docket under a chopping board is the ordinary reason this
+      // button is pressed a second time.
+      final printer = await openQueueWithPrinter(tester);
+
+      await tester.tap(find.text('Print').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Print').first);
+      await tester.pumpAndSettle();
+
+      expect(printer.sent, hasLength(2));
+      expect(printer.sent.first, equals(printer.sent.last));
+    });
+
+    testWidgets('a printer that is not there says so', (tester) async {
+      // Mid-service, a silent failure means a dish nobody cooks.
+      await openQueueWithPrinter(tester, failing: true);
+
+      await tester.tap(find.text('Print').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not print the ticket.'), findsOneWidget);
+    });
+  });
+}
+
+/// A printer that records, or refuses.
+class _SpyPrinter implements TicketPrinter {
+  _SpyPrinter({this.failing = false});
+
+  final bool failing;
+  final List<List<int>> sent = [];
+
+  @override
+  Future<void> send(List<int> bytes) async {
+    if (failing) throw PrinterException('no printer');
+    sent.add(bytes);
+  }
 }
 
 bool _always(MerchantRole role) => true;

@@ -3,6 +3,7 @@ import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../printing/ticket_printer.dart';
 import '../image_source.dart';
 import 'manage_screen.dart';
 import 'orders_screen.dart';
@@ -17,10 +18,14 @@ class MerchantHomeScreen extends StatefulWidget {
     required this.auth,
     required this.imageSource,
     required this.localeController,
+    this.printer,
   });
 
   final AuthController auth;
   final ImageSource imageSource;
+
+  /// Handed to the kitchen queue; null means the console printer.
+  final TicketPrinter? printer;
   final LocaleController localeController;
 
   @override
@@ -88,7 +93,7 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
               presetKey: widget.auth.selectedVenue?.themePreset,
               child: Scaffold(
                 appBar: AppBar(title: Text(l.navKitchen)),
-                body: OrdersView(auth: widget.auth),
+                body: OrdersView(auth: widget.auth, printer: widget.printer),
               ),
             ),
           ),

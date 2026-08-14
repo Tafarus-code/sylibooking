@@ -1240,4 +1240,16 @@ class LEn extends L {
   String ofBookings(int count) {
     return 'of $count bookings';
   }
+
+  @override
+  String get printTicket => 'Print';
+
+  @override
+  String get ticketPrinted => 'Ticket sent to the printer.';
+
+  @override
+  String get ticketPrintFailed => 'Could not print the ticket.';
+
+  @override
+  String get reprintTicket => 'Print again';
 }

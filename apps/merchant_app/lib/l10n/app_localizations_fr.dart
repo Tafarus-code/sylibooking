@@ -1251,4 +1251,16 @@ class LFr extends L {
   String ofBookings(int count) {
     return 'sur $count réservations';
   }
+
+  @override
+  String get printTicket => 'Imprimer';
+
+  @override
+  String get ticketPrinted => 'Ticket envoyé à l\'imprimante.';
+
+  @override
+  String get ticketPrintFailed => 'Impossible d\'imprimer le ticket.';
+
+  @override
+  String get reprintTicket => 'Réimprimer';
 }

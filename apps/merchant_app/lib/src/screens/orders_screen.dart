@@ -4,6 +4,8 @@ import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../printing/kitchen_ticket.dart';
+import '../printing/ticket_printer.dart';
 import '../labels.dart';
 import 'walk_in_order_screen.dart';
 
@@ -13,9 +15,20 @@ import 'walk_in_order_screen.dart';
 /// waiting to be started, everything on, everything on the pass — and a single
 /// list ordered by time mixes all three together.
 class OrdersView extends StatefulWidget {
-  const OrdersView({super.key, required this.auth, this.reloadToken = 0});
+  const OrdersView({
+    super.key,
+    required this.auth,
+    this.reloadToken = 0,
+    this.printer,
+  });
 
   final AuthController auth;
+
+  /// Where a ticket goes. Injected so a test can read what was printed, and
+  /// so the day a venue owns a printer is a constructor argument rather than
+  /// a rewrite. Defaults to the console printer, which is what runs until
+  /// then — see printing/ticket_printer.dart.
+  final TicketPrinter? printer;
 
   /// Bumped by the desk's refresh button.
   final int reloadToken;
@@ -125,6 +138,34 @@ class _OrdersViewState extends State<OrdersView> {
       if (mounted) setState(() => _loadingMore = false);
     } on ApiUnreachableException {
       if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  late final TicketPrinter _printer = widget.printer ?? ConsoleTicketPrinter();
+
+  /// Send one ticket to the printer, again if it has been sent before.
+  ///
+  /// A reprint is byte-identical on purpose: a kitchen holding two dockets
+  /// for one order should find them the same. Losing a ticket is the ordinary
+  /// reason this button is pressed.
+  Future<void> _print(Order order) async {
+    final l = L.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final venue = widget.auth.selectedVenue?.name ?? order.establishmentName;
+
+    try {
+      await _printer.send(
+        KitchenTicket(order: order, venueName: venue).toBytes(),
+      );
+      if (!mounted) return;
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(l.ticketPrinted)));
+    } on PrinterException {
+      if (!mounted) return;
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(l.ticketPrintFailed)));
     }
   }
 
@@ -278,6 +319,7 @@ class _OrdersViewState extends State<OrdersView> {
             order: order,
             busy: _busyId == order.id,
             onAdvance: () => _advance(order, order.nextStatus),
+            onPrint: () => _print(order),
             onCancel: () => _cancel(order),
           );
         },
@@ -312,12 +354,14 @@ class OrderTicket extends StatelessWidget {
     required this.busy,
     required this.onAdvance,
     required this.onCancel,
+    required this.onPrint,
   });
 
   final Order order;
   final bool busy;
   final VoidCallback onAdvance;
   final VoidCallback onCancel;
+  final VoidCallback onPrint;
 
   @override
   Widget build(BuildContext context) {
@@ -438,6 +482,14 @@ class OrderTicket extends StatelessWidget {
                 TextButton(
                   onPressed: busy ? null : onCancel,
                   child: Text(l.cancel),
+                ),
+                // Available at every stage, including collected: the reason
+                // somebody prints again is that the first one is under a
+                // chopping board.
+                TextButton.icon(
+                  onPressed: busy ? null : onPrint,
+                  icon: const Icon(Icons.print_outlined, size: 18),
+                  label: Text(l.printTicket),
                 ),
                 FilledButton(
                   onPressed: busy || !order.canAdvance ? null : onAdvance,

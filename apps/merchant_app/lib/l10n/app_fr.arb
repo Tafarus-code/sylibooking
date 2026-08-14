@@ -351,5 +351,9 @@
   "repeatEmpty": "Aucune réservation avec numéro sur cette période.",
   "repeatEmptyWhy": "Les clients sont reconnus à leur numéro de téléphone : une réservation sans numéro ne peut pas être rapprochée.",
   "insightsFailed": "Impossible de charger les analyses",
-  "ofBookings": "sur {count} réservations"
+  "ofBookings": "sur {count} réservations",
+  "printTicket": "Imprimer",
+  "ticketPrinted": "Ticket envoyé à l'imprimante.",
+  "ticketPrintFailed": "Impossible d'imprimer le ticket.",
+  "reprintTicket": "Réimprimer"
 }

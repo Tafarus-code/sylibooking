@@ -738,5 +738,9 @@
         "type": "int"
       }
     }
-  }
+  },
+  "printTicket": "Print",
+  "ticketPrinted": "Ticket sent to the printer.",
+  "ticketPrintFailed": "Could not print the ticket.",
+  "reprintTicket": "Print again"
 }

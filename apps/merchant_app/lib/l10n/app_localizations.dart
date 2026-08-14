@@ -2004,6 +2004,210 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This venue has no items on its menu yet.'**
   String get walkInNoMenu;
+
+  /// No description provided for @insights.
+  ///
+  /// In en, this message translates to:
+  /// **'Insights'**
+  String get insights;
+
+  /// No description provided for @insightsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers, no-shows, what sells, who comes back.'**
+  String get insightsSubtitle;
+
+  /// No description provided for @insightsWindow7.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get insightsWindow7;
+
+  /// No description provided for @insightsWindow30.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get insightsWindow30;
+
+  /// No description provided for @insightsWindow90.
+  ///
+  /// In en, this message translates to:
+  /// **'90 days'**
+  String get insightsWindow90;
+
+  /// No description provided for @coversTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers'**
+  String get coversTitle;
+
+  /// No description provided for @coversTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} people'**
+  String coversTotal(int count);
+
+  /// No description provided for @coversBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'over {count} bookings'**
+  String coversBookings(int count);
+
+  /// No description provided for @averageParty.
+  ///
+  /// In en, this message translates to:
+  /// **'Average party of {size}'**
+  String averageParty(String size);
+
+  /// No description provided for @coversByWeekday.
+  ///
+  /// In en, this message translates to:
+  /// **'By day of the week'**
+  String get coversByWeekday;
+
+  /// No description provided for @coversEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No sittings yet in this period.'**
+  String get coversEmpty;
+
+  /// No description provided for @coversEmptyWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers count people who came. Confirm a booking and mark the guests arrived, and they will show here.'**
+  String get coversEmptyWhy;
+
+  /// No description provided for @attendanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tables held for nobody'**
+  String get attendanceTitle;
+
+  /// No description provided for @attendanceMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get attendanceMissed;
+
+  /// No description provided for @attendanceMissedWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody came, and nobody said.'**
+  String get attendanceMissedWhy;
+
+  /// No description provided for @attendanceCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get attendanceCancelled;
+
+  /// No description provided for @attendanceCancelledWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer told you first.'**
+  String get attendanceCancelledWhy;
+
+  /// No description provided for @attendanceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookings in this period.'**
+  String get attendanceEmpty;
+
+  /// No description provided for @attendanceEmptyWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'There is nothing to work out a rate from yet.'**
+  String get attendanceEmptyWhy;
+
+  /// No description provided for @peakHoursTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When the room fills'**
+  String get peakHoursTitle;
+
+  /// No description provided for @peakHoursEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No sittings yet in this period.'**
+  String get peakHoursEmpty;
+
+  /// No description provided for @dishesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What sells'**
+  String get dishesTitle;
+
+  /// No description provided for @dishesByQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Most ordered'**
+  String get dishesByQuantity;
+
+  /// No description provided for @dishesByRevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Earns the most'**
+  String get dishesByRevenue;
+
+  /// No description provided for @dishesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No orders in this period.'**
+  String get dishesEmpty;
+
+  /// No description provided for @dishesEmptyWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Only restaurants take orders ahead, and only completed ones count here.'**
+  String get dishesEmptyWhy;
+
+  /// No description provided for @dishesLoungeWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lounges do not take orders ahead, so there is nothing to rank.'**
+  String get dishesLoungeWhy;
+
+  /// No description provided for @repeatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People who came back'**
+  String get repeatTitle;
+
+  /// No description provided for @repeatRate.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} of bookings'**
+  String repeatRate(String percent);
+
+  /// No description provided for @repeatCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} returning customers'**
+  String repeatCustomers(int count);
+
+  /// No description provided for @repeatEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookings with a phone number in this period.'**
+  String get repeatEmpty;
+
+  /// No description provided for @repeatEmptyWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers are recognised by their phone number, so a booking without one cannot be matched.'**
+  String get repeatEmptyWhy;
+
+  /// No description provided for @insightsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load insights'**
+  String get insightsFailed;
+
+  /// No description provided for @ofBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'of {count} bookings'**
+  String ofBookings(int count);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

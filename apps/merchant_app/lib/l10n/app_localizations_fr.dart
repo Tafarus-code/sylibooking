@@ -1130,4 +1130,125 @@ class LFr extends L {
   @override
   String get walkInNoMenu =>
       'Cet établissement n’a encore aucun article au menu.';
+
+  @override
+  String get insights => 'Analyses';
+
+  @override
+  String get insightsSubtitle =>
+      'Couverts, absences, ce qui se vend, qui revient.';
+
+  @override
+  String get insightsWindow7 => '7 jours';
+
+  @override
+  String get insightsWindow30 => '30 jours';
+
+  @override
+  String get insightsWindow90 => '90 jours';
+
+  @override
+  String get coversTitle => 'Couverts';
+
+  @override
+  String coversTotal(int count) {
+    return '$count personnes';
+  }
+
+  @override
+  String coversBookings(int count) {
+    return 'sur $count réservations';
+  }
+
+  @override
+  String averageParty(String size) {
+    return 'Groupe moyen de $size';
+  }
+
+  @override
+  String get coversByWeekday => 'Par jour de la semaine';
+
+  @override
+  String get coversEmpty => 'Aucun service sur cette période.';
+
+  @override
+  String get coversEmptyWhy =>
+      'Les couverts comptent les personnes venues. Confirmez une réservation et marquez les clients arrivés, et ils apparaîtront ici.';
+
+  @override
+  String get attendanceTitle => 'Tables retenues pour personne';
+
+  @override
+  String get attendanceMissed => 'Absents';
+
+  @override
+  String get attendanceMissedWhy =>
+      'Personne n\'est venu, et personne n\'a prévenu.';
+
+  @override
+  String get attendanceCancelled => 'Annulées';
+
+  @override
+  String get attendanceCancelledWhy => 'Le client vous a prévenu.';
+
+  @override
+  String get attendanceEmpty => 'Aucune réservation sur cette période.';
+
+  @override
+  String get attendanceEmptyWhy =>
+      'Il n\'y a pas encore de quoi calculer un taux.';
+
+  @override
+  String get peakHoursTitle => 'Quand la salle se remplit';
+
+  @override
+  String get peakHoursEmpty => 'Aucun service sur cette période.';
+
+  @override
+  String get dishesTitle => 'Ce qui se vend';
+
+  @override
+  String get dishesByQuantity => 'Les plus commandés';
+
+  @override
+  String get dishesByRevenue => 'Rapportent le plus';
+
+  @override
+  String get dishesEmpty => 'Aucune commande sur cette période.';
+
+  @override
+  String get dishesEmptyWhy =>
+      'Seuls les restaurants prennent des commandes à l\'avance, et seules les commandes terminées comptent ici.';
+
+  @override
+  String get dishesLoungeWhy =>
+      'Les lounges ne prennent pas de commandes à l\'avance, il n\'y a donc rien à classer.';
+
+  @override
+  String get repeatTitle => 'Clients revenus';
+
+  @override
+  String repeatRate(String percent) {
+    return '$percent des réservations';
+  }
+
+  @override
+  String repeatCustomers(int count) {
+    return '$count clients fidèles';
+  }
+
+  @override
+  String get repeatEmpty => 'Aucune réservation avec numéro sur cette période.';
+
+  @override
+  String get repeatEmptyWhy =>
+      'Les clients sont reconnus à leur numéro de téléphone : une réservation sans numéro ne peut pas être rapprochée.';
+
+  @override
+  String get insightsFailed => 'Impossible de charger les analyses';
+
+  @override
+  String ofBookings(int count) {
+    return 'sur $count réservations';
+  }
 }

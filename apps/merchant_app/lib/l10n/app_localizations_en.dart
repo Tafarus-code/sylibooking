@@ -1120,4 +1120,124 @@ class LEn extends L {
 
   @override
   String get walkInNoMenu => 'This venue has no items on its menu yet.';
+
+  @override
+  String get insights => 'Insights';
+
+  @override
+  String get insightsSubtitle =>
+      'Covers, no-shows, what sells, who comes back.';
+
+  @override
+  String get insightsWindow7 => '7 days';
+
+  @override
+  String get insightsWindow30 => '30 days';
+
+  @override
+  String get insightsWindow90 => '90 days';
+
+  @override
+  String get coversTitle => 'Covers';
+
+  @override
+  String coversTotal(int count) {
+    return '$count people';
+  }
+
+  @override
+  String coversBookings(int count) {
+    return 'over $count bookings';
+  }
+
+  @override
+  String averageParty(String size) {
+    return 'Average party of $size';
+  }
+
+  @override
+  String get coversByWeekday => 'By day of the week';
+
+  @override
+  String get coversEmpty => 'No sittings yet in this period.';
+
+  @override
+  String get coversEmptyWhy =>
+      'Covers count people who came. Confirm a booking and mark the guests arrived, and they will show here.';
+
+  @override
+  String get attendanceTitle => 'Tables held for nobody';
+
+  @override
+  String get attendanceMissed => 'Missed';
+
+  @override
+  String get attendanceMissedWhy => 'Nobody came, and nobody said.';
+
+  @override
+  String get attendanceCancelled => 'Cancelled';
+
+  @override
+  String get attendanceCancelledWhy => 'The customer told you first.';
+
+  @override
+  String get attendanceEmpty => 'No bookings in this period.';
+
+  @override
+  String get attendanceEmptyWhy =>
+      'There is nothing to work out a rate from yet.';
+
+  @override
+  String get peakHoursTitle => 'When the room fills';
+
+  @override
+  String get peakHoursEmpty => 'No sittings yet in this period.';
+
+  @override
+  String get dishesTitle => 'What sells';
+
+  @override
+  String get dishesByQuantity => 'Most ordered';
+
+  @override
+  String get dishesByRevenue => 'Earns the most';
+
+  @override
+  String get dishesEmpty => 'No orders in this period.';
+
+  @override
+  String get dishesEmptyWhy =>
+      'Only restaurants take orders ahead, and only completed ones count here.';
+
+  @override
+  String get dishesLoungeWhy =>
+      'Lounges do not take orders ahead, so there is nothing to rank.';
+
+  @override
+  String get repeatTitle => 'People who came back';
+
+  @override
+  String repeatRate(String percent) {
+    return '$percent of bookings';
+  }
+
+  @override
+  String repeatCustomers(int count) {
+    return '$count returning customers';
+  }
+
+  @override
+  String get repeatEmpty => 'No bookings with a phone number in this period.';
+
+  @override
+  String get repeatEmptyWhy =>
+      'Customers are recognised by their phone number, so a booking without one cannot be matched.';
+
+  @override
+  String get insightsFailed => 'Could not load insights';
+
+  @override
+  String ofBookings(int count) {
+    return 'of $count bookings';
+  }
 }

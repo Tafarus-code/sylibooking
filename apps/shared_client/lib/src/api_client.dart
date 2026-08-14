@@ -1139,6 +1139,21 @@ class SylibookingApi {
     return PaymentDashboard.fromJson(json as Map<String, dynamic>);
   }
 
+  /// What the venue can learn about itself over [days].
+  ///
+  /// The server offers 7, 30 and 90 and refuses anything else — two merchants
+  /// comparing "last 30 days" against "last 28" are comparing nothing.
+  Future<VenueInsights> insights({
+    required int establishmentId,
+    int days = 30,
+  }) async {
+    final json = await _get(
+      '/merchant/establishments/$establishmentId/insights/',
+      {'days': '$days'},
+    );
+    return VenueInsights.fromJson(json as Map<String, dynamic>);
+  }
+
   void close() => _http.close();
 }
 

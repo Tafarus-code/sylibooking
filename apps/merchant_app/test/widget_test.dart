@@ -2381,6 +2381,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
+      // Manage is longer than a 360x900 phone since Insights joined it, so
+      // the last entries are not built until they are scrolled to.
+      await tester.scrollUntilVisible(find.text('Branding'), 200);
       await tester.tap(find.text('Branding'));
       await tester.pumpAndSettle();
       return backend;
@@ -2632,7 +2635,10 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      // scrollUntilVisible rather than a fixed drag: Manage grows an entry
+      // now and then, and a magic offset silently stops reaching the bottom
+      // when it does.
+      await tester.scrollUntilVisible(find.text('Français'), 200);
       await tester.pumpAndSettle();
 
       expect(find.text('Language'), findsOneWidget);
@@ -2656,7 +2662,10 @@ void main() {
       await tester.tap(find.text('Français'));
       await tester.pumpAndSettle();
       // French runs longer, so the same rows sit further down the list.
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      // scrollUntilVisible rather than a fixed drag: Manage grows an entry
+      // now and then, and a magic offset silently stops reaching the bottom
+      // when it does.
+      await tester.scrollUntilVisible(find.text('Français'), 200);
       await tester.pumpAndSettle();
 
       expect(find.text('Se déconnecter'), findsOneWidget);
@@ -2670,7 +2679,10 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.tune_outlined));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      // scrollUntilVisible rather than a fixed drag: Manage grows an entry
+      // now and then, and a magic offset silently stops reaching the bottom
+      // when it does.
+      await tester.scrollUntilVisible(find.text('Français'), 200);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Français'));
       await tester.pumpAndSettle();
@@ -5649,6 +5661,9 @@ void main() {
     const gates = <String, bool Function(MerchantRole)>{
       'Menu': _always,
       'Photos': _always,
+      // Which night is busy is floor knowledge, and the server lets staff
+      // read it — the desk must not be stricter than the API.
+      'Insights': _always,
       'Tables and rooms': _always,
       'Opening hours': _editsProfile,
       'Venue details': _editsProfile,
@@ -5710,6 +5725,13 @@ void main() {
 
         for (final entry in gates.entries) {
           final allowed = entry.value(role);
+          // Manage is taller than a 360x900 phone, so an entry a role *may*
+          // use still has to be scrolled to before it exists in the tree.
+          // An entry a role may not use is absent however far you scroll,
+          // which is what the other branch checks.
+          if (allowed) {
+            await tester.scrollUntilVisible(find.text(entry.key), 200);
+          }
           expect(
             find.text(entry.key),
             allowed ? findsOneWidget : findsNothing,
@@ -5959,6 +5981,227 @@ void main() {
         find.text('La connexion est lente. Nous essayons toujours.'),
         findsOneWidget,
       );
+    });
+  });
+
+  group('a venue reading its own numbers', () {
+    Map<String, dynamic> insightsJson({
+      int covers = 38,
+      int bookings = 10,
+      double? averageParty = 3.8,
+      int missed = 2,
+      int cancelled = 3,
+      int total = 15,
+      List<Map<String, dynamic>>? byQuantity,
+      List<Map<String, dynamic>>? byRevenue,
+      int repeatBookings = 10,
+      int returning = 2,
+      double? returningRate = 0.2,
+    }) =>
+        {
+          'window': {
+            'days': 30,
+            'from': '2026-07-14',
+            'to': '2026-08-13',
+            'options': [7, 30, 90],
+          },
+          'establishment': {'id': 7, 'name': 'Le Petit Baobab'},
+          'covers': {
+            'total': covers,
+            'bookings': bookings,
+            'average_party_size': averageParty,
+            'by_date': [],
+            'by_weekday': [
+              for (var i = 0; i < 7; i++)
+                {
+                  'weekday': i,
+                  'covers': i == 4 ? covers : 0,
+                  'bookings': i == 4 ? bookings : 0,
+                },
+            ],
+          },
+          'attendance': {
+            'total': total,
+            'served': total - missed - cancelled,
+            'missed': missed,
+            'cancelled': cancelled,
+            'missed_rate': total == 0 ? null : missed / total,
+            'cancelled_rate': total == 0 ? null : cancelled / total,
+            'unfilled_rate': total == 0 ? null : (missed + cancelled) / total,
+          },
+          'peak_hours': [
+            {'hour': 19, 'bookings': 4, 'covers': 12},
+            {'hour': 21, 'bookings': 2, 'covers': 5},
+          ],
+          'dishes': {
+            'by_quantity': byQuantity ??
+                [
+                  {
+                    'id': 1,
+                    'name': 'Alloco',
+                    'quantity': 10,
+                    'revenue': '200000.00',
+                  },
+                ],
+            'by_revenue': byRevenue ??
+                [
+                  {
+                    'id': 2,
+                    'name': 'Poisson braise',
+                    'quantity': 3,
+                    'revenue': '270000.00',
+                  },
+                ],
+          },
+          'repeat_customers': {
+            'bookings': repeatBookings,
+            'returning_bookings': returning,
+            'returning_customers': returning,
+            'returning_rate': returningRate,
+          },
+        };
+
+    Future<FakeBackend> openInsights(
+      WidgetTester tester, {
+      Map<String, dynamic>? payload,
+      Size size = phoneSize,
+      String role = 'owner',
+    }) async {
+      final (:auth, :backend) = buildAuth(
+        tester,
+        storedToken: 'stored-token',
+        size: size,
+      );
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on(
+        'GET',
+        '/api/merchant/establishments/7/insights/',
+        payload ?? insightsJson(),
+      );
+
+      await tester.pumpWidget(
+        MerchantApp(auth: auth, localeStore: InMemoryLocaleStore()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Insights'));
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    testWidgets('covers are people, and say so', (tester) async {
+      await openInsights(tester);
+
+      expect(find.text('38 people'), findsOneWidget);
+      expect(find.text('over 10 bookings'), findsOneWidget);
+      expect(find.text('Average party of 3.8'), findsOneWidget);
+    });
+
+    testWidgets('missed and cancelled are shown apart', (tester) async {
+      // **The distinction the section exists for.** Added together they teach
+      // a merchant to distrust the customers who telephoned.
+      await openInsights(tester);
+
+      expect(find.text('Missed'), findsOneWidget);
+      expect(find.text('Nobody came, and nobody said.'), findsOneWidget);
+      expect(find.text('Cancelled'), findsOneWidget);
+      expect(find.text('The customer told you first.'), findsOneWidget);
+      expect(find.text('13%'), findsOneWidget);
+      expect(find.text('20%'), findsWidgets);
+    });
+
+    testWidgets('both dish rankings are shown, because they disagree',
+        (tester) async {
+      await openInsights(tester);
+      // The dish section is below the fold on a phone, which is fine — it is
+      // the least urgent of the five — so scroll to it as a merchant would.
+      await tester.scrollUntilVisible(find.text('Most ordered'), 200);
+
+      expect(find.text('Most ordered'), findsOneWidget);
+      expect(find.text('Alloco'), findsOneWidget);
+      expect(find.text('Earns the most'), findsOneWidget);
+      expect(find.text('Poisson braise'), findsOneWidget);
+    });
+
+    testWidgets('every weekday has a bar, including the quiet ones',
+        (tester) async {
+      // A missing Wednesday reads as a rendering bug rather than a quiet
+      // night.
+      await openInsights(tester);
+
+      expect(find.text('Wednesday'), findsOneWidget);
+      expect(find.text('Sunday'), findsOneWidget);
+    });
+
+    testWidgets('an empty period says why, rather than drawing nothing',
+        (tester) async {
+      await openInsights(
+        tester,
+        payload: insightsJson(
+          covers: 0,
+          bookings: 0,
+          averageParty: null,
+          missed: 0,
+          cancelled: 0,
+          total: 0,
+          byQuantity: const [],
+          byRevenue: const [],
+          repeatBookings: 0,
+          returning: 0,
+          returningRate: null,
+        ),
+      );
+
+      expect(find.text('No sittings yet in this period.'), findsWidgets);
+      expect(
+        find.textContaining('Covers count people who came'),
+        findsWidgets,
+      );
+      // A rate that cannot be computed is a dash, never 0%.
+      expect(find.text('0%'), findsNothing);
+    });
+
+    testWidgets('a lounge is told why it has no dishes to rank',
+        (tester) async {
+      await openInsights(
+        tester,
+        payload: insightsJson(byQuantity: const [], byRevenue: const []),
+      );
+      await tester.scrollUntilVisible(
+        find.textContaining('Lounges do not take orders ahead'),
+        200,
+      );
+
+      expect(
+        find.textContaining('Lounges do not take orders ahead'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('changing the window re-asks the server', (tester) async {
+      final backend = await openInsights(tester);
+
+      await tester.tap(find.text('7 days'));
+      await tester.pumpAndSettle();
+
+      expect(backend.requests.last.url.queryParameters['days'], '7');
+    });
+
+    testWidgets('and it all still reads on a tablet', (tester) async {
+      await openInsights(tester, size: const Size(1280, 800));
+
+      expect(find.text('38 people'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

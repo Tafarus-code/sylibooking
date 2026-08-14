@@ -10,12 +10,42 @@ test comparing the two, so the definitions cannot drift apart.
 """
 
 import json
+import os
 from pathlib import Path
 
-# backend/establishments/ -> backend/ -> repo root -> design/
-PRESETS_FILE = (
-    Path(__file__).resolve().parent.parent.parent / 'design' / 'theme_presets.json'
+_HERE = Path(__file__).resolve().parent
+
+#: Where the shared design file might be, in the order to look.
+#:
+#: Two layouts, both real. In a checkout the file sits at the repo root beside
+#: `backend/`; in the container `backend/` *is* the root, so it is copied in
+#: beside the app instead. Searching rather than assuming is what stopped the
+#: image building at all — the path was right for a checkout and resolved to
+#: `/design/theme_presets.json` inside the image.
+_CANDIDATES = (
+    # backend/establishments/ -> backend/ -> repo root -> design/
+    _HERE.parent.parent / 'design' / 'theme_presets.json',
+    # /app/establishments/ -> /app/ -> /app/design/
+    _HERE.parent / 'design' / 'theme_presets.json',
 )
+
+
+def _find():
+    override = os.environ.get('THEME_PRESETS_FILE')
+    if override:
+        return Path(override)
+    for candidate in _CANDIDATES:
+        if candidate.exists():
+            return candidate
+    # Named so the error says what was looked for rather than only what was
+    # missing — the failure mode here is a path that is right somewhere else.
+    raise FileNotFoundError(
+        'theme_presets.json not found. Looked in: '
+        + ', '.join(str(c) for c in _CANDIDATES)
+    )
+
+
+PRESETS_FILE = _find()
 
 
 def _load():

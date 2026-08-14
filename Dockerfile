@@ -53,6 +53,10 @@ RUN pip install --no-index --find-links=/wheels -r requirements.txt \
 
 WORKDIR /app
 COPY --chown=sylibooking:sylibooking backend/ /app/
+# The design file is shared with the Flutter side and read at import by
+# establishments/theme_presets.py. Only backend/ is copied above, so without
+# this the image cannot even start Django.
+COPY --chown=sylibooking:sylibooking design/ /app/design/
 COPY --chown=sylibooking:sylibooking deploy/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

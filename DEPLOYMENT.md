@@ -20,6 +20,7 @@ deploy fails for five reasons simultaneously.
 | # | Step | Blocks | Do it when |
 |---|---|---|---|
 | 1 | [Railway + Postgres](#1-railway-and-postgres) | everything | first |
+| 1b | [The apps as web services](#1b-the-two-apps-as-web-services) | browser access to either app | after the API answers |
 | 2 | [Cloudflare R2](#2-cloudflare-r2-for-images) | photo uploads | before any real merchant uploads a photo |
 | 3 | [Redis + worker + beat](#3-redis-the-worker-and-beat) | reminders, no-show sweeps, payment polling | with step 1 |
 | 4 | [SMS gateway](#4-sms) | reminders and password resets actually arriving | before a pilot |
@@ -105,6 +106,74 @@ storage — rather than just "unhealthy".
 Railway sleeps inactive services on some plans. A sleeping worker does not
 run beat, so reminders stop and no-show sweeps stop. If bookings matter more
 than the bill, that is the thing to pay for first.
+
+---
+
+## 1b. The two apps, as web services
+
+Three services from one repository: the API, the merchant app and the
+customer app. The apps are Flutter, so on Railway they are **web builds** —
+Android remains how most people will use them, and `RELEASE.md` still governs
+that. What a web build buys is a venue with a laptop and no wish to install
+anything, and a link somebody can open before they trust you enough to
+install an app.
+
+### Add each service
+
+Both use the same Dockerfile; which app they build is a variable.
+
+1. **New service → GitHub repo**, same repository.
+2. **Settings → Config as code**: `deploy/railway-web.json`
+3. **Variables**, per service:
+
+| Service | Variables |
+|---|---|
+| merchant-web | `APP=merchant_app`<br>`API_BASE_URL=https://<api-domain>/api` |
+| customer-web | `APP=customer_app`<br>`API_BASE_URL=https://<api-domain>/api` |
+
+`APP` and `API_BASE_URL` are **build arguments**. Railway passes service
+variables to a Dockerfile build, and both are declared `ARG` — but check the
+build log the first time: `APP` has no default, so a build that never
+received it fails immediately and says so rather than quietly building the
+wrong app.
+
+**`API_BASE_URL` is baked in at compile time.** A web build has no emulator
+fallback and no settings screen; wrong here is an app that loads and can do
+nothing. Point it at the API service's domain, including `/api`.
+
+### Then tell the API about them
+
+The browser enforces same-origin; Android never did. Production reads an
+explicit allowlist and fails closed, so until this is set every request from
+either web app is refused:
+
+```
+CORS_ALLOWED_ORIGINS=https://merchant.sylibooking.gn,https://customer.sylibooking.gn
+```
+
+Railway's generated domains work too, and are what you will have first.
+
+### What a visitor downloads
+
+Measured on this build, not estimated:
+
+| | Raw | Over the wire |
+|---|---|---|
+| `main.dart.js` | 8.1 MB | **1.5 MB** gzipped |
+| CanvasKit wasm | 6.8 MB | ~2.5 MB, cached for a year |
+
+The image pre-compresses everything at build time and nginx serves those
+directly, so the first visit is roughly **4 MB** and every later one is
+close to nothing.
+
+That is a real number to weigh, and it points different ways for the two
+apps. **For the merchant app it is clearly worth it**: a venue opens it once
+at the start of a shift, on wifi, probably on a laptop, and never installs
+anything. **For the customer app it deserves a thought** — 4 MB on mobile
+data to browse venues, against a native app that downloads once. It is a
+reasonable channel for somebody following a link who has not installed
+anything, and a poor default for a regular. Both are built here; which you
+promote is a product decision, not a technical one.
 
 ---
 

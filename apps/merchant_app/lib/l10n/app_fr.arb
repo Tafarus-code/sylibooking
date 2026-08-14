@@ -355,5 +355,10 @@
   "printTicket": "Imprimer",
   "ticketPrinted": "Ticket envoyé à l'imprimante.",
   "ticketPrintFailed": "Impossible d'imprimer le ticket.",
-  "reprintTicket": "Réimprimer"
+  "reprintTicket": "Réimprimer",
+  "exportCsv": "Exporter",
+  "exportBookings": "Réservations en CSV",
+  "exportPayments": "Paiements en CSV",
+  "exportSaved": "Enregistré : {name}",
+  "exportFailed": "Impossible d'exporter le fichier."
 }

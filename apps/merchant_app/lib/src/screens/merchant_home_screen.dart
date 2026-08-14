@@ -3,6 +3,7 @@ import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../export_sink.dart';
 import '../printing/ticket_printer.dart';
 import '../image_source.dart';
 import 'manage_screen.dart';
@@ -19,6 +20,7 @@ class MerchantHomeScreen extends StatefulWidget {
     required this.imageSource,
     required this.localeController,
     this.printer,
+    this.exportSink,
   });
 
   final AuthController auth;
@@ -26,6 +28,9 @@ class MerchantHomeScreen extends StatefulWidget {
 
   /// Handed to the kitchen queue; null means the console printer.
   final TicketPrinter? printer;
+
+  /// Handed to the payments dashboard; null means the file sink.
+  final ExportSink? exportSink;
   final LocaleController localeController;
 
   @override
@@ -97,7 +102,7 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
               ),
             ),
           ),
-          PaymentsDashboardScreen(auth: widget.auth),
+          PaymentsDashboardScreen(auth: widget.auth, sink: widget.exportSink),
           ReviewsScreen(auth: widget.auth),
           ManageScreen(
             auth: widget.auth,

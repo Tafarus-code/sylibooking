@@ -220,6 +220,19 @@ class SylibookingApi {
   Future<dynamic> _send(
     Future<http.Response> Function() request, {
     bool idempotent = false,
+  }) async =>
+      // Decoding sits outside the retry: a 400 is the server answering, not
+      // the network failing, and asking again would get the same refusal.
+      _decode(await _perform(request, idempotent: idempotent));
+
+  /// The transport half: deadline, retry, and the two failure kinds.
+  ///
+  /// Separate from decoding because not everything the API returns is JSON —
+  /// an export is a CSV file, and it wants the same timeouts and the same
+  /// retry rule without being parsed.
+  Future<http.Response> _perform(
+    Future<http.Response> Function() request, {
+    bool idempotent = false,
   }) async {
     final timeout = idempotent ? readTimeout : writeTimeout;
     final attempts = idempotent ? readRetries + 1 : 1;
@@ -240,9 +253,7 @@ class SylibookingApi {
       }
     }
 
-    // Decoding sits outside the retry: a 400 is the server answering, not the
-    // network failing, and asking again would get the same refusal.
-    return _decode(response!);
+    return response!;
   }
 
   dynamic _decode(http.Response response) {
@@ -1152,6 +1163,39 @@ class SylibookingApi {
       {'days': '$days'},
     );
     return VenueInsights.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// A venue's books as a CSV file, for whoever does its accounts.
+  ///
+  /// Returns the file's text rather than parsing it: nothing in the app reads
+  /// these columns, and a client that parsed them would be a second opinion
+  /// about their meaning.
+  ///
+  /// Owner and manager only; the server refuses anyone else.
+  Future<String> exportCsv({
+    required int establishmentId,
+    required String kind,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final response = await _perform(
+      () => _http.get(
+        _uri('/merchant/establishments/$establishmentId/export/', {
+          'kind': kind,
+          if (from != null) 'date_from': formatDate(from),
+          if (to != null) 'date_to': formatDate(to),
+        }),
+        headers: _headers,
+      ),
+      idempotent: true,
+    );
+
+    if (response.statusCode >= 400) {
+      // Errors are still JSON, so hand them to the usual decoder to get the
+      // server's own message rather than inventing one.
+      _decode(response);
+    }
+    return utf8.decode(response.bodyBytes);
   }
 
   void close() => _http.close();

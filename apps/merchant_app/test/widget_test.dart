@@ -10,6 +10,9 @@ import 'package:merchant_app/src/app.dart';
 import 'package:merchant_app/src/auth_controller.dart';
 import 'package:merchant_app/src/image_source.dart';
 import 'package:merchant_app/src/token_store.dart';
+import 'dart:io';
+
+import 'package:merchant_app/src/export_sink.dart';
 import 'package:merchant_app/src/printing/ticket_printer.dart';
 import 'package:merchant_app/src/screens/orders_screen.dart';
 import 'package:merchant_app/src/screens/reservation_detail_screen.dart';
@@ -42,7 +45,9 @@ class SlowLocaleStore implements LocaleStore {
 
 /// Canned backend. Routes are keyed "METHOD /path".
 class FakeBackend {
-  final Map<String, ({int status, Object? body})> routes = {};
+  /// `raw` bodies are sent as written rather than JSON-encoded — an export
+  /// is a CSV file, and quoting it would be testing the fake.
+  final Map<String, ({int status, Object? body, bool raw})> routes = {};
   final List<http.Request> requests = [];
 
   /// Paths that never answer, for the tests about a stalled connection.
@@ -55,8 +60,9 @@ class FakeBackend {
   /// Stop stalling, so a retry can be shown to succeed.
   void recover() => stalling.clear();
 
-  void on(String method, String path, Object? body, {int status = 200}) {
-    routes['$method $path'] = (status: status, body: body);
+  void on(String method, String path, Object? body,
+      {int status = 200, bool raw = false}) {
+    routes['$method $path'] = (status: status, body: body, raw: raw);
   }
 
   http.Client get client => MockClient((request) async {
@@ -68,6 +74,13 @@ class FakeBackend {
         if (route == null) {
           return http.Response(jsonEncode({'detail': 'not found'}), 404,
               headers: {'content-type': 'application/json'});
+        }
+        if (route.raw) {
+          return http.Response(
+            '${route.body ?? ''}',
+            route.status,
+            headers: {'content-type': 'text/csv; charset=utf-8'},
+          );
         }
         return http.Response(
           route.body == null ? '' : jsonEncode(route.body),
@@ -6311,6 +6324,116 @@ void main() {
       expect(find.text('Could not print the ticket.'), findsOneWidget);
     });
   });
+
+  group('handing the books to an accountant', () {
+    Future<_SpySink> openPayments(
+      WidgetTester tester, {
+      String role = 'owner',
+      bool failing = false,
+    }) async {
+      final sink = _SpySink(failing: failing);
+      final (:auth, :backend) = buildAuth(tester, storedToken: 'stored-token');
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [venueJson(role: role)],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 0,
+        'next': null,
+        'results': [],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+      backend.on('GET', '/api/dashboard/payments/', {
+        'period': {'from': '2026-07-15', 'to': '2026-08-14'},
+        'establishments': [
+          {'id': 7, 'name': 'Le Petit Baobab'},
+        ],
+        'reservations': {'total': 0},
+        'payments': {
+          'collected': '0.00',
+          'awaiting': '0.00',
+          'failed': '0.00',
+          'refunded': '0.00',
+          'forfeited': '0.00',
+        },
+        'by_provider': [],
+        'needs_attention': [],
+      });
+      backend.on(
+        'GET',
+        '/api/merchant/establishments/7/export/',
+        'reference,date\nabc,2026-08-14\n',
+      );
+
+      await tester.pumpWidget(MerchantApp(
+        auth: auth,
+        localeStore: InMemoryLocaleStore(),
+        exportSink: sink,
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.payments_outlined));
+      await tester.pumpAndSettle();
+      return sink;
+    }
+
+    testWidgets('an owner is offered both exports', (tester) async {
+      await openPayments(tester);
+
+      await tester.tap(find.byIcon(Icons.ios_share));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bookings as CSV'), findsOneWidget);
+      expect(find.text('Payments as CSV'), findsOneWidget);
+    });
+
+    testWidgets('choosing one writes the file it was given', (tester) async {
+      final sink = await openPayments(tester);
+
+      await tester.tap(find.byIcon(Icons.ios_share));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bookings as CSV'));
+      await tester.pumpAndSettle();
+
+      expect(sink.delivered, hasLength(1));
+      expect(sink.delivered.single.contents, contains('reference,date'));
+      expect(sink.delivered.single.filename, contains('bookings'));
+      expect(sink.delivered.single.filename, endsWith('.csv'));
+    });
+
+    testWidgets('staff are not offered it at all', (tester) async {
+      // Absent rather than shown and refused, matching every other control
+      // a role cannot use — and matching the server, which refuses them.
+      await openPayments(tester, role: 'staff');
+
+      expect(find.byIcon(Icons.ios_share), findsNothing);
+    });
+
+    testWidgets('a failure is said out loud', (tester) async {
+      await openPayments(tester, failing: true);
+
+      await tester.tap(find.byIcon(Icons.ios_share));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Payments as CSV'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not export the file.'), findsOneWidget);
+    });
+  });
+}
+
+/// An export sink that records, or refuses.
+class _SpySink implements ExportSink {
+  _SpySink({this.failing = false});
+
+  final bool failing;
+  final List<({String filename, String contents})> delivered = [];
+
+  @override
+  Future<ExportResult> deliver(String filename, String contents) async {
+    if (failing) throw const FileSystemException('no room');
+    delivered.add((filename: filename, contents: contents));
+    return ExportResult(path: '/tmp/$filename', bytes: contents.length);
+  }
 }
 
 /// A printer that records, or refuses.

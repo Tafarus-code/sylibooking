@@ -4,12 +4,18 @@ import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
+import '../export_sink.dart';
 
 /// What the venue took, what is still owed, and who to chase.
 class PaymentsDashboardScreen extends StatefulWidget {
-  const PaymentsDashboardScreen({super.key, required this.auth});
+  const PaymentsDashboardScreen({super.key, required this.auth, this.sink});
 
   final AuthController auth;
+
+  /// Where an exported file goes. Injected so a widget test can read what
+  /// was written; defaults to the file sink. See export_sink.dart for why
+  /// this is not a share sheet yet.
+  final ExportSink? sink;
 
   @override
   State<PaymentsDashboardScreen> createState() =>
@@ -42,6 +48,47 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  late final ExportSink _sink = widget.sink ?? FileExportSink();
+  bool _exporting = false;
+
+  /// Fetch the CSV and hand it to the sink.
+  ///
+  /// The window on screen decides the range, so what a merchant exports is
+  /// what they were just looking at — an export that quietly covered a
+  /// different period than the figures above it would be worse than none.
+  Future<void> _export(String kind) async {
+    final l = L.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final from = today.subtract(Duration(days: _window.daysBack));
+
+    setState(() => _exporting = true);
+    try {
+      final csv = await widget.auth.api.exportCsv(
+        establishmentId: widget.auth.selectedVenueId!,
+        kind: kind,
+        from: from,
+        to: today,
+      );
+      final name = '$kind-${formatDate(from)}-to-${formatDate(today)}.csv';
+      final result = await _sink.deliver(name, csv);
+      if (!mounted) return;
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text(l.exportSaved(result.path))),
+        );
+    } on Object {
+      if (!mounted) return;
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(l.exportFailed)));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   Future<void> _load() async {
@@ -91,6 +138,26 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
       appBar: AppBar(
         title: Text(l.navPayments),
         actions: [
+          // Owner and manager only, matching the server. Staff read the
+          // takings on this screen; copying the whole ledger out is a
+          // different act and the API refuses it.
+          if (widget.auth.role.canEditProfile)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.ios_share),
+              tooltip: l.exportCsv,
+              enabled: !_exporting,
+              onSelected: _export,
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'bookings',
+                  child: Text(l.exportBookings),
+                ),
+                PopupMenuItem(
+                  value: 'payments',
+                  child: Text(l.exportPayments),
+                ),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,

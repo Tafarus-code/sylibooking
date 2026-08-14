@@ -742,5 +742,17 @@
   "printTicket": "Print",
   "ticketPrinted": "Ticket sent to the printer.",
   "ticketPrintFailed": "Could not print the ticket.",
-  "reprintTicket": "Print again"
+  "reprintTicket": "Print again",
+  "exportCsv": "Export",
+  "exportBookings": "Bookings as CSV",
+  "exportPayments": "Payments as CSV",
+  "exportSaved": "Saved {name}",
+  "@exportSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFailed": "Could not export the file."
 }

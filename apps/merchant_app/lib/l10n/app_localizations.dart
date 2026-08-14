@@ -2232,6 +2232,36 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Print again'**
   String get reprintTicket;
+
+  /// No description provided for @exportCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get exportCsv;
+
+  /// No description provided for @exportBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookings as CSV'**
+  String get exportBookings;
+
+  /// No description provided for @exportPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments as CSV'**
+  String get exportPayments;
+
+  /// No description provided for @exportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name}'**
+  String exportSaved(String name);
+
+  /// No description provided for @exportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the file.'**
+  String get exportFailed;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

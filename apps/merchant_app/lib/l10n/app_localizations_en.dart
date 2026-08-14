@@ -1252,4 +1252,21 @@ class LEn extends L {
 
   @override
   String get reprintTicket => 'Print again';
+
+  @override
+  String get exportCsv => 'Export';
+
+  @override
+  String get exportBookings => 'Bookings as CSV';
+
+  @override
+  String get exportPayments => 'Payments as CSV';
+
+  @override
+  String exportSaved(String name) {
+    return 'Saved $name';
+  }
+
+  @override
+  String get exportFailed => 'Could not export the file.';
 }

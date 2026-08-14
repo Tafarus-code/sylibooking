@@ -41,6 +41,32 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
+# The platform's own hostnames, added without anybody having to remember them.
+#
+# Railway injects the domain it routes to, and — the part that catches people —
+# sends its health check with `Host: healthcheck.railway.app`. Django answers a
+# host it does not recognise with 400, so a service that is working perfectly
+# fails its health check, gets restarted, and fails again. The logs say
+# "Invalid HTTP_HOST header", which reads like an attack rather than the
+# platform doing its job.
+#
+# Appended rather than replacing ALLOWED_HOSTS: a custom domain still has to be
+# listed deliberately.
+for _platform_host in (
+    config('RAILWAY_PUBLIC_DOMAIN', default=''),
+    config('RAILWAY_PRIVATE_DOMAIN', default=''),
+    'healthcheck.railway.app',
+):
+    if _platform_host and _platform_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_platform_host)
+
+# CSRF wants the scheme as well, and only for a domain a browser will use.
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+if _railway_domain := config('RAILWAY_PUBLIC_DOMAIN', default=''):
+    _railway_origin = f'https://{_railway_domain}'
+    if _railway_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_origin)
+
 
 # Application definition
 
@@ -834,11 +860,9 @@ if DJANGO_ENV == 'production':
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
 
-    # Trusted origins for CSRF, which /admin/ needs once it is behind a
-    # domain rather than localhost.
-    CSRF_TRUSTED_ORIGINS = config(
-        'CSRF_TRUSTED_ORIGINS', default='', cast=Csv()
-    )
+    # CSRF_TRUSTED_ORIGINS is set near ALLOWED_HOSTS, where the platform's
+    # own domain is added to it. Re-reading the variable here would silently
+    # drop that, which /admin/ would then refuse every login from.
 
 
 #: How a push is actually sent. The console sender runs everywhere until a

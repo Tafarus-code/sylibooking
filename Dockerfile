@@ -77,9 +77,15 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 # Overridden for the worker and beat. Gunicorn's default worker is right here:
 # every view is ordinary blocking Django, and async workers would buy nothing
 # but a new class of bug.
-CMD ["gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8000", \
-     "--workers", "3", \
-     "--timeout", "60", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+#
+# Bound to $PORT, not to 8000. Railway, Render and Fly all inject the port
+# they route to and expect the process to listen on it; a container that
+# hardcodes 8000 deploys green and 502s every request, which is a long
+# afternoon to debug because nothing in the logs looks wrong.
+#
+# Shell form so the variable expands — the entrypoint execs whatever it is
+# given, and an exec-form CMD would hand gunicorn the literal "${PORT:-8000}".
+#
+# WEB_CONCURRENCY because a 512MB container cannot afford three workers of
+# this app, and the platform is the only thing that knows how big it is.
+CMD ["sh", "-c", "gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-3} --timeout 60 --access-logfile - --error-logfile -"]

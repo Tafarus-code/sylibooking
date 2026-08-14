@@ -43,9 +43,23 @@ venue taking cash on arrival — which is most of them, most of the time.
    [`RELEASE.md`](RELEASE.md).
 2. Add a **PostgreSQL** database to the project. Railway sets `DATABASE_URL`
    automatically and the app reads it.
-3. Railway builds from the repo's `Dockerfile`, which collects static files
-   at build time. `deploy/entrypoint.sh` runs migrations on boot and then
-   starts gunicorn.
+3. Railway reads [`railway.json`](railway.json): build from the `Dockerfile`,
+   health check `/api/health/`, restart on failure up to three times. The
+   image collects static files at build time; `deploy/entrypoint.sh` runs
+   migrations on boot and then starts gunicorn.
+
+Three things are already handled so you do not have to find them the hard
+way:
+
+* **The port.** Gunicorn binds `$PORT`, which Railway injects. A container
+  that hardcodes 8000 deploys green and 502s every request.
+* **The health check host.** Railway sends it with
+  `Host: healthcheck.railway.app`, which Django would answer with a 400 —
+  a healthy service failing its check and being restarted forever. That
+  host, and Railway's public and private domains, are added to
+  `ALLOWED_HOSTS` automatically.
+* **Workers.** `WEB_CONCURRENCY` sets the gunicorn worker count; the default
+  of 3 is too many for a 512MB container. Set it to 2 there.
 
 ### Variables
 
@@ -53,10 +67,16 @@ Set these on the **web** service. Anything not listed has a working default.
 
 ```
 DJANGO_ENV=production
-SECRET_KEY=<50+ random characters, see below>
-ALLOWED_HOSTS=<your-app>.up.railway.app,api.sylibooking.gn
-CSRF_TRUSTED_ORIGINS=https://<your-app>.up.railway.app,https://api.sylibooking.gn
+SECRET_KEY=<generate one, see below>
 DEBUG=False
+```
+
+`ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` only need setting once you put a
+custom domain in front — Railway's own domain is added for you. With one:
+
+```
+ALLOWED_HOSTS=api.sylibooking.gn
+CSRF_TRUSTED_ORIGINS=https://api.sylibooking.gn
 ```
 
 Generate the secret key with:
@@ -136,10 +156,14 @@ happens.
 1. Add **Redis** to the Railway project. It sets `REDIS_URL`.
 2. Add two more services from the same repo, changing only the start command:
 
-| Service | Start command |
-|---|---|
-| worker | `celery -A config worker -l info` |
-| beat | `celery -A config beat -l info` |
+| Service | Start command | Also set |
+|---|---|---|
+| worker | `celery -A config worker -l info` | `RUN_MIGRATIONS=no` |
+| beat | `celery -A config beat -l info` | `RUN_MIGRATIONS=no` |
+
+`RUN_MIGRATIONS=no` matters: the entrypoint migrates on boot, and three
+services racing the same migration is how a half-applied schema happens. The
+web service is the one that migrates.
 
 3. On **all three** services (web, worker, beat):
 

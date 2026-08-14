@@ -45,6 +45,7 @@ from .orders import (
     OrderCreateView,
 )
 from .password_reset import ConfirmResetView, RequestResetView
+from .payment_callbacks import MtnMoneyCallbackView, OrangeMoneyCallbackView
 from .reviews import EstablishmentPhotosView, EstablishmentReviewsView
 from .views import EstablishmentViewSet, ReservationViewSet
 
@@ -224,6 +225,18 @@ urlpatterns = [
         name='device-registration',
     ),
     # Operability. Liveness touches nothing; readiness names each part.
+    # Unauthenticated by necessity, guarded by a secret in the path. See
+    # api/payment_callbacks.py for why the payload is never believed.
+    path(
+        'payments/callbacks/orange/<str:secret>/',
+        OrangeMoneyCallbackView.as_view(),
+        name='orange-callback',
+    ),
+    path(
+        'payments/callbacks/mtn/<str:secret>/',
+        MtnMoneyCallbackView.as_view(),
+        name='mtn-callback',
+    ),
     path('health/', LivenessView.as_view(), name='health'),
     path('health/ready/', ReadinessView.as_view(), name='health-ready'),
     path('metrics/', MetricsView.as_view(), name='metrics'),

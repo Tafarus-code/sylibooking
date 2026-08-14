@@ -10,11 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import json
 import sys
 from decimal import Decimal
 from pathlib import Path
 
 from decouple import AutoConfig, Csv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -454,10 +456,84 @@ RESERVATION_DURATION_MINUTES = 120
 # Orange Money / MTN adapters land behind the same interface, so switching one
 # on is a change here rather than in the reservation flow.
 
+# Which adapter serves which provider. Both default to the mock, so a machine
+# with no credentials behaves exactly as it always has — switching one on is
+# this setting and nothing else.
+#
+#   ORANGE_MONEY_ADAPTER=payments.orange.OrangeMoneyProvider
+#   MTN_MONEY_ADAPTER=payments.mtn.MtnMoneyProvider
+#
+# See DEPLOYMENT.md for what has to exist before either is worth setting.
 PAYMENT_PROVIDERS = {
-    'orange_money': 'payments.providers.MockPaymentProvider',
-    'mtn_money': 'payments.providers.MockPaymentProvider',
+    'orange_money': config(
+        'ORANGE_MONEY_ADAPTER',
+        default='payments.providers.MockPaymentProvider',
+    ),
+    'mtn_money': config(
+        'MTN_MONEY_ADAPTER',
+        default='payments.providers.MockPaymentProvider',
+    ),
 }
+
+# --- Orange Money ---------------------------------------------------------
+#
+# Every URL is configurable because Orange's contract differs by country and
+# by merchant agreement. The defaults are the published shape; check them
+# against what Orange sends you rather than trusting them.
+ORANGE_MONEY = {
+    'client_id': config('ORANGE_CLIENT_ID', default=''),
+    'client_secret': config('ORANGE_CLIENT_SECRET', default=''),
+    'merchant_key': config('ORANGE_MERCHANT_KEY', default=''),
+    'token_url': config(
+        'ORANGE_TOKEN_URL', default='https://api.orange.com/oauth/v3/token'
+    ),
+    'payment_url': config(
+        'ORANGE_PAYMENT_URL',
+        default='https://api.orange.com/orange-money-webpay/dev/v1/webpayment',
+    ),
+    'status_url': config(
+        'ORANGE_STATUS_URL',
+        default=(
+            'https://api.orange.com/orange-money-webpay/dev/v1/'
+            'transactionstatus'
+        ),
+    ),
+    'currency': config('ORANGE_CURRENCY', default='GNF'),
+    'lang': config('ORANGE_LANG', default='fr'),
+    'reference': config('ORANGE_REFERENCE', default='Sylibooking'),
+    # Where Orange sends the customer, and us, when a payment ends.
+    'return_url': config('ORANGE_RETURN_URL', default=''),
+    'cancel_url': config('ORANGE_CANCEL_URL', default=''),
+    'notif_url': config('ORANGE_NOTIF_URL', default=''),
+}
+
+#: The secret in the notification URL's path. Without it that endpoint is a
+#: write surface anybody can find, so an unset value refuses every callback
+#: rather than accepting every callback.
+ORANGE_CALLBACK_SECRET = config('ORANGE_CALLBACK_SECRET', default='')
+
+# --- MTN Mobile Money -----------------------------------------------------
+MTN_MOMO = {
+    'base_url': config(
+        'MTN_BASE_URL', default='https://sandbox.momodeveloper.mtn.com'
+    ),
+    'api_user': config('MTN_API_USER', default=''),
+    'api_key': config('MTN_API_KEY', default=''),
+    'subscription_key': config('MTN_SUBSCRIPTION_KEY', default=''),
+    # 'sandbox' until MTN issues the production environment string for
+    # Guinea, which is part of your contract with them.
+    'environment': config('MTN_ENVIRONMENT', default='sandbox'),
+    'currency': config('MTN_CURRENCY', default='EUR'),
+    'payer_message': config('MTN_PAYER_MESSAGE', default='Sylibooking'),
+    'payee_note': config('MTN_PAYEE_NOTE', default='Sylibooking booking'),
+    # Refunds are a different MTN product with its own key, so a venue can
+    # collect long before disbursements are arranged.
+    'disbursement_subscription_key': config(
+        'MTN_DISBURSEMENT_SUBSCRIPTION_KEY', default=''
+    ),
+}
+
+MTN_CALLBACK_SECRET = config('MTN_CALLBACK_SECRET', default='')
 
 # What a mobile money booking pays up front, in Guinean francs. Global for now;
 # per-establishment pricing is a product decision, not a client-supplied value.
@@ -480,9 +556,25 @@ AVAILABILITY_WINDOW_END = '23:00'
 
 
 # --- Notifications --------------------------------------------------------
+def json_setting(name, default):
+    """An environment variable that carries JSON.
+
+    Parsed here so a malformed value fails at boot with the variable's name in
+    the message, rather than at midnight inside a Celery task.
+    """
+    raw = config(name, default=default)
+    if isinstance(raw, (dict, list)):
+        return raw
+    try:
+        return json.loads(raw)
+    except ValueError as error:
+        raise ImproperlyConfigured(f'{name} is not valid JSON: {error}') from error
+
+
 # Same shape as PAYMENT_PROVIDERS: swapping the console stub for a real SMS
 # aggregator is a settings change, not a code change.
 NOTIFIERS = {
+    # accounts.gateways.HttpSmsNotifier once a gateway is arranged.
     'sms': config(
         'SMS_NOTIFIER',
         default='accounts.notifications.ConsoleSmsNotifier',
@@ -491,6 +583,55 @@ NOTIFIERS = {
         'EMAIL_NOTIFIER',
         default='accounts.notifications.EmailNotifier',
     ),
+    # accounts.gateways.WhatsAppNotifier once a WhatsApp Business number and
+    # an approved template exist.
+    'whatsapp': config(
+        'WHATSAPP_NOTIFIER',
+        default='accounts.notifications.ConsoleSmsNotifier',
+    ),
+}
+
+# --- SMS gateway ----------------------------------------------------------
+#
+# Deliberately vendor-neutral: which aggregator serves Guinea is a commercial
+# decision, and they all offer the same HTTP shape. `payload` is a template —
+# {to}, {text} and {sender} are substituted wherever they appear, at any depth
+# — so a new vendor is environment variables rather than an adapter.
+#
+# DEPLOYMENT.md carries worked examples for Twilio and for a generic reseller.
+SMS_GATEWAY = {
+    'url': config('SMS_URL', default=''),
+    'method': config('SMS_METHOD', default='POST'),
+    # 'json' or 'form'. Older aggregators want form-encoded.
+    'encoding': config('SMS_ENCODING', default='json'),
+    'sender': config('SMS_SENDER', default='Sylibooking'),
+    'username': config('SMS_USERNAME', default=''),
+    'password': config('SMS_PASSWORD', default=''),
+    'default_country_code': config('SMS_COUNTRY_CODE', default='224'),
+    'headers': json_setting('SMS_HEADERS', default='{}'),
+    'payload': json_setting(
+        'SMS_PAYLOAD',
+        default='{"to": "{to}", "from": "{sender}", "text": "{text}"}',
+    ),
+    # Some gateways answer 200 and put the refusal in the body. Where these
+    # are set, the body is checked; where they are not, a 200 is believed.
+    'success_path': config('SMS_SUCCESS_PATH', default=''),
+    'success_value': config('SMS_SUCCESS_VALUE', default=''),
+}
+
+# --- WhatsApp (Meta Cloud API) --------------------------------------------
+#
+# Only templates, because a first message outside a 24-hour reply window has
+# to be one. The template itself is approved in Meta's console, not here.
+WHATSAPP = {
+    'base_url': config(
+        'WHATSAPP_BASE_URL', default='https://graph.facebook.com/v21.0'
+    ),
+    'phone_number_id': config('WHATSAPP_PHONE_NUMBER_ID', default=''),
+    'token': config('WHATSAPP_TOKEN', default=''),
+    'template': config('WHATSAPP_TEMPLATE', default=''),
+    'language': config('WHATSAPP_LANGUAGE', default='fr'),
+    'default_country_code': config('SMS_COUNTRY_CODE', default='224'),
 }
 
 # Console in development, so a reset code is readable in the terminal without
@@ -500,6 +641,51 @@ EMAIL_BACKEND = config(
     default='django.core.mail.backends.console.EmailBackend',
 )
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@sylibooking.gn')
+
+
+# --- Cache ----------------------------------------------------------------
+#
+# **Shared, not per-process, and that is load-bearing.** Django's default is
+# an in-memory cache local to each worker, which quietly breaks two things the
+# moment there is more than one worker:
+#
+#   * Throttle counters. Each worker would count separately, so a limit of
+#     "5 an hour" becomes five an hour *per worker* — the ceiling silently
+#     multiplies by however many processes are running.
+#   * The Orange Money payment context. `pay_token` is written when a payment
+#     starts and read when its status is checked, and those are different
+#     requests that land on different workers. A status check that cannot find
+#     it can never settle the payment, so the customer pays and the booking
+#     stays pending.
+#
+# So production uses Redis — the same instance Celery brokers through, on a
+# different database number so a `FLUSHDB` on one does not take the other.
+# Local development keeps the in-process cache, where there is only ever one
+# process and no Redis to install.
+
+_redis_url = config('REDIS_URL', default=config('CELERY_BROKER_URL', default=''))
+
+if DJANGO_ENV == 'production' and _redis_url:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _redis_url,
+            'KEY_PREFIX': 'sylibooking',
+        }
+    }
+elif DJANGO_ENV == 'production':
+    raise ImproperlyConfigured(
+        'Production needs REDIS_URL (or CELERY_BROKER_URL): the cache holds '
+        'throttle counters and in-flight payment context, and a per-process '
+        'cache makes both wrong once there is a second worker.'
+    )
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'sylibooking-local',
+        }
+    }
 
 
 # --- Task queue -----------------------------------------------------------

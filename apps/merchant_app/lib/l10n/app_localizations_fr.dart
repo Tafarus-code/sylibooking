@@ -1263,4 +1263,21 @@ class LFr extends L {
 
   @override
   String get reprintTicket => 'Réimprimer';
+
+  @override
+  String get exportCsv => 'Exporter';
+
+  @override
+  String get exportBookings => 'Réservations en CSV';
+
+  @override
+  String get exportPayments => 'Paiements en CSV';
+
+  @override
+  String exportSaved(String name) {
+    return 'Enregistré : $name';
+  }
+
+  @override
+  String get exportFailed => 'Impossible d\'exporter le fichier.';
 }

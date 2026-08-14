@@ -4,6 +4,7 @@ import 'package:shared_client/shared_client.dart';
 
 import '../l10n/app_localizations.dart';
 import 'auth_controller.dart';
+import 'export_sink.dart';
 import 'image_source.dart';
 import 'printing/ticket_printer.dart';
 import 'screens/login_screen.dart';
@@ -19,6 +20,7 @@ class MerchantApp extends StatefulWidget {
     this.imageSource,
     this.localeStore,
     this.printer,
+    this.exportSink,
   });
 
   final AuthController auth;
@@ -29,6 +31,9 @@ class MerchantApp extends StatefulWidget {
   /// Where kitchen tickets go. Null means the console printer, which is what
   /// runs until a venue owns hardware — see printing/ticket_printer.dart.
   final TicketPrinter? printer;
+
+  /// Where an exported CSV goes. Null means the file sink.
+  final ExportSink? exportSink;
 
   /// Injected so widget tests can start the app in either language.
   final LocaleStore? localeStore;
@@ -113,6 +118,7 @@ class _MerchantAppState extends State<MerchantApp> {
                           imageSource: widget.imageSource ?? DeviceImageSource(),
                           localeController: _locale,
                           printer: widget.printer,
+                          exportSink: widget.exportSink,
                           // Keyed on the venue as well as the user: switching
                           // venues must refetch, not show the previous venue's
                           // bookings.

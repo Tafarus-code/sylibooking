@@ -207,6 +207,11 @@ jobs:
           DB_USER: sylibooking
           DB_PASSWORD: sylibooking
           DB_HOST: localhost
+          # Part of a correct production configuration, and now checked as
+          # one: the cache holds throttle counters and in-flight payment
+          # context, so a per-process cache is a deployment error rather
+          # than a preference.
+          CELERY_BROKER_URL: redis://localhost:6379/0
         run: python manage.py check --deploy --fail-level WARNING
 
       - name: Build the image

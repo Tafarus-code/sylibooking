@@ -1,25 +1,130 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../l10n/app_localizations.dart';
 import 'booking_store.dart';
-import 'screens/browse_screen.dart';
+import 'customer_auth.dart';
+import 'directions.dart';
+import 'favourites_controller.dart';
+import 'image_source.dart';
+import 'location_source.dart';
+import 'screens/customer_home_screen.dart';
 
-class CustomerApp extends StatelessWidget {
-  const CustomerApp({super.key, required this.api, required this.store});
+class CustomerApp extends StatefulWidget {
+  const CustomerApp({
+    super.key,
+    required this.api,
+    required this.store,
+    this.tokenStore,
+    this.localeStore,
+    this.imageSource,
+    this.locationSource,
+    this.directionsLauncher,
+  });
 
   final SylibookingApi api;
   final BookingStore store;
 
+  /// Injected so widget tests can drive these without a platform channel.
+  final CustomerTokenStore? tokenStore;
+  final LocaleStore? localeStore;
+  final ImageSource? imageSource;
+  final LocationSource? locationSource;
+  final DirectionsLauncher? directionsLauncher;
+
+  @override
+  State<CustomerApp> createState() => _CustomerAppState();
+}
+
+class _CustomerAppState extends State<CustomerApp> {
+  late final CustomerAuth _auth;
+  late final FavouritesController _favourites;
+  late final LocaleController _locale;
+
+  @override
+  void initState() {
+    super.initState();
+    // Built here rather than in the shell so they outlive a rebuild: the
+    // account, the saved list and the language are app state, not screen
+    // state.
+    _auth = CustomerAuth(
+      api: widget.api,
+      store: widget.store,
+      tokenStore: widget.tokenStore ?? SharedPreferencesCustomerTokenStore(),
+    );
+    _favourites = FavouritesController(
+      api: widget.api,
+      store: widget.store,
+      auth: _auth,
+    );
+    _locale = LocaleController(
+      store: widget.localeStore ?? SharedPreferencesLocaleStore(),
+      api: widget.api,
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _favourites.dispose();
+    _auth.dispose();
+    _locale.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sylibooking',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFB4551C)),
-        useMaterial3: true,
+    return ListenableBuilder(
+      listenable: _locale,
+      builder: (context, _) => MaterialApp(
+        onGenerateTitle: (context) => L.of(context).appTitle,
+        debugShowCheckedModeBanner: false,
+        // The app's own look. Establishment branding is layered on top of
+        // this by EstablishmentThemeScope, and only on a venue's own screens.
+        //
+        // Dark app bar: the design system's customer screens all wear the
+        // deepwood band at the top. The merchant app asks for the light one.
+        theme: sylibookingAppTheme(darkAppBar: true),
+        // Null follows the phone, which in this market is usually already
+        // French. The toggle is for when the phone is wrong, not a first step.
+        locale: _locale.locale,
+        supportedLocales: L.supportedLocales,
+        localizationsDelegates: const [
+          L.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        // The client writes two sentences of its own — a stalled request and
+        // an unreachable one — and has no catalogue to write them from. Handed
+        // down here, where the language is settled, for the same reason the
+        // locale controller hands down `languageCode`.
+        builder: (context, child) {
+          widget.api.networkText = ApiNetworkText(
+            slow: L.of(context).connectionSlow,
+            unreachable: L.of(context).connectionFailed,
+          );
+          return child ?? const SizedBox.shrink();
+        },
+        // Nothing is fetched until the stored language is known. Reading it
+        // takes one frame, and without this wait the very first request goes
+        // out before the API is told which language to answer in — so a cold
+        // start would show its first error message in English.
+        home: !_locale.isLoaded
+            ? const Scaffold(body: SizedBox.shrink())
+            : CustomerHomeScreen(
+                api: widget.api,
+                store: widget.store,
+                auth: _auth,
+                favourites: _favourites,
+                localeController: _locale,
+                imageSource: widget.imageSource ?? DeviceImageSource(),
+                locationSource:
+                    widget.locationSource ?? const DeviceLocationSource(),
+                directionsLauncher: widget.directionsLauncher ??
+                    const DeviceDirectionsLauncher(),
+              ),
       ),
-      home: BrowseScreen(api: api, store: store),
     );
   }
 }

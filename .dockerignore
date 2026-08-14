@@ -1,0 +1,21 @@
+# The Flutter apps are not in this image — it serves the API.
+apps/
+build/
+
+# Local-only state that must never be baked in.
+.venv/
+**/db.sqlite3
+backend/media/
+backend/staticfiles/
+.env
+**/.env
+
+.git/
+.github/
+.claude/
+**/__pycache__/
+**/*.pyc
+**/.dart_tool/
+*.md
+*.docx
+*.html

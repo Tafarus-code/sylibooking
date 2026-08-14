@@ -15,6 +15,8 @@ from rest_framework.views import APIView
 
 from establishments.models import Establishment
 
+from .throttling import LoginIpThrottle, LoginUsernameThrottle
+
 User = get_user_model()
 
 
@@ -47,6 +49,10 @@ class LoginView(APIView):
 
     authentication_classes = []
     permission_classes = []
+    # Per connection and per account. An attacker rotating IPs still has to
+    # name the account; a staff room sharing one connection should not lock
+    # each other out.
+    throttle_classes = [LoginIpThrottle, LoginUsernameThrottle]
 
     def post(self, request):
         serializer = AuthTokenSerializer(

@@ -12,6 +12,7 @@ void main() {
     CustomerApp(
       api: SylibookingApi(baseUrl: AppConfig.apiBaseUrl),
       store: SharedPreferencesBookingStore(),
+      tokenStore: SharedPreferencesCustomerTokenStore(),
     ),
   );
 }

@@ -1,0 +1,106 @@
+import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../auth_controller.dart';
+import '../image_source.dart';
+import 'manage_screen.dart';
+import 'orders_screen.dart';
+import 'payments_dashboard_screen.dart';
+import 'reviews_screen.dart';
+import 'venue_desk_screen.dart';
+
+/// The signed-in shell: tonight's bookings, and the money behind them.
+class MerchantHomeScreen extends StatefulWidget {
+  const MerchantHomeScreen({
+    super.key,
+    required this.auth,
+    required this.imageSource,
+    required this.localeController,
+  });
+
+  final AuthController auth;
+  final ImageSource imageSource;
+  final LocaleController localeController;
+
+  @override
+  State<MerchantHomeScreen> createState() => _MerchantHomeScreenState();
+}
+
+class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = L.of(context);
+
+    return AdaptiveScaffold(
+      selectedIndex: _index,
+      onDestinationSelected: (index) => setState(() => _index = index),
+      // Five, matching the design system's rail. The kitchen queue and the
+      // reviews used to be reached through the desk's own toggle and through
+      // Manage — one tap deeper than the two jobs deserve, given a cook
+      // watches the queue all evening and a merchant checks reviews the way
+      // they check takings.
+      destinations: [
+        AdaptiveDestination(
+          label: l.navReservations,
+          icon: Icons.event_note_outlined,
+          selectedIcon: Icons.event_note,
+        ),
+        AdaptiveDestination(
+          label: l.navKitchen,
+          icon: Icons.local_fire_department_outlined,
+          selectedIcon: Icons.local_fire_department,
+        ),
+        AdaptiveDestination(
+          label: l.navPayments,
+          icon: Icons.payments_outlined,
+          selectedIcon: Icons.payments,
+        ),
+        AdaptiveDestination(
+          label: l.navReviews,
+          icon: Icons.star_outline,
+          selectedIcon: Icons.star,
+        ),
+        AdaptiveDestination(
+          label: l.navManage,
+          icon: Icons.tune_outlined,
+          selectedIcon: Icons.tune,
+        ),
+      ],
+      // IndexedStack rather than rebuilding: switching to payments and back
+      // should not throw away the day's list and re-fetch it.
+      body: IndexedStack(
+        index: _index,
+        children: [
+          VenueDeskScreen(auth: widget.auth),
+          // The queue on its own, with its own app bar. The desk keeps its
+          // Reservations/Orders toggle as well: a phone in a waiter's pocket
+          // flips between the two far more often than it changes tab, and
+          // the design's staff screen draws both.
+          // Inside the venue's theme scope like the desk beside it: a cook
+          // and a host are looking at the same venue, and only one of their
+          // screens wearing its colours would read as two different apps.
+          ListenableBuilder(
+            listenable: widget.auth,
+            builder: (context, _) => EstablishmentThemeScope(
+              presetKey: widget.auth.selectedVenue?.themePreset,
+              child: Scaffold(
+                appBar: AppBar(title: Text(l.navKitchen)),
+                body: OrdersView(auth: widget.auth),
+              ),
+            ),
+          ),
+          PaymentsDashboardScreen(auth: widget.auth),
+          ReviewsScreen(auth: widget.auth),
+          ManageScreen(
+            auth: widget.auth,
+            imageSource: widget.imageSource,
+            localeController: widget.localeController,
+          ),
+        ],
+      ),
+    );
+  }
+}

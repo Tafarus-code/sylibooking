@@ -7,6 +7,9 @@ clash when those windows overlap.
 A cancelled reservation frees its slot. Everything else — pending, confirmed,
 completed — holds it, so a merchant cannot accidentally double-book over a
 visit that already happened.
+
+A deactivated space is offered no slots at all. Its existing bookings still
+hold their windows, because those sittings are still happening.
 """
 
 from datetime import datetime, time, timedelta
@@ -90,7 +93,9 @@ def availability_for_establishment(establishment, day, party_size=None):
 
     Returns a list of ``{'space': Space, 'slots': [{'start', 'available'}]}``.
     """
-    spaces = Space.objects.filter(establishment=establishment)
+    # Only spaces still in service. A deactivated table keeps its bookings and
+    # its history, but must never be offered again.
+    spaces = Space.objects.filter(establishment=establishment, is_active=True)
     if party_size is not None:
         spaces = spaces.filter(capacity__gte=party_size)
     spaces = list(spaces)

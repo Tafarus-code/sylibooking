@@ -3,6 +3,8 @@ from datetime import date as date_cls
 from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.utils.translation import gettext as _
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -10,6 +12,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from establishments.models import Establishment, Space
+from establishments.permissions import (
+    get_establishment_or_404,
+    require_operations_access,
+    require_refund_access,
+)
+from payments.models import Payment
+from payments.providers import PaymentError
+from payments.services import refund_deposit, settle_deposit, start_payment
 from reservations.availability import availability_for_establishment, is_space_available
 from reservations.models import Reservation
 
@@ -19,6 +29,7 @@ from .serializers import (
     ReservationSerializer,
     SpaceAvailabilitySerializer,
 )
+from .throttling import BookingIpThrottle, BookingPhoneThrottle, BrowseThrottle
 
 
 class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -26,9 +37,15 @@ class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
 
     Read-only and public: this is the customer's discovery surface. Merchants
     create and edit establishments through /admin/ for now.
+
+    Throttled per connection. Public and unlimited are not the same thing:
+    this is the whole catalogue, and a competitor pulling it nightly costs us
+    and gains them. The ceiling is set well above anything a person browsing
+    could reach.
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [BrowseThrottle]
 
     def get_queryset(self):
         queryset = Establishment.objects.all()
@@ -48,10 +65,17 @@ class EstablishmentViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == 'list':
             # annotate() adds a GROUP BY, which makes Django treat the queryset
             # as unordered and pagination inconsistent, so re-state Meta.ordering.
-            return queryset.annotate(space_count=Count('spaces')).order_by(
-                'city', 'name'
+            # Hours are prefetched because every card shows an open/closed
+            # indicator computed from them.
+            return (
+                queryset.annotate(space_count=Count('spaces'))
+                .prefetch_related('hours')
+                .order_by('city', 'name')
             )
-        return queryset.prefetch_related('spaces')
+        # Reviews are prefetched because the detail response averages them.
+        return queryset.prefetch_related(
+            'spaces', 'hours', 'menu_items', 'reviews'
+        )
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -126,19 +150,46 @@ class ReservationViewSet(
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Reservation.objects.select_related(
-            'space', 'space__establishment'
-        ).all()
+        queryset = (
+            Reservation.objects.select_related('space', 'space__establishment')
+            # The list renders a payment badge per row; without this that is a
+            # query per booking across a whole day's bookings.
+            .prefetch_related('payments')
+            .all()
+        )
 
-        # Scope to the caller's own venues. Without this, any logged-in user
-        # would see every establishment's customer names and phone numbers.
         user = self.request.user
-        if not user.is_superuser:
-            queryset = queryset.filter(space__establishment__staff=user)
 
-        establishment = self.request.query_params.get('establishment')
-        if establishment:
-            queryset = queryset.filter(space__establishment_id=establishment)
+        # Listing is scoped to one venue, named explicitly. Merging every
+        # venue a user staffs was fine when nobody had two; with roles and
+        # multiple venues it hides which venue a booking belongs to.
+        establishment_id = self.request.query_params.get('establishment')
+        if self.action == 'list':
+            if not establishment_id:
+                raise ValidationError(
+                    {
+                        'establishment': (
+                            'Required. Pick a venue; listings are no longer '
+                            'merged across venues.'
+                        )
+                    }
+                )
+            establishment = get_establishment_or_404(establishment_id)
+            # Membership, not just a filter: asking for a venue you have no
+            # part in is refused rather than quietly returning nothing.
+            require_operations_access(user, establishment)
+            queryset = queryset.filter(space__establishment=establishment)
+        else:
+            # Detail routes and actions stay scoped by membership across all
+            # the caller's venues; the object itself names the venue.
+            if not user.is_superuser:
+                queryset = queryset.filter(
+                    space__establishment__memberships__user=user
+                )
+            if establishment_id:
+                queryset = queryset.filter(
+                    space__establishment_id=establishment_id
+                )
 
         status_ = self.request.query_params.get('status')
         if status_:
@@ -161,15 +212,28 @@ class ReservationViewSet(
 
         return queryset
 
-    def perform_create(self, serializer):
-        """Re-check availability under a row lock.
+    def get_throttles(self):
+        """Only creating is throttled.
 
-        The serializer already checked, but two requests can pass that check
-        concurrently and both write. Locking the space row serialises them so
-        the second one loses cleanly.
+        Browsing a booking by reference, or a merchant working their own
+        list, is not the path an abuser uses to make somebody's phone ring.
+        """
+        if self.action == 'create':
+            return [BookingIpThrottle(), BookingPhoneThrottle()]
+        return super().get_throttles()
+
+    def perform_create(self, serializer):
+        """Re-check availability under a row lock, then open any payment.
+
+        The serializer already checked availability, but two requests can pass
+        that check concurrently and both write. Locking the space row
+        serialises them so the second one loses cleanly.
         """
         space = serializer.validated_data['space']
         start = serializer.validated_data['datetime']
+        provider = serializer.validated_data.pop(
+            'payment_provider', Payment.Provider.CASH_ON_ARRIVAL
+        )
 
         with transaction.atomic():
             locked_space = get_object_or_404(
@@ -179,11 +243,26 @@ class ReservationViewSet(
                 raise ValidationError(
                     {'datetime': f'{locked_space.name} was just booked for that time.'}
                 )
-            serializer.save(status=Reservation.Status.PENDING)
+            reservation = serializer.save(status=Reservation.Status.PENDING)
+
+            # Cash on arrival returns None and changes nothing. Mobile money
+            # opens a payment and, if it completes, confirms the booking.
+            start_payment(reservation, provider)
+
+        # start_payment may have moved the reservation to confirmed; without
+        # this the response would still claim it is pending.
+        reservation.refresh_from_db()
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def confirm(self, request, pk=None):
-        """Merchant accepts a pending booking."""
+        """Merchant accepts a pending booking.
+
+        Cash on arrival may be confirmed before any money changes hands — that
+        is what cash on arrival means. A mobile money booking may not: holding
+        a table against a payment that is still pending, or has failed, is
+        exactly the no-show the deposit exists to prevent. Enforced here rather
+        than by hiding the button, since the API is reachable directly.
+        """
         reservation = self.get_object()
         if reservation.status == Reservation.Status.CANCELLED:
             return Response(
@@ -191,8 +270,120 @@ class ReservationViewSet(
                 status=status.HTTP_409_CONFLICT,
             )
 
+        if reservation.needs_payment_before_confirming:
+            payment = reservation.latest_payment
+            return Response(
+                {
+                    'detail': (
+                        f'{payment.get_provider_display()} payment is '
+                        f'{payment.get_status_display().lower()}. Confirm this '
+                        f'booking once the payment completes, or cancel it.'
+                    ),
+                    'payment_status': payment.status,
+                    'payment_provider': payment.provider,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         reservation.status = Reservation.Status.CONFIRMED
         reservation.save(update_fields=['status'])
+        return Response(self.get_serializer(reservation).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def complete(self, request, pk=None):
+        """Merchant marks the guests as arrived.
+
+        This is what closes a booking. Without it a confirmed booking stays
+        confirmed for ever, its slot is held for ever, and "past bookings" are
+        past only by date.
+
+        A booking in the future cannot be completed — someone has not arrived
+        for a sitting that has not started, and allowing it would let a table
+        be freed by marking tomorrow's guests as already gone.
+        """
+        reservation = self.get_object()
+
+        if reservation.status not in Reservation.OPEN_STATUSES:
+            return Response(
+                {
+                    'detail': _(
+                        'Only a booking that is still open can be completed; '
+                        'this one is %(status)s.'
+                    )
+                    % {'status': reservation.get_status_display().lower()},
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if not reservation.has_started:
+            return Response(
+                {'detail': _('That booking has not started yet.')},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        reservation.status = Reservation.Status.COMPLETED
+        reservation.arrived_at = timezone.now()
+        reservation.save(update_fields=['status', 'arrived_at'])
+
+        # The guests arrived, so any deposit comes off their bill.
+        settle_deposit(reservation)
+
+        reservation.refresh_from_db()
+        return Response(self.get_serializer(reservation).data)
+
+    @action(
+        detail=True,
+        methods=['post'],
+        permission_classes=[IsAuthenticated],
+        url_path='refund-deposit',
+        # Without this the route is named after the method and the two
+        # drift apart.
+        url_name='refund-deposit',
+    )
+    def refund(self, request, pk=None):
+        """Give back a deposit kept for a no-show, without undoing the no-show.
+
+        A customer who turns up three quarters of an hour late has still
+        missed their table — the venue held it and then lost it, and the
+        record should say so. But a merchant who decides to seat them anyway,
+        or simply judges the charge harsh, needs a way to return the money
+        that does not require rewriting what happened.
+
+        So this moves the deposit and nothing else. The booking stays missed,
+        the venue's no-show count stays honest, and the takings stop counting
+        money that went back.
+        """
+        reservation = self.get_object()
+        require_refund_access(request.user, reservation.space.establishment)
+
+        payment = reservation.latest_payment
+        if payment is None or payment.outcome != Payment.Outcome.FORFEITED:
+            return Response(
+                {
+                    'detail': _(
+                        'There is no kept deposit on this booking to '
+                        'give back.'
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            refund_deposit(payment)
+        except PaymentError:
+            # We do not know whether the provider took it. Saying "refunded"
+            # would be a claim we cannot support.
+            return Response(
+                {
+                    'detail': _(
+                        'The provider could not be reached. The deposit has '
+                        'not been given back — try again shortly.'
+                    )
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        reservation.refresh_from_db()
         return Response(self.get_serializer(reservation).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])

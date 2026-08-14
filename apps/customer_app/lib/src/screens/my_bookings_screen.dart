@@ -2,17 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
+import '../image_source.dart';
+import 'write_review_screen.dart';
 
 /// Bookings made on this device, re-read from the server so the status is live.
 ///
-/// There are no customer accounts yet, so the ids come from local storage and
-/// each is fetched by id. A booking made on another phone will not appear here.
+/// The references come from local storage rather than from an account, and
+/// deliberately: a reference is the credential, so this list works signed out,
+/// which is how most of this market will use the app.
+///
+/// Accounts do exist. Signing in claims whatever is on this phone into the
+/// account — see `CustomerAuth._adoptWhatIsOnThisPhone` — so the history
+/// survives a lost phone. This screen still reads the device's own list, so a
+/// booking made on another phone appears here only once it has been claimed.
 class MyBookingsScreen extends StatefulWidget {
-  const MyBookingsScreen({super.key, required this.api, required this.store});
+  const MyBookingsScreen({
+    super.key,
+    required this.api,
+    required this.store,
+    required this.imageSource,
+  });
 
   final SylibookingApi api;
   final BookingStore store;
+  final ImageSource imageSource;
 
   @override
   State<MyBookingsScreen> createState() => _MyBookingsScreenState();
@@ -71,28 +86,29 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   Future<void> _cancel(Reservation reservation) async {
+    final l = L.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel this booking?'),
+        title: Text(l.cancelBookingTitle),
         content: Text(
-          '${reservation.establishmentName} on '
-          '${DateFormat.MMMEd().format(reservation.dateTime)} at '
-          '${DateFormat.Hm().format(reservation.dateTime)}.\n\n'
-          'The table goes back to other customers, so you may not get it '
-          'again.',
+          l.cancelBookingWhen(
+            '${reservation.establishmentName} · '
+            '${DateFormat.MMMEd(l.localeName).format(reservation.dateTime)} '
+            '${DateFormat.Hm(l.localeName).format(reservation.dateTime)}',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep it'),
+            child: Text(l.keepIt),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Cancel booking'),
+            child: Text(l.cancelBooking),
           ),
         ],
       ),
@@ -111,7 +127,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             r.reference == updated.reference ? updated : r,
         ];
       });
-      _notify('Booking cancelled.');
+      _notify(L.of(context).bookingCancelled);
     } on ApiException catch (e) {
       if (!mounted) return;
       _notify(e.message, isError: true);
@@ -121,6 +137,82 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       if (mounted) _notify(e.message, isError: true);
     } finally {
       if (mounted) setState(() => _cancelling.remove(reservation.reference));
+    }
+  }
+
+  Future<void> _review(Reservation reservation) async {
+    final posted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => WriteReviewScreen(
+          api: widget.api,
+          reservation: reservation,
+        ),
+      ),
+    );
+
+    if ((posted ?? false) && mounted) {
+      _notify(L.of(context).reviewIsLive);
+    }
+  }
+
+  /// Share a photo from a visit.
+  ///
+  /// The reservation reference is the credential, so any booking qualifies —
+  /// including one that was cancelled, since someone turned away may still
+  /// have something worth showing.
+  Future<void> _addPhoto(Reservation reservation) async {
+    final picked = await widget.imageSource.pick();
+    if (picked == null) return;
+    // The picker takes the user out of the app; they may not come back to it.
+    if (!mounted) return;
+
+    final caption = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: Text(L.of(context).addACaption),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: L.of(context).optional,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(L.of(context).cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: Text(L.of(context).share),
+            ),
+          ],
+        );
+      },
+    );
+    if (caption == null) return;
+
+    setState(() => _cancelling.add(reservation.reference));
+    try {
+      await widget.api.uploadPhoto(
+        establishmentId: reservation.establishmentId!,
+        bytes: picked.bytes,
+        filename: picked.filename,
+        reservationReference: reservation.reference,
+        caption: caption,
+      );
+      if (mounted) _notify(L.of(context).photoShared);
+    } on ApiException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } on ApiUnreachableException catch (e) {
+      if (mounted) _notify(e.message, isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _cancelling.remove(reservation.reference));
+      }
     }
   }
 
@@ -139,10 +231,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('My bookings')),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
-    );
+    // A body, not a screen: the activity screen above owns the bar and the
+    // Bookings/Orders switcher, so both halves share one heading.
+    return RefreshIndicator(onRefresh: _load, child: _body());
   }
 
   Widget _body() {
@@ -153,7 +244,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (_error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Icon(Icons.cloud_off, size: 56, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(height: 16),
@@ -163,7 +254,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
-          FilledButton(onPressed: _load, child: const Text('Try again')),
+          FilledButton(onPressed: _load, child: Text(L.of(context).tryAgain)),
         ],
       );
     }
@@ -171,7 +262,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (_reservations.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+        padding: contentInsets(context, minHorizontal: 32).copyWith(top: 72, bottom: 32),
         children: [
           Icon(
             Icons.receipt_long,
@@ -180,13 +271,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No bookings yet',
+            L.of(context).noBookingsYet,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Reservations you make on this phone show up here.',
+            L.of(context).noBookingsOnThisPhone,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -197,6 +288,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
 
     return ListView.builder(
+      padding: contentInsets(context, maxWidth: ContentWidth.list),
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _reservations.length,
       itemBuilder: (context, index) {
@@ -232,20 +324,56 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                             '${reservation.partySize == 1 ? "guest" : "guests"}',
                             style: theme.textTheme.bodySmall,
                           ),
+                          if (reservation.payment case final payment?)
+                            Text(
+                              switch (payment.status) {
+                                PaymentStatus.completed =>
+                                  '${payment.providerDisplay} · '
+                                      '${payment.amount} GNF paid',
+                                PaymentStatus.failed =>
+                                  '${payment.providerDisplay} · payment failed',
+                                _ => '${payment.providerDisplay} · '
+                                    'payment pending',
+                              },
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: payment.status == PaymentStatus.failed
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                         ],
                       ),
                     ),
                     _StatusChip(status: reservation.status),
                   ],
                 ),
-                if (reservation.canCancel) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed:
+                        busy ? null : () => _addPhoto(reservation),
+                    icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                    label: Text(L.of(context).addAPhoto),
+                  ),
+                ),
+                if (reservation.status == ReservationStatus.completed) ...[
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => _review(reservation),
+                      icon: const Icon(Icons.rate_review_outlined, size: 18),
+                      label: Text(L.of(context).writeAReview),
+                    ),
+                  ),
+                ] else if (reservation.canCancel) ...[
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
                       onPressed: busy ? null : () => _cancel(reservation),
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Cancel booking'),
+                      label: Text(L.of(context).cancelBooking),
                       style: TextButton.styleFrom(
                         foregroundColor: theme.colorScheme.error,
                       ),
@@ -274,51 +402,32 @@ class _StatusChip extends StatelessWidget {
 
   final ReservationStatus status;
 
+  /// The shared vocabulary, not this screen's own palette.
+  ///
+  /// A completed booking is deliberately blue rather than the green a
+  /// finished order wears: they answer different questions, and the customer
+  /// sees both lists behind the same toggle.
+  static StatusTone toneFor(ReservationStatus status) => switch (status) {
+        ReservationStatus.pending => StatusTone.orderPlaced,
+        ReservationStatus.confirmed => StatusTone.confirmed,
+        ReservationStatus.cancelled => StatusTone.unpaid,
+        ReservationStatus.completed => StatusTone.reservationCompleted,
+        ReservationStatus.noShow => StatusTone.noShow,
+        ReservationStatus.unknown => StatusTone.orderPlaced,
+      };
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (label, background, foreground) = switch (status) {
-      ReservationStatus.pending => (
-          'Pending',
-          scheme.tertiaryContainer,
-          scheme.onTertiaryContainer,
-        ),
-      ReservationStatus.confirmed => (
-          'Confirmed',
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-        ),
-      ReservationStatus.cancelled => (
-          'Cancelled',
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-        ),
-      ReservationStatus.completed => (
-          'Completed',
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-        ),
-      ReservationStatus.unknown => (
-          'Unknown',
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-        ),
+    final l = L.of(context);
+    final label = switch (status) {
+      ReservationStatus.pending => l.resStatusPending,
+      ReservationStatus.confirmed => l.resStatusConfirmed,
+      ReservationStatus.cancelled => l.resStatusCancelled,
+      ReservationStatus.completed => l.resStatusCompleted,
+      ReservationStatus.noShow => l.resStatusMissed,
+      ReservationStatus.unknown => l.resStatusPending,
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: foreground,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
+    return StatusBadge(label: label, tone: toneFor(status));
   }
 }

@@ -1,10 +1,99 @@
 from django.conf import settings
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from establishments.models import Establishment, Space
+from establishments.hours import (
+    closing_time_at,
+    is_open_at,
+    todays_hours,
+    week_schedule,
+)
+from establishments.images import copy_url
+from establishments.models import Establishment, MenuItem, OpeningHours, Space
+from payments.models import Payment
+from payments.services import deposit_amount
 from reservations.availability import is_space_available
 from reservations.models import Reservation
+from reservations.no_show import no_show_window
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Read-only view of a payment. Nothing here is client-settable."""
+
+    provider_display = serializers.CharField(
+        source='get_provider_display', read_only=True
+    )
+    status_display = serializers.CharField(
+        source='get_status_display', read_only=True
+    )
+    outcome_display = serializers.CharField(
+        source='get_outcome_display', read_only=True
+    )
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id',
+            'provider',
+            'provider_display',
+            'amount',
+            'status',
+            'status_display',
+            'outcome',
+            'outcome_display',
+            'provider_reference',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+
+class OpeningHoursSerializer(serializers.ModelSerializer):
+    day_display = serializers.CharField(
+        source='get_day_of_week_display', read_only=True
+    )
+    runs_past_midnight = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = OpeningHours
+        fields = [
+            'day_of_week',
+            'day_display',
+            'is_closed',
+            'opens',
+            'closes',
+            'runs_past_midnight',
+        ]
+        read_only_fields = fields
+
+
+class MenuItemSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    # Additive: `image` still means the original, so a released build that
+    # has never heard of thumbnails keeps working exactly as it did.
+    thumbnail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MenuItem
+        fields = ['id', 'name', 'description', 'price', 'image', 'thumbnail']
+        read_only_fields = fields
+
+    def get_image(self, item):
+        """Absolute, or null — most items will have none, especially early."""
+        return copy_url(item, 'image', self.context.get('request'))
+
+    def get_thumbnail(self, item):
+        """What a menu row should actually fetch. Never null when `image`
+        is not: it falls back to the original."""
+        return copy_url(item, 'thumbnail', self.context.get('request'))
+
+
+class MenuCategorySerializer(serializers.Serializer):
+    """One category with its items. Empty categories are never emitted."""
+
+    category = serializers.CharField(read_only=True)
+    category_display = serializers.CharField(read_only=True)
+    items = MenuItemSerializer(many=True, read_only=True)
 
 
 class SpaceSerializer(serializers.ModelSerializer):
@@ -15,11 +104,79 @@ class SpaceSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'type', 'type_display', 'capacity']
 
 
+class SpaceWriteSerializer(serializers.ModelSerializer):
+    """A merchant laying out their room.
+
+    Separate from `SpaceSerializer` because that one is what a customer sees,
+    and `is_active` is not a customer's business — a deactivated space is
+    simply absent from their payload rather than present and marked.
+    """
+
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+
+    class Meta:
+        model = Space
+        fields = [
+            'id',
+            'name',
+            'type',
+            'type_display',
+            'capacity',
+            'is_active',
+        ]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError(_('Give the space a name.'))
+        return value
+
+    def validate_capacity(self, value):
+        # PositiveSmallIntegerField already refuses negatives, but zero is a
+        # valid positive integer and not a valid table.
+        if value < 1:
+            raise serializers.ValidationError(
+                _('A space seats at least one guest.')
+            )
+        return value
+
+    def validate(self, attrs):
+        """Surface the per-venue unique name as a field error, not a 500.
+
+        The database constraint is the real guard; without this the second
+        "Table 4" is an IntegrityError escaping as a server error.
+        """
+        establishment = self.context.get('establishment')
+        name = attrs.get('name', getattr(self.instance, 'name', None))
+
+        if establishment is not None and name is not None:
+            clash = Space.objects.filter(
+                establishment=establishment, name__iexact=name
+            )
+            if self.instance is not None:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError(
+                    {'name': _('There is already a space called that here.')}
+                )
+
+        return attrs
+
+
 class EstablishmentListSerializer(serializers.ModelSerializer):
     """Slim payload for the customer's browse screen."""
 
     type_display = serializers.CharField(source='get_type_display', read_only=True)
     space_count = serializers.IntegerField(read_only=True)
+
+    # Computed here rather than in the app: the overnight arithmetic should
+    # exist once, and both apps should agree on the answer.
+    is_open_now = serializers.SerializerMethodField()
+    closes_at = serializers.SerializerMethodField()
+    # Sent by the detail endpoint too. Without it the browse card cannot tell
+    # "closed right now" from "this venue never told us its hours", and every
+    # row reads "Hours not listed" however complete the record is.
+    today = serializers.SerializerMethodField()
 
     class Meta:
         model = Establishment
@@ -33,12 +190,39 @@ class EstablishmentListSerializer(serializers.ModelSerializer):
             'latitude',
             'longitude',
             'space_count',
+            'is_open_now',
+            'closes_at',
+            'today',
+            'theme_preset',
         ]
+
+    def get_is_open_now(self, establishment):
+        return is_open_at(establishment)
+
+    def get_closes_at(self, establishment):
+        return closing_time_at(establishment)
+
+    def get_today(self, establishment):
+        hours = todays_hours(establishment)
+        return None if hours is None else OpeningHoursSerializer(hours).data
 
 
 class EstablishmentDetailSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
-    spaces = SpaceSerializer(many=True, read_only=True)
+    spaces = serializers.SerializerMethodField()
+
+    is_open_now = serializers.SerializerMethodField()
+    closes_at = serializers.SerializerMethodField()
+    today = serializers.SerializerMethodField()
+    hours = serializers.SerializerMethodField()
+    menu = serializers.SerializerMethodField()
+    no_show_window_minutes = serializers.SerializerMethodField()
+    deposit_amount = serializers.SerializerMethodField()
+
+    # Computed, never stored: a denormalised average drifts the moment a
+    # review is hidden, and hiding is the point of moderation.
+    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    review_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Establishment
@@ -51,10 +235,94 @@ class EstablishmentDetailSerializer(serializers.ModelSerializer):
             'address',
             'latitude',
             'longitude',
+            'is_open_now',
+            'closes_at',
+            'today',
+            'hours',
+            'menu',
+            'average_rating',
+            'review_count',
+            'theme_preset',
             'opening_hours',
             'spaces',
+            'no_show_window_minutes',
+            'deposit_amount',
             'created_at',
         ]
+
+    def get_deposit_amount(self, establishment):
+        """What a mobile money booking here pays up front.
+
+        Sent for the same reason as the grace period: the customer has to be
+        told what is being taken, and what happens to it, before it is taken.
+        """
+        return str(deposit_amount())
+
+    def get_no_show_window_minutes(self, establishment):
+        """What a booking taken here right now would be held for.
+
+        Sent so the customer can be told the grace period *before* they book.
+        A forfeited deposit is only defensible if this figure was on screen
+        beforehand, and it differs between a restaurant and a lounge.
+        """
+        return no_show_window(establishment)
+
+    def get_spaces(self, establishment):
+        """Only spaces still in service.
+
+        A deactivated table is absent rather than present and marked: a
+        customer has no use for the distinction, and listing it invites the
+        app to offer a table that is no longer there.
+        """
+        return SpaceSerializer(
+            establishment.spaces.filter(is_active=True), many=True
+        ).data
+
+    def get_is_open_now(self, establishment):
+        return is_open_at(establishment)
+
+    def get_closes_at(self, establishment):
+        """When the interval in progress ends, or null when closed."""
+        return closing_time_at(establishment)
+
+    def get_today(self, establishment):
+        """The current day's hours, or null if the merchant never set them.
+
+        Only ever the current day — falling back to another day would tell a
+        customer a shut venue is open.
+        """
+        row = todays_hours(establishment)
+        return None if row is None else OpeningHoursSerializer(row).data
+
+    def get_hours(self, establishment):
+        """All seven days, so the app can render a full week."""
+        return OpeningHoursSerializer(week_schedule(establishment), many=True).data
+
+    def get_menu(self, establishment):
+        """Available items grouped by category.
+
+        Unavailable items are excluded, and a category with nothing left in it
+        is dropped entirely rather than sent as an empty group — otherwise the
+        app renders a heading with nothing under it.
+        """
+        available = [
+            item for item in establishment.menu_items.all() if item.is_available
+        ]
+        groups = []
+        for value, label in MenuItem.Category.choices:
+            items = [item for item in available if item.category == value]
+            if not items:
+                continue
+            groups.append(
+                {
+                    'category': value,
+                    'category_display': label,
+                    'items': MenuItemSerializer(
+                        items, many=True, context=self.context
+                    ).data,
+                }
+            )
+        return groups
 
 
 class SlotSerializer(serializers.Serializer):
@@ -85,6 +353,48 @@ class ReservationSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     can_cancel = serializers.SerializerMethodField()
 
+    # Written on create to choose how to pay; read back as how the booking is
+    # actually being paid, cash included. The Reservation property behind it
+    # reports cash_on_arrival when no Payment row exists.
+    payment_provider = serializers.ChoiceField(
+        choices=Payment.Provider.choices,
+        required=False,
+        default=Payment.Provider.CASH_ON_ARRIVAL,
+        help_text=(
+            'cash_on_arrival (the default) books exactly as before. A mobile '
+            'money provider opens a payment, and the booking is confirmed only '
+            'once that payment completes.'
+        ),
+    )
+    payment_provider_display = serializers.SerializerMethodField()
+
+    # Flat fields so a merchant list can render a badge per row without
+    # digging into the nested payment object.
+    payment_status = serializers.CharField(read_only=True, allow_null=True)
+    is_paid = serializers.BooleanField(read_only=True)
+    can_confirm = serializers.SerializerMethodField()
+
+    payment = serializers.SerializerMethodField()
+
+    def get_payment_provider_display(self, reservation):
+        return Payment.Provider(reservation.payment_provider).label
+
+    def get_can_confirm(self, reservation):
+        """Whether the merchant may confirm this booking right now.
+
+        Sent so the app can disable the button, but the server enforces it
+        regardless — see ReservationViewSet.confirm.
+        """
+        return (
+            reservation.status == Reservation.Status.PENDING
+            and not reservation.needs_payment_before_confirming
+        )
+
+    def get_payment(self, reservation):
+        """The most recent payment, or null for cash on arrival."""
+        payment = reservation.latest_payment
+        return None if payment is None else PaymentSerializer(payment).data
+
     def get_can_cancel(self, reservation):
         """Whether the customer may still cancel this themselves.
 
@@ -112,9 +422,23 @@ class ReservationSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
             'can_cancel',
+            'can_confirm',
+            'payment_provider',
+            'payment_provider_display',
+            'payment_status',
+            'is_paid',
+            'payment',
+            'arrived_at',
+            'no_show_after_minutes',
             'created_at',
         ]
-        read_only_fields = ['status', 'reference', 'created_at']
+        read_only_fields = [
+            'status',
+            'reference',
+            'arrived_at',
+            'no_show_after_minutes',
+            'created_at',
+        ]
 
     def validate_party_size(self, value):
         if value < 1:
@@ -136,6 +460,14 @@ class ReservationSerializer(serializers.ModelSerializer):
         space = attrs.get('space')
         party_size = attrs.get('party_size')
         start = attrs.get('datetime')
+
+        # A deactivated space is absent from every list the app builds from,
+        # so reaching this means a stale screen or a direct call. Either way
+        # the table is gone.
+        if space and not space.is_active:
+            raise serializers.ValidationError(
+                {'space': _('%(name)s is no longer bookable.') % {'name': space.name}}
+            )
 
         if space and party_size and party_size > space.capacity:
             raise serializers.ValidationError(

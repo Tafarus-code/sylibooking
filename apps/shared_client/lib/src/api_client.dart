@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'customer_models.dart';
 import 'models.dart';
+import 'order_models.dart';
 
 /// A non-2xx response from the API.
 ///
@@ -17,6 +20,20 @@ class ApiException implements Exception {
 
   bool get isUnauthorized => statusCode == 401 || statusCode == 403;
   bool get isConflict => statusCode == 409;
+
+  /// Refused for asking too often, not for being wrong.
+  ///
+  /// Worth its own flag because the apps say something different for it: a
+  /// throttle the user cannot tell apart from a crash gets reported as one.
+  bool get isThrottled => statusCode == 429;
+
+  /// The server's own message, unless it is a throttle.
+  ///
+  /// DRF's throttle reply is English and counts seconds; neither belongs on
+  /// a customer's screen. Everything else the API says is already localised
+  /// and already written for the person reading it.
+  String messageOr({required String whenThrottled}) =>
+      isThrottled ? whenThrottled : message;
   bool get isNotFound => statusCode == 404;
 
   String get message {
@@ -41,17 +58,70 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
+/// What to say when the network is at fault, in the reader's language.
+///
+/// These two sentences are the only ones the client produces itself —
+/// everything else a user reads comes from the API, which already answers in
+/// the right language. A transport failure never reaches the server, so there
+/// is nobody to translate it but the app.
+///
+/// Supplied by whoever builds the client rather than read from a catalogue
+/// here: `shared_client` is used by two apps with two catalogues, and it has
+/// no business knowing about either.
+class ApiNetworkText {
+  const ApiNetworkText({required this.slow, required this.unreachable});
+
+  /// Answered too late, or not yet — the request may still be travelling.
+  final String slow;
+
+  /// Never got there at all.
+  final String unreachable;
+}
+
 /// Thrown when the API cannot be reached at all.
 class ApiUnreachableException implements Exception {
-  ApiUnreachableException(this.cause);
+  ApiUnreachableException(this.cause, {String? message}) : _message = message;
 
   final Object cause;
 
+  /// Localised wording, when the client was given any. English otherwise, so
+  /// a caller that never sets it behaves exactly as it did before.
+  final String? _message;
+
   String get message =>
+      _message ??
       'Could not reach the server. Check the connection and the API address.';
 
   @override
   String toString() => 'ApiUnreachableException: $cause';
+}
+
+/// The request was not refused — it was never answered in time.
+///
+/// A subclass rather than a sibling, deliberately: every screen that already
+/// handles "cannot reach the server" keeps working unchanged, and only the
+/// screens that want to say something softer have to know this exists.
+///
+/// The distinction is worth drawing at all because the two mean different
+/// things to the person holding the phone. Unreachable is usually the address
+/// or an aeroplane-mode kind of gone. A timeout on a Conakry mobile network is
+/// the ordinary case — the request may well still be travelling — and telling
+/// someone their connection failed when it is merely slow invites them to
+/// retry something that is already in flight.
+class ApiTimeoutException extends ApiUnreachableException {
+  ApiTimeoutException(super.cause, this.limit, {super.message});
+
+  /// How long was waited before giving up.
+  final Duration limit;
+
+  @override
+  String get message =>
+      _message ??
+      'The server is taking longer than usual to answer. It may just be a '
+      'slow connection.';
+
+  @override
+  String toString() => 'ApiTimeoutException after $limit: $cause';
 }
 
 /// HTTP client for the Sylibooking API, shared by both apps.
@@ -59,14 +129,62 @@ class ApiUnreachableException implements Exception {
 /// Holds an auth token once [login] succeeds, or accepts a stored one via
 /// [token] so a returning user is not asked to sign in again.
 class SylibookingApi {
-  SylibookingApi({required this.baseUrl, http.Client? httpClient, this.token})
-      : _http = httpClient ?? http.Client();
+  SylibookingApi({
+    required this.baseUrl,
+    http.Client? httpClient,
+    this.token,
+    this.readTimeout = const Duration(seconds: 15),
+    this.writeTimeout = const Duration(seconds: 30),
+    this.readRetries = 2,
+    Future<void> Function(Duration)? delay,
+  })  : _http = httpClient ?? http.Client(),
+        _delay = delay ?? _sleep;
+
+  static Future<void> _sleep(Duration d) => Future<void>.delayed(d);
 
   /// Root of the API, e.g. `http://10.0.2.2:8000/api`. No trailing slash.
   final String baseUrl;
   final http.Client _http;
 
+  /// How long a read may take before it is treated as a timeout.
+  ///
+  /// `package:http` has no timeout of its own, so without this a stalled
+  /// connection — the usual failure here, rather than a clean refusal —
+  /// leaves a spinner turning for as long as the app is open.
+  final Duration readTimeout;
+
+  /// Longer than [readTimeout], because a write can legitimately take longer:
+  /// initiating a mobile money payment waits on a provider, where listing
+  /// venues waits on a database.
+  final Duration writeTimeout;
+
+  /// How many times a read is retried after the first attempt fails.
+  ///
+  /// Reads only. See [_send] for why writes are never retried.
+  final int readRetries;
+
+  /// Injected so tests can assert the backoff without waiting through it.
+  final Future<void> Function(Duration) _delay;
+
+  /// Doubling from 400ms: long enough for a blip to pass, short enough that
+  /// three attempts still fit inside someone's patience.
+  Duration _backoff(int attempt) =>
+      Duration(milliseconds: 400 * (1 << (attempt - 1)));
+
   String? token;
+
+  /// Which language the server should answer in, e.g. 'fr'.
+  ///
+  /// Set from the app's chosen locale. Null sends no header at all, which the
+  /// server reads as English — so a client that never sets this behaves
+  /// exactly as it did before the API learned any French.
+  String? languageCode;
+
+  /// The two sentences the client has to write for itself, localised.
+  ///
+  /// Set alongside [languageCode] — same lifetime, same reason. Null keeps the
+  /// English defaults on the exceptions.
+  ApiNetworkText? networkText;
 
   bool get isAuthenticated => token != null && token!.isNotEmpty;
 
@@ -74,20 +192,60 @@ class SylibookingApi {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         if (isAuthenticated) 'Authorization': 'Token $token',
+        // The API translates its error messages, and an English sentence
+        // arriving in a French app is the one thing that still gives it away.
+        'Accept-Language': ?languageCode,
       };
 
   Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(
         '$baseUrl$path',
       ).replace(queryParameters: query?.isEmpty ?? true ? null : query);
 
-  Future<dynamic> _send(Future<http.Response> Function() request) async {
-    final http.Response response;
-    try {
-      response = await request();
-    } on Object catch (error) {
-      throw ApiUnreachableException(error);
+  /// Perform a request, with a deadline and — for reads only — a retry.
+  ///
+  /// **Reads are retried. Writes are never retried, and must not be.**
+  ///
+  /// A GET that fails is worth trying again: nothing changed on the server, so
+  /// the worst case is a wasted request. A POST is the opposite. When a write
+  /// times out, the request may already have reached the server and been
+  /// acted on — the answer is what went missing, not the work. Retrying it
+  /// books the table twice, or charges the deposit twice, and the customer
+  /// discovers which on arrival.
+  ///
+  /// That is why this takes [idempotent] from the caller rather than
+  /// inspecting the HTTP verb: the decision belongs to whoever knows what the
+  /// call does. If a future change makes writes retryable, it needs an
+  /// idempotency key travelling with the request and agreed with the server —
+  /// not a wider condition here.
+  Future<dynamic> _send(
+    Future<http.Response> Function() request, {
+    bool idempotent = false,
+  }) async {
+    final timeout = idempotent ? readTimeout : writeTimeout;
+    final attempts = idempotent ? readRetries + 1 : 1;
+
+    http.Response? response;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        response = await request().timeout(timeout);
+        break;
+      } on Object catch (error) {
+        final failure = error is TimeoutException
+            ? ApiTimeoutException(error, timeout,
+                message: networkText?.slow)
+            : ApiUnreachableException(error,
+                message: networkText?.unreachable);
+        if (attempt == attempts) throw failure;
+        await _delay(_backoff(attempt));
+      }
     }
 
+    // Decoding sits outside the retry: a 400 is the server answering, not the
+    // network failing, and asking again would get the same refusal.
+    return _decode(response!);
+  }
+
+  dynamic _decode(http.Response response) {
     if (response.statusCode == 204 || response.body.isEmpty) {
       if (response.statusCode >= 400) {
         throw ApiException(response.statusCode, const {});
@@ -116,8 +274,10 @@ class SylibookingApi {
     return decoded;
   }
 
-  Future<dynamic> _get(String path, [Map<String, String>? query]) =>
-      _send(() => _http.get(_uri(path, query), headers: _headers));
+  Future<dynamic> _get(String path, [Map<String, String>? query]) => _send(
+        () => _http.get(_uri(path, query), headers: _headers),
+        idempotent: true,
+      );
 
   Future<dynamic> _post(String path, [Map<String, dynamic>? body]) => _send(
         () => _http.post(
@@ -126,6 +286,18 @@ class SylibookingApi {
           body: body == null ? null : jsonEncode(body),
         ),
       );
+
+  Future<dynamic> _patch(String path, Map<String, dynamic> body) => _send(
+        () => _http.patch(_uri(path), headers: _headers, body: jsonEncode(body)),
+      );
+
+  /// Takes a list body: the hours endpoint replaces a whole week at once.
+  Future<dynamic> _put(String path, Object body) => _send(
+        () => _http.put(_uri(path), headers: _headers, body: jsonEncode(body)),
+      );
+
+  Future<dynamic> _delete(String path) =>
+      _send(() => _http.delete(_uri(path), headers: _headers));
 
   // --- Auth ---------------------------------------------------------------
 
@@ -197,11 +369,13 @@ class SylibookingApi {
 
   // --- Reservations -------------------------------------------------------
 
-  /// Merchant-side listing. Scoped server-side to the caller's own venues.
+  /// Merchant-side listing for one venue.
   ///
+  /// [establishmentId] is required — listings are no longer merged across
+  /// venues, and the server refuses one the caller has no membership in.
   /// [date] matches one day; [from]/[to] match an inclusive range.
   Future<Page<Reservation>> reservations({
-    int? establishmentId,
+    required int establishmentId,
     ReservationStatus? status,
     DateTime? date,
     DateTime? from,
@@ -209,7 +383,7 @@ class SylibookingApi {
     int? page,
   }) async {
     final json = await _get('/reservations/', {
-      if (establishmentId != null) 'establishment': '$establishmentId',
+      'establishment': '$establishmentId',
       if (status != null) 'status': status.wireValue,
       if (date != null) 'date': formatDate(date),
       if (from != null) 'date_from': formatDate(from),
@@ -224,7 +398,7 @@ class SylibookingApi {
   /// A week at a busy venue exceeds one page, and a merchant scrolling their
   /// calendar should not silently see only the first twenty.
   Future<List<Reservation>> allReservations({
-    int? establishmentId,
+    required int establishmentId,
     ReservationStatus? status,
     DateTime? date,
     DateTime? from,
@@ -270,12 +444,19 @@ class SylibookingApi {
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Book a slot.
+  ///
+  /// [paymentProvider] defaults to cash on arrival, which leaves the booking
+  /// pending for the merchant to confirm. A mobile money provider opens a
+  /// payment; the booking confirms only once that payment completes. The
+  /// amount is decided by the server — it is deliberately not a parameter.
   Future<Reservation> createReservation({
     required int spaceId,
     required String customerName,
     required String customerPhone,
     required DateTime when,
     required int partySize,
+    PaymentProvider paymentProvider = PaymentProvider.cashOnArrival,
   }) async {
     final json = await _post('/reservations/', {
       'space': spaceId,
@@ -283,8 +464,18 @@ class SylibookingApi {
       'customer_phone': customerPhone,
       'datetime': when.toUtc().toIso8601String(),
       'party_size': partySize,
+      'payment_provider': paymentProvider.wireValue,
     });
     return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Ask where a booking's payment stands.
+  ///
+  /// The server polls the provider and applies the result, so a payment that
+  /// settled since the last call confirms the booking here.
+  Future<PaymentStatusResult> paymentStatus(String reference) async {
+    final json = await _get('/reservations/ref/$reference/payment/');
+    return PaymentStatusResult.fromJson(json as Map<String, dynamic>);
   }
 
   Future<Reservation> confirmReservation(int id) async {
@@ -292,9 +483,660 @@ class SylibookingApi {
     return Reservation.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Mark the guests as arrived, which closes the booking.
+  ///
+  /// The server refuses a booking that has not started, or one that is no
+  /// longer open — a table cannot be freed by declaring tomorrow's guests
+  /// already gone.
+  Future<Reservation> completeReservation(int id) async {
+    final json = await _post('/reservations/$id/complete/', const {});
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Give back a deposit kept for a no-show, leaving the booking missed.
+  ///
+  /// The venue held the table and lost it; that stays in the record. Only
+  /// the money moves.
+  Future<Reservation> refundDeposit(int id) async {
+    final json = await _post('/reservations/$id/refund-deposit/', const {});
+    return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<Reservation> cancelReservation(int id) async {
     final json = await _post('/reservations/$id/cancel/');
     return Reservation.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Customer accounts (optional) ----------------------------------------
+
+  /// Make an account. Signup signs you in, so a token comes back with it.
+  Future<CustomerSession> registerCustomer({
+    required String username,
+    required String password,
+    String name = '',
+    // Optional, and the only way back in after a forgotten password.
+    String phone = '',
+    String email = '',
+  }) async {
+    final json = await _post('/customer/register/', {
+      'username': username,
+      'password': password,
+      'name': name,
+      'phone': phone,
+      'email': email,
+    });
+    final session = CustomerSession.fromJson(json as Map<String, dynamic>);
+    token = session.token;
+    return session;
+  }
+
+  /// Sign in an existing customer. Shares the merchant login endpoint —
+  /// one user table, and a customer is simply a user with no venues.
+  Future<CustomerSession> signInCustomer({
+    required String username,
+    required String password,
+  }) async {
+    final json = await _post('/auth/login/', {
+      'username': username,
+      'password': password,
+    });
+    final map = json as Map<String, dynamic>;
+    final session = CustomerSession(
+      token: map['token'] as String,
+      customer: CustomerAccount.fromJson(
+        map['user'] as Map<String, dynamic>,
+      ),
+    );
+    token = session.token;
+    return session;
+  }
+
+  /// Ask for a reset code. The answer is the same whether or not the account
+  /// exists, so the app must not treat "sent" as proof of anything.
+  Future<PasswordResetRequest> requestPasswordReset(String identifier) async {
+    final json = await _post('/customer/password-reset/', {
+      'identifier': identifier,
+    });
+    return PasswordResetRequest.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Use the code. Succeeds or throws with a message worth showing.
+  Future<String> confirmPasswordReset({
+    required String identifier,
+    required String code,
+    required String newPassword,
+  }) async {
+    final json = await _post('/customer/password-reset/confirm/', {
+      'identifier': identifier,
+      'code': code,
+      'new_password': newPassword,
+    });
+    return (json as Map<String, dynamic>)['detail'] as String? ?? '';
+  }
+
+  Future<CustomerAccount> customerMe() async {
+    final json = await _get('/customer/me/');
+    return CustomerAccount.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Hand this phone's bookings and orders to the account just signed into.
+  Future<({int reservations, int orders})> claim({
+    List<String> reservationReferences = const [],
+    List<String> orderReferences = const [],
+  }) async {
+    final json = await _post('/customer/claim/', {
+      'reservation_references': reservationReferences,
+      'order_references': orderReferences,
+    });
+    final map = json as Map<String, dynamic>;
+    return (
+      reservations: map['reservations'] as int? ?? 0,
+      orders: map['orders'] as int? ?? 0,
+    );
+  }
+
+  /// Everything this account has booked or ordered, from the server rather
+  /// than from this phone — which is the whole point of having one.
+  Future<({List<Reservation> reservations, List<Order> orders})>
+      customerHistory() async {
+    final json = await _get('/customer/history/') as Map<String, dynamic>;
+    return (
+      reservations: (json['reservations'] as List<dynamic>? ?? [])
+          .map((e) => Reservation.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      orders: (json['orders'] as List<dynamic>? ?? [])
+          .map((e) => Order.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Future<List<Establishment>> favourites() async {
+    final json = await _get('/customer/favourites/') as Map<String, dynamic>;
+    return (json['results'] as List<dynamic>? ?? [])
+        .map((e) => Establishment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Save one venue, or merge a phone's whole list up at sign-in.
+  Future<List<Establishment>> addFavourites(List<int> establishmentIds) async {
+    final json = await _post('/customer/favourites/', {
+      'establishments': establishmentIds,
+    }) as Map<String, dynamic>;
+    return (json['results'] as List<dynamic>? ?? [])
+        .map((e) => Establishment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> removeFavourite(int establishmentId) async {
+    await _delete('/customer/favourites/$establishmentId/');
+  }
+
+  // --- Ordering ahead -------------------------------------------------------
+
+  /// Place a pickup order. No account: the reference that comes back is the
+  /// only handle on it, exactly as with a booking.
+  Future<Order> createOrder({
+    required int establishmentId,
+    required String customerName,
+    required String customerPhone,
+    required DateTime pickupTime,
+    required List<CartLine> items,
+    PaymentProvider paymentProvider = PaymentProvider.cashOnArrival,
+    String? reservationReference,
+  }) async {
+    final json = await _post('/orders/', {
+      'establishment': establishmentId,
+      'customer_name': customerName,
+      'customer_phone': customerPhone,
+      'pickup_time': pickupTime.toUtc().toIso8601String(),
+      'items': [for (final line in items) line.toJson()],
+      'payment_provider': paymentProvider.wireValue,
+      'reservation_reference': ?reservationReference,
+    });
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Follow an order. The server polls the payment provider on the way, so
+  /// refreshing this screen is what settles a payment that went through.
+  Future<Order> orderByReference(String reference) async {
+    final json = await _get('/orders/ref/$reference/');
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// The kitchen queue for one venue, for the day being worked.
+  /// One page of the kitchen queue.
+  ///
+  /// Paged rather than everything: a busy Saturday is not twenty tickets,
+  /// and a screen that waits for all of them before showing any is a screen
+  /// nobody uses at the moment they most need it.
+  Future<Page<Order>> merchantOrders({
+    required int establishmentId,
+    DateTime? date,
+    int page = 1,
+  }) async {
+    final json = await _get('/merchant/orders/', {
+      'establishment': '$establishmentId',
+      if (date != null) 'date': formatDate(date),
+      if (page > 1) 'page': '$page',
+    });
+    return Page.fromJson(json as Map<String, dynamic>, Order.fromJson);
+  }
+
+  Future<Order> setOrderStatus(int orderId, OrderStatus status) async {
+    final json = await _post('/merchant/orders/$orderId/status/', {
+      'status': status.wireValue,
+    });
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Reviews and photos -------------------------------------------------
+
+  Future<Page<Review>> reviews(int establishmentId, {int? page}) async {
+    final json = await _get('/establishments/$establishmentId/reviews/', {
+      if (page != null) 'page': '$page',
+    });
+    return Page.fromJson(json as Map<String, dynamic>, Review.fromJson);
+  }
+
+  /// Leave a review for a completed visit.
+  ///
+  /// [reservationReference] is the credential: an account is optional and
+  /// most customers will not have one, so holding the reference is what
+  /// proves the visit happened. The server
+  /// rejects anything not completed, not at this venue, or already reviewed.
+  Future<Review> createReview({
+    required int establishmentId,
+    required String reservationReference,
+    required int rating,
+    String comment = '',
+  }) async {
+    final json = await _post('/establishments/$establishmentId/reviews/', {
+      'reservation_reference': reservationReference,
+      'rating': rating,
+      'comment': comment,
+    });
+    return Review.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Page<Photo>> photos(int establishmentId, {int? page}) async {
+    final json = await _get('/establishments/$establishmentId/photos/', {
+      if (page != null) 'page': '$page',
+    });
+    return Page.fromJson(json as Map<String, dynamic>, Photo.fromJson);
+  }
+
+  /// Upload a photo.
+  ///
+  /// Pass [reservationReference] as a customer, or authenticate as staff of
+  /// the establishment. [bytes] and [filename] come from the image picker.
+  Future<Photo> uploadPhoto({
+    required int establishmentId,
+    required List<int> bytes,
+    required String filename,
+    String? reservationReference,
+    String caption = '',
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      _uri('/establishments/$establishmentId/photos/'),
+    );
+    if (isAuthenticated) {
+      request.headers['Authorization'] = 'Token $token';
+    }
+    if (reservationReference != null) {
+      request.fields['reservation_reference'] = reservationReference;
+    }
+    if (caption.isNotEmpty) request.fields['caption'] = caption;
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: filename),
+    );
+
+    final json = await _send(() async {
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    });
+    return Photo.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant venues ----------------------------------------------------
+
+  /// The venues this user has a membership in, with their role at each.
+  Future<List<MerchantVenue>> merchantVenues() async {
+    final json = await _get('/merchant/establishments/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => MerchantVenue.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Create a venue. The caller becomes its owner.
+  Future<Establishment> createEstablishment({
+    required String name,
+    required String type,
+    required String city,
+    required String address,
+    String tagline = '',
+    String description = '',
+  }) async {
+    final json = await _post('/merchant/establishments/', {
+      'name': name,
+      'type': type,
+      'city': city,
+      'address': address,
+      'tagline': tagline,
+      'description': description,
+    });
+    return Establishment.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// The venue's editable profile. Any member may read it.
+  Future<Establishment> merchantProfile(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/');
+    return Establishment.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Owner and manager only; the server returns 403 for staff.
+  Future<Establishment> updateProfile(
+    int establishmentId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/',
+      fields,
+    );
+    return Establishment.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant hours -----------------------------------------------------
+
+  Future<List<OpeningHours>> merchantHours(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/hours/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => OpeningHours.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Replace the whole week. A week is edited as a unit, so this is a PUT.
+  Future<List<OpeningHours>> replaceHours(
+    int establishmentId,
+    List<Map<String, dynamic>> week,
+  ) async {
+    final json = await _put(
+      '/merchant/establishments/$establishmentId/hours/',
+      week,
+    );
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => OpeningHours.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Keep a returning customer's details current.
+  ///
+  /// Only what an account may change about itself: not the username, which
+  /// is what they sign in with.
+  /// Featured dishes across every venue, for the browse screen's other half.
+  ///
+  /// Same ceiling as the venue list — it is the same catalogue seen from a
+  /// different angle, and it should not be a cheaper door for a scraper.
+  Future<Page<FeaturedItem>> featuredItems({String? city, String? type}) async {
+    final json = await _get('/featured-items/', {
+      'city': ?city,
+      'type': ?type,
+    });
+    return Page.fromJson(json as Map<String, dynamic>, FeaturedItem.fromJson);
+  }
+
+  Future<CustomerAccount> updateCustomerProfile({
+    String? name,
+    String? phone,
+    String? email,
+  }) async {
+    final json = await _patch('/customer/me/', {
+      'name': ?name,
+      'phone': ?phone,
+      'email': ?email,
+    });
+    return CustomerAccount.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Close the account for good.
+  ///
+  /// The password is asked for again because this cannot be undone and the
+  /// token on this phone may not be in the right hands. Past bookings stay
+  /// with the venue, stripped of anything that says whose they were.
+  Future<void> closeCustomerAccount({required String password}) async {
+    await _send(
+      () => _http.delete(
+        _uri('/customer/me/'),
+        headers: _headers,
+        body: jsonEncode({'password': password}),
+      ),
+    );
+    token = null;
+  }
+
+  // --- Merchant activity --------------------------------------------------
+
+  /// How much has arrived at this venue since [since].
+  ///
+  /// Counts only. The app already knows how to fetch the lists; what it
+  /// lacks is a reason to, and asking for the rows here would mean the same
+  /// data twice and a question about which copy is right.
+  Future<MerchantActivity> merchantActivity({
+    required int establishmentId,
+    required DateTime since,
+  }) async {
+    final json = await _get('/merchant/activity/', {
+      'establishment': '$establishmentId',
+      'since': since.toUtc().toIso8601String(),
+    });
+    return MerchantActivity.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant orders ----------------------------------------------------
+
+  /// Ring up an order for somebody standing at the counter.
+  ///
+  /// Everything the customer form insists on is optional: a walk-in may have
+  /// no phone, no name worth typing and no collection time other than now.
+  /// Cash always — there is no prompt to push at somebody in the room.
+  Future<Order> createWalkInOrder({
+    required int establishmentId,
+    required List<({int menuItemId, int quantity})> items,
+    String customerName = '',
+  }) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/orders/',
+      {
+        if (customerName.trim().isNotEmpty) 'customer_name': customerName.trim(),
+        'items': [
+          for (final line in items)
+            {'menu_item': line.menuItemId, 'quantity': line.quantity},
+        ],
+      },
+    );
+    return Order.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant reviews ---------------------------------------------------
+
+  /// What customers said, including anything an admin has taken down.
+  Future<MerchantReviewPage> merchantReviews(int establishmentId) async {
+    final json = await _get(
+      '/merchant/establishments/$establishmentId/reviews/',
+    );
+    return MerchantReviewPage.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Ask an admin to look at one review.
+  ///
+  /// Flagging is all a venue may do. It changes nothing a customer sees —
+  /// a venue able to hide its own bad reviews would leave the ratings worth
+  /// nothing to the people they exist to inform.
+  Future<MerchantReview> flagReview({
+    required int establishmentId,
+    required int reviewId,
+    required String reason,
+  }) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/reviews/$reviewId/flag/',
+      {'reason': reason},
+    );
+    return MerchantReview.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant spaces ----------------------------------------------------
+
+  /// Every space including retired ones. Any member may read it.
+  ///
+  /// Retired spaces are included so a merchant can see what they took out of
+  /// service and bring it back; the customer-facing payload omits them.
+  Future<List<Space>> merchantSpaces(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/spaces/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => Space.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Space> createSpace(
+    int establishmentId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/spaces/',
+      fields,
+    );
+    return Space.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Space> updateSpace(
+    int establishmentId,
+    int spaceId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/spaces/$spaceId/',
+      fields,
+    );
+    return Space.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Take a space out of service, or delete it outright if it never held a
+  /// booking.
+  ///
+  /// Returns null when the row is gone, and the retired space when it was
+  /// kept — the server decides which, because only it knows whether anything
+  /// was ever booked there. The caller uses the answer to say the right thing.
+  Future<Space?> removeSpace(int establishmentId, int spaceId) async {
+    final json = await _delete(
+      '/merchant/establishments/$establishmentId/spaces/$spaceId/',
+    );
+    return json == null
+        ? null
+        : Space.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant menu ------------------------------------------------------
+
+  /// Every item including unavailable ones. Any member may read it.
+  Future<List<MerchantMenuItem>> merchantMenu(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/menu/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => MerchantMenuItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<MerchantMenuItem> createMenuItem(
+    int establishmentId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/menu/',
+      fields,
+    );
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Attach or replace an item's picture.
+  ///
+  /// Separate from [updateMenuItem] because it is multipart; the rest of the
+  /// item is JSON, and mixing the two would make every text edit an upload.
+  Future<MerchantMenuItem> uploadMenuItemImage({
+    required int establishmentId,
+    required int itemId,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final request = http.MultipartRequest(
+      'PATCH',
+      _uri('/merchant/establishments/$establishmentId/menu/$itemId/'),
+    );
+    if (isAuthenticated) {
+      request.headers['Authorization'] = 'Token $token';
+    }
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: filename),
+    );
+
+    final json = await _send(() async {
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    });
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<MerchantMenuItem> updateMenuItem(
+    int establishmentId,
+    int itemId,
+    Map<String, dynamic> fields,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/menu/$itemId/',
+      fields,
+    );
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMenuItem(int establishmentId, int itemId) async {
+    await _delete('/merchant/establishments/$establishmentId/menu/$itemId/');
+  }
+
+  /// Mark an item sold out, or back on. Staff may do this; it is the one
+  /// menu change their role allows.
+  Future<MerchantMenuItem> setMenuItemAvailability(
+    int establishmentId,
+    int itemId,
+    bool isAvailable,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/menu/$itemId/availability/',
+      {'is_available': isAvailable},
+    );
+    return MerchantMenuItem.fromJson(json as Map<String, dynamic>);
+  }
+
+  // --- Merchant staff -----------------------------------------------------
+
+  /// Owner only; the server returns 403 for manager and staff alike.
+  Future<List<Membership>> merchantStaff(int establishmentId) async {
+    final json = await _get('/merchant/establishments/$establishmentId/staff/');
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((e) => Membership.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Membership> addStaff(
+    int establishmentId, {
+    required String username,
+    required MerchantRole role,
+  }) async {
+    final json = await _post(
+      '/merchant/establishments/$establishmentId/staff/',
+      {'username': username, 'role': role.name.toLowerCase()},
+    );
+    return Membership.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<Membership> changeStaffRole(
+    int establishmentId,
+    int membershipId,
+    MerchantRole role,
+  ) async {
+    final json = await _patch(
+      '/merchant/establishments/$establishmentId/staff/$membershipId/',
+      {'role': role.name.toLowerCase()},
+    );
+    return Membership.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<void> removeStaff(int establishmentId, int membershipId) async {
+    await _delete(
+      '/merchant/establishments/$establishmentId/staff/$membershipId/',
+    );
+  }
+
+  // --- Merchant dashboard -------------------------------------------------
+
+  /// Takings, outstanding money, and bookings worth chasing, for one venue.
+  ///
+  /// [establishmentId] is required: figures are no longer merged across
+  /// venues, and the server refuses a venue the caller has no part in.
+  Future<PaymentDashboard> paymentDashboard({
+    required int establishmentId,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final json = await _get('/dashboard/payments/', {
+      'establishment': '$establishmentId',
+      if (from != null) 'date_from': formatDate(from),
+      if (to != null) 'date_to': formatDate(to),
+    });
+    return PaymentDashboard.fromJson(json as Map<String, dynamic>);
   }
 
   void close() => _http.close();

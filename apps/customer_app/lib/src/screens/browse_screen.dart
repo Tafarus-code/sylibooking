@@ -3,16 +3,35 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_client/shared_client.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../booking_store.dart';
+import '../favourites_controller.dart';
+import '../directions.dart';
+import '../image_source.dart';
+import '../location_source.dart';
+import '../widgets/browse_header.dart';
+import '../widgets/establishment_card.dart';
+import '../widgets/featured_grid.dart';
 import 'establishment_screen.dart';
-import 'my_bookings_screen.dart';
 
 /// Discovery: what is open near me, and what kind of place is it.
 class BrowseScreen extends StatefulWidget {
-  const BrowseScreen({super.key, required this.api, required this.store});
+  const BrowseScreen({
+    super.key,
+    required this.api,
+    required this.store,
+    required this.favourites,
+    required this.imageSource,
+    required this.locationSource,
+    required this.directionsLauncher,
+  });
 
   final SylibookingApi api;
   final BookingStore store;
+  final FavouritesController favourites;
+  final ImageSource imageSource;
+  final LocationSource locationSource;
+  final DirectionsLauncher directionsLauncher;
 
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
@@ -23,14 +42,154 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Timer? _debounce;
 
   List<Establishment> _establishments = const [];
+
+  /// The other half of discovery. Loaded lazily: somebody who never taps
+  /// Dishes should not pay for the request.
+  List<FeaturedItem> _dishes = const [];
+  bool _dishesLoading = false;
+  bool _showDishes = false;
+
   bool _loading = true;
   String? _error;
   EstablishmentType? _typeFilter;
+
+  LatLng? _here;
+  LocationStatus _locationStatus = LocationStatus.unknown;
+  bool _sortByDistance = false;
+
+  /// Filtered client-side: the API has no open-now filter, and adding one
+  /// would mean the server deciding "now" for a list the client caches.
+  bool _openOnly = false;
+
+  /// Sentinels so the chip row can carry filters of different kinds.
+  static const _openNowFilter = 'open-now';
+  static const _nearestFilter = 'nearest';
+
+  /// From the last booking on this device, so the greeting knows a name
+  /// without requiring an account — most customers here will never make one.
+  String? _customerName;
+
+  /// Cover photo per venue, fetched lazily so the list is not blocked on it.
+  final Map<int, String?> _covers = {};
+
+  /// Sorting by distance is only offered once there is a position to sort by.
+  bool get _canSortByDistance => _here != null;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _locateIfAlreadyAllowed();
+    _loadCustomerName();
+  }
+
+  Future<void> _loadCustomerName() async {
+    final last = await widget.store.lastCustomer();
+    if (last == null || !mounted) return;
+    setState(() => _customerName = last.name);
+  }
+
+  /// Only asks the system for a fix if permission is already granted.
+  ///
+  /// Browsing must not open with a permission dialog: distance is a
+  /// convenience, and a prompt before the customer has seen anything is the
+  /// fastest way to get a permanent "no".
+  Future<void> _locateIfAlreadyAllowed() async {
+    if (!await widget.locationSource.hasPermission()) return;
+    await _locate();
+  }
+
+  Future<void> _locate() async {
+    final result = await widget.locationSource.current();
+    if (!mounted) return;
+    setState(() {
+      _here = result.position;
+      _locationStatus = result.status;
+      // Nothing to sort by if the fix did not arrive.
+      if (_here == null) _sortByDistance = false;
+    });
+  }
+
+  /// Explains why before prompting, so a refusal is an informed one.
+  Future<void> _askForLocation() async {
+    final l = L.of(context);
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.showDistancesTitle),
+        content: Text(l.showDistancesBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.notNow),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.allow),
+          ),
+        ],
+      ),
+    );
+    if (!(agreed ?? false)) return;
+
+    await _locate();
+    if (!mounted || _here != null) return;
+
+    // Nothing arrived. Say why, once, and carry on — browsing never depended
+    // on this.
+    final message = switch (_locationStatus) {
+      LocationStatus.denied => l.locationDenied,
+      LocationStatus.servicesOff => l.locationServicesOff,
+      _ => l.locationUnavailable,
+    };
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Fetch a venue's first photo once, for the card's cover.
+  ///
+  /// Deliberately after the list is on screen: the names and times are what a
+  /// customer is scanning, and they should not wait on images.
+  void _ensureCover(Establishment establishment) {
+    if (_covers.containsKey(establishment.id)) return;
+    _covers[establishment.id] = null;
+
+    widget.api.photos(establishment.id).then((page) {
+      if (!mounted || page.results.isEmpty) return;
+      setState(() => _covers[establishment.id] = page.results.first.thumbnailUrl);
+    }).catchError((Object _) {
+      // No cover is a normal state, not an error worth showing.
+    });
+  }
+
+  /// Distance from here, or null when either end has no coordinates.
+  double? _distanceTo(Establishment establishment) {
+    final here = _here;
+    final there = establishment.position;
+    if (here == null || there == null) return null;
+    return distanceKm(here, there);
+  }
+
+  List<Establishment> get _visible {
+    var shown = _establishments;
+    if (_openOnly) {
+      shown = shown.where((e) => e.isOpenNow).toList();
+    }
+    if (!_sortByDistance || _here == null) return shown;
+
+    final sorted = [...shown];
+    sorted.sort((a, b) {
+      final da = _distanceTo(a);
+      final db = _distanceTo(b);
+      // Venues with no coordinates sink to the bottom rather than sorting as
+      // if they were at the origin.
+      if (da == null && db == null) return a.name.compareTo(b.name);
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da.compareTo(db);
+    });
+    return sorted;
   }
 
   @override
@@ -64,7 +223,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        // The catalogue is throttled per connection now. DRF's own wording
+        // for that is English and counts seconds; this says the same thing
+        // in the customer's language and without the arithmetic.
+        _error = e.messageOr(whenThrottled: L.of(context).browsingTooFast);
         _loading = false;
       });
     } on ApiUnreachableException catch (e) {
@@ -84,170 +246,249 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+
+    // Chrome: this screen stays on the app theme no matter which venues, and
+    // therefore which presets, appear in the list below.
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Find a table'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.receipt_long),
-            tooltip: 'My bookings',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MyBookingsScreen(
-                  api: widget.api,
-                  store: widget.store,
+      body: SafeArea(
+        bottom: false,
+        // Header, filters and list share one measure, so the search field does
+        // not stretch to a desktop's full width while the cards stay centred.
+        child: ContentColumn(
+          maxWidth: ContentWidth.list,
+          child: Column(
+          children: [
+            BrowseHeader(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              customerName: _customerName,
+              onClear: () {
+                _searchController.clear();
+                _load();
+              },
+            ),
+            BrowseFilters(
+              options: [
+                (null, l.filterAll),
+                (EstablishmentType.restaurant, l.filterRestaurants),
+                (EstablishmentType.lounge, l.filterLounges),
+                (_openNowFilter, l.filterOpenNow),
+                (
+                  _nearestFilter,
+                  _canSortByDistance ? l.filterNearest : l.filterShowDistances,
                 ),
+              ],
+              isSelected: (value) => switch (value) {
+                _openNowFilter => _openOnly,
+                _nearestFilter => _sortByDistance,
+                final EstablishmentType? type => _typeFilter == type,
+                _ => false,
+              },
+              onSelected: (value) {
+                switch (value) {
+                  case _openNowFilter:
+                    setState(() => _openOnly = !_openOnly);
+                  case _nearestFilter:
+                    if (_canSortByDistance) {
+                      setState(() => _sortByDistance = !_sortByDistance);
+                    } else {
+                      _askForLocation();
+                    }
+                  case final EstablishmentType? type:
+                    setState(() => _typeFilter = type);
+                    _load();
+                }
+              },
+            ),
+            SegmentedToggle(
+              options: [l.browseVenues, l.browseDishes],
+              selectedIndex: _showDishes ? 1 : 0,
+              onSelected: (index) {
+                setState(() => _showDishes = index == 1);
+                if (_showDishes && _dishes.isEmpty) _loadDishes();
+              },
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _showDishes ? _loadDishes : _load,
+                child: _showDishes ? _dishesBody() : _body(),
               ),
             ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(112),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search by name',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    isDense: true,
-                    suffixIcon: _searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              _load();
-                            },
-                          ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (final entry in [
-                      (null, 'All'),
-                      (EstablishmentType.lounge, 'Lounges'),
-                      (EstablishmentType.restaurant, 'Restaurants'),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: FilterChip(
-                          label: Text(entry.$2),
-                          selected: _typeFilter == entry.$1,
-                          onSelected: (_) {
-                            setState(() => _typeFilter = entry.$1);
-                            _load();
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+          ],
           ),
         ),
       ),
-      body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }
 
+  Future<void> _loadDishes() async {
+    setState(() => _dishesLoading = true);
+    try {
+      final page = await widget.api.featuredItems(
+        type: switch (_typeFilter) {
+          EstablishmentType.lounge => 'lounge',
+          EstablishmentType.restaurant => 'restaurant',
+          _ => null,
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _dishes = page.results;
+        _dishesLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.messageOr(whenThrottled: L.of(context).browsingTooFast);
+        _dishesLoading = false;
+      });
+    } on ApiUnreachableException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _dishesLoading = false;
+      });
+    }
+  }
+
+  Widget _dishesBody() {
+    if (_dishesLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return FeaturedGrid(items: _dishes, onTap: _openDish);
+  }
+
+  /// A dish is a way into its venue, so the tap lands where booking happens —
+  /// under that venue's own branding, like any other route in.
+  ///
+  /// The feed carries only enough of the venue to name it, so the full record
+  /// is fetched on the way. One round trip on a deliberate tap is fair; doing
+  /// it for every card in the grid up front would not be.
+  Future<void> _openDish(FeaturedItem item) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final l = L.of(context);
+
+    try {
+      final establishment = await widget.api.establishment(item.establishmentId);
+      if (!mounted) return;
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (context) => EstablishmentScreen(
+            api: widget.api,
+            store: widget.store,
+            establishment: establishment,
+            directionsLauncher: widget.directionsLauncher,
+            here: _here,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.messageOr(whenThrottled: l.browsingTooFast))),
+      );
+    } on ApiUnreachableException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   Widget _body() {
+    final l = L.of(context);
+
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
       return _EmptyState(
         icon: Icons.cloud_off,
-        title: 'Could not load places',
+        title: l.couldNotLoadPlaces,
         detail: _error!,
-        action: FilledButton(onPressed: _load, child: const Text('Try again')),
+        action: FilledButton(onPressed: _load, child: Text(l.tryAgain)),
       );
     }
 
-    if (_establishments.isEmpty) {
-      return const _EmptyState(
+    final visible = _visible;
+
+    if (visible.isEmpty) {
+      // "Open now" filters client-side, so the list can empty out even when the
+      // fetch returned venues. Name that case rather than showing blank space.
+      return _EmptyState(
         icon: Icons.search_off,
-        title: 'Nothing found',
-        detail: 'Try a different name, or clear the filters.',
+        title: l.nothingFound,
+        detail: _openOnly && _establishments.isNotEmpty
+            ? l.nothingOpenRightNow
+            : l.nothingFoundDetail,
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _establishments.length,
-      itemBuilder: (context, index) {
-        final establishment = _establishments[index];
-        return _EstablishmentTile(
-          establishment: establishment,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => EstablishmentScreen(
-                api: widget.api,
-                store: widget.store,
-                establishment: establishment,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // One column on a phone, more as the window allows. Driven by the card
+        // width the design wants, not by a device guess.
+        final columns = columnsForWidth(constraints.maxWidth);
+
+        if (columns == 1) {
+          return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: visible.length,
+            itemBuilder: (context, index) => _card(visible[index]),
+          );
+        }
+
+        // Tall enough for the cover plus two lines of text under it. A grid
+        // cell is a fixed box, so this leans generous: empty space at the
+        // bottom of a card is survivable, a clipped rating line is not.
+        final cellWidth = constraints.maxWidth / columns;
+        var cellHeight = cellWidth / 0.92;
+
+        // Except on a short window, where a card taller than the viewport
+        // means never seeing a whole one. The card gives the cover back the
+        // height instead of overflowing.
+        final ceiling = constraints.maxHeight * 0.75;
+        if (constraints.hasBoundedHeight && cellHeight > ceiling) {
+          cellHeight = ceiling;
+        }
+
+        return GridView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            childAspectRatio: cellWidth / cellHeight,
           ),
+          itemCount: visible.length,
+          itemBuilder: (context, index) => _card(visible[index]),
         );
       },
     );
   }
-}
 
-class _EstablishmentTile extends StatelessWidget {
-  const _EstablishmentTile({required this.establishment, required this.onTap});
-
-  final Establishment establishment;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isLounge = establishment.type == EstablishmentType.lounge;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: isLounge
-              ? theme.colorScheme.tertiaryContainer
-              : theme.colorScheme.secondaryContainer,
-          child: Icon(
-            isLounge ? Icons.local_fire_department : Icons.restaurant,
-            color: isLounge
-                ? theme.colorScheme.onTertiaryContainer
-                : theme.colorScheme.onSecondaryContainer,
+  Widget _card(Establishment establishment) {
+    _ensureCover(establishment);
+    // Listens per card: the heart has to fill the instant it is tapped, and
+    // rebuilding the whole list for that would lose the scroll position on a
+    // long one.
+    return ListenableBuilder(
+      listenable: widget.favourites,
+      builder: (context, _) => EstablishmentCard(
+        establishment: establishment,
+        coverUrl: _covers[establishment.id],
+        distanceKm: _distanceTo(establishment),
+        isFavourite: widget.favourites.contains(establishment.id),
+        onToggleFavourite: () => widget.favourites.toggle(establishment.id),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EstablishmentScreen(
+              api: widget.api,
+              store: widget.store,
+              establishment: establishment,
+              here: _here,
+              directionsLauncher: widget.directionsLauncher,
+            ),
           ),
         ),
-        title: Text(establishment.name),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 2),
-            Text('${establishment.typeDisplay} · ${establishment.city}'),
-            if (establishment.spaceCount != null)
-              Text(
-                '${establishment.spaceCount} '
-                '${establishment.spaceCount == 1 ? "space" : "spaces"}',
-                style: theme.textTheme.bodySmall,
-              ),
-          ],
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
       ),
     );
   }

@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
+from decimal import Decimal
 from pathlib import Path
 
 from decouple import AutoConfig, Csv
@@ -57,15 +59,26 @@ INSTALLED_APPS = [
     'establishments',
     'reservations',
     'payments',
+    'orders',
+    'accounts',
+    'notifications',
     'api',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves the collected static files — the admin's CSS and the browsable
+    # API's — without a separate web server in front. There is no public
+    # website here, so a whole nginx to serve a few hundred kilobytes of
+    # admin assets would be a second thing to deploy and keep patched.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     # Must sit above CommonMiddleware so preflight OPTIONS requests get their
     # headers even when another middleware would short-circuit the response.
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # Reads Accept-Language and activates it for the request, so a French app
+    # gets French error messages back. Must sit above CommonMiddleware.
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -97,19 +110,59 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 #
 # DJANGO_ENV=local (the default) needs no configuration at all: SQLite in
-# backend/db.sqlite3. DJANGO_ENV=production reads the DB_* variables.
+# backend/db.sqlite3. DJANGO_ENV=production reads DATABASE_URL if the host
+# provides one, and the discrete DB_* variables otherwise.
+
+
+def _database_from_url(url):
+    """Parse the single connection string managed hosts hand out.
+
+    Render, Railway and Fly all inject one DATABASE_URL rather than five
+    variables, and it is generated — nobody types it, so nobody can split it
+    into DB_NAME and friends without a step that will eventually be skipped.
+
+    Hand-parsed rather than adding dj-database-url: it is a URL, the stdlib
+    parses URLs, and a dependency whose whole job is six lines is a
+    dependency to keep updated forever.
+    """
+    from urllib.parse import unquote, urlparse
+
+    parsed = urlparse(url)
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': parsed.path.lstrip('/'),
+        'USER': unquote(parsed.username or ''),
+        # Unquoted: a generated password routinely contains characters that
+        # have to be percent-encoded in a URL, and passing them through
+        # still encoded is an authentication failure that reads like a wrong
+        # password.
+        'PASSWORD': unquote(parsed.password or ''),
+        'HOST': parsed.hostname or 'localhost',
+        'PORT': str(parsed.port or 5432),
+        # Managed Postgres is reached over the network and expects TLS.
+        'OPTIONS': {'sslmode': config('DB_SSLMODE', default='require')},
+        # One connection reused for a minute rather than a fresh one per
+        # request. These hosts cap connections tightly and Celery holds its
+        # own alongside the web workers.
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+    }
+
 
 if DJANGO_ENV == 'production':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME'),
-            'USER': config('DB_USER'),
-            'PASSWORD': config('DB_PASSWORD'),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
+    _database_url = config('DATABASE_URL', default='')
+    if _database_url:
+        DATABASES = {'default': _database_from_url(_database_url)}
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': config('DB_NAME'),
+                'USER': config('DB_USER'),
+                'PASSWORD': config('DB_PASSWORD'),
+                'HOST': config('DB_HOST', default='localhost'),
+                'PORT': config('DB_PORT', default='5432'),
+            }
         }
-    }
 else:
     DATABASES = {
         'default': {
@@ -143,6 +196,15 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
+# English is the source language and the fallback; French is what most
+# customers here actually read. A request with no Accept-Language gets
+# English, which keeps every existing client working unchanged.
+LANGUAGES = [
+    ('en', 'English'),
+    ('fr', 'Français'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
+
 # Reservations are booked in local Guinean time; datetimes are still stored in
 # UTC (USE_TZ) and rendered in this zone.
 TIME_ZONE = 'Africa/Conakry'
@@ -156,6 +218,101 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+#: Where collectstatic writes. Baked into the image at build time rather than
+#: collected at boot — see the Dockerfile.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Uploaded files (establishment photos)
+#
+# Served by Django only when DEBUG is on — see config/urls.py. In production a
+# web server or object store serves MEDIA_URL; Django must not.
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Photos go to object storage in production, and have to.
+#
+# backend/media/ is inside the container: a redeploy replaces the container,
+# and every photo a merchant uploaded goes with it. That is not a performance
+# consideration, it is data loss on an ordinary Tuesday deploy — and the
+# people who lose it are venues who spent an evening photographing their room.
+#
+# Any S3-compatible bucket. Written that way on purpose: the endpoint is a
+# setting, so a regional provider can be used instead of AWS if that is what
+# is actually payable from Guinea.
+USE_S3_MEDIA = config('USE_S3_MEDIA', default=False, cast=bool)
+
+if USE_S3_MEDIA:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3.S3Storage',
+            'OPTIONS': {
+                'bucket_name': config('AWS_STORAGE_BUCKET_NAME'),
+                # R2 wants 'auto'; AWS wants a real region.
+                'region_name': config('AWS_S3_REGION_NAME', default='auto'),
+                # Blank for AWS itself; set for anyone else.
+                'endpoint_url': config('AWS_S3_ENDPOINT_URL', default='') or None,
+                'access_key': config('AWS_ACCESS_KEY_ID', default=''),
+                'secret_key': config('AWS_SECRET_ACCESS_KEY', default=''),
+                # No ACL. S3 has per-object ACLs and Cloudflare R2 does
+                # not — it rejects the header outright, so asking for
+                # 'public-read' fails every upload rather than making
+                # anything public. On R2 a bucket is served publicly by
+                # attaching a domain to it, which is what the custom domain
+                # below is for; on S3 use a bucket policy.
+                'default_acl': None,
+                # Unsigned URLs. Photos are shown to anyone browsing a venue,
+                # and a signed URL would expire in the middle of a gallery.
+                'querystring_auth': False,
+                # The public hostname in front of the bucket. Without it
+                # django-storages builds URLs against the S3 API endpoint,
+                # which on R2 is not publicly readable — every photo would
+                # 401 while looking perfectly configured.
+                'custom_domain': config('MEDIA_CUSTOM_DOMAIN', default='') or None,
+                # A photo never changes once uploaded — the filename carries a
+                # uuid — so it can be cached hard. On the connections this
+                # market runs on, that is the difference between a venue's
+                # gallery loading and not.
+                'object_parameters': {'CacheControl': 'max-age=86400'},
+                # Never silently overwrite: two venues uploading terrasse.jpg
+                # must not become one photo shown to both.
+                'file_overwrite': False,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+
+# Largest photo a customer or merchant may upload. Phones here produce large
+# files on poor connections, so the limit is enforced rather than hoped for.
+MAX_PHOTO_UPLOAD_BYTES = config(
+    'MAX_PHOTO_UPLOAD_BYTES', default=5 * 1024 * 1024, cast=int
+)
+ALLOWED_PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+
+# How many photos one venue's gallery may take in a day, from everyone
+# combined. A size cap alone bounds each file and nothing else: a hundred
+# admissible 5 MB uploads is still half a gigabyte of disk and a gallery
+# nobody can scroll. Counted per venue rather than per uploader because it is
+# the venue's gallery that suffers, and a customer with a reference is not the
+# only one who can post to it.
+MAX_PHOTOS_PER_VENUE_PER_DAY = config(
+    'MAX_PHOTOS_PER_VENUE_PER_DAY', default=40, cast=int
+)
+
+# The floor a password-reset request answers no faster than.
+#
+# The message is already the same whether or not the identifier exists. The
+# work behind it is not: a hit issues a code, writes a row and hands it to a
+# notifier, and a miss returns after one query. That difference is readable
+# from outside as a yes/no on whether an account exists, and it gets worse,
+# not better, once the notifier is a real SMS gateway making a network call.
+# So both answers wait out the same floor. Affordable because this endpoint
+# is already capped at a handful of requests an hour.
+PASSWORD_RESET_MIN_SECONDS = config(
+    'PASSWORD_RESET_MIN_SECONDS', default=0.25, cast=float
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -184,7 +341,40 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    # A floor under the whole API, so a route added next month is covered by
+    # having been written rather than by somebody remembering to cover it.
+    # Views that name their own throttles replace these, which is the order
+    # wanted: the tighter, purpose-built limit wins where there is one.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'api.throttling.AnonSurfaceThrottle',
+        'api.throttling.UserSurfaceThrottle',
+    ],
+    # See api/throttling.py for why each of these is keyed the way it is.
+    #
+    # The two surface rates and the browse rate are provisional. A blanket
+    # ceiling wants real traffic to size and there is none yet, so they are
+    # set loose enough that no honest use should ever meet them, and tightened
+    # once Slice 20 makes throttle hits visible.
+    'DEFAULT_THROTTLE_RATES': {
+        'anon_surface': '90/min',
+        'user_surface': '240/min',
+        'browse': '300/hour',
+        'login_ip': '10/min',
+        'login_username': '5/min',
+        'register': '5/hour',
+        'password_reset': '5/hour',
+        'password_reset_identifier': '3/hour',
+        'booking_ip': '30/hour',
+        'booking_phone': '5/hour',
+    },
 }
+
+# Off during tests: turning it on for the suite would mean every test that
+# signs in twice fighting a counter that outlives it. The tests that actually
+# care about throttling switch it back on explicitly.
+THROTTLING_ENABLED = config(
+    'THROTTLING_ENABLED', default='test' not in sys.argv, cast=bool
+)
 
 
 # CORS
@@ -215,6 +405,209 @@ CORS_ALLOW_CREDENTIALS = False
 # parsed — once it becomes structured, these three become per-establishment.
 
 RESERVATION_DURATION_MINUTES = 120
+
+# Payments
+#
+# Every provider currently resolves to the mock, which always succeeds. Real
+# Orange Money / MTN adapters land behind the same interface, so switching one
+# on is a change here rather than in the reservation flow.
+
+PAYMENT_PROVIDERS = {
+    'orange_money': 'payments.providers.MockPaymentProvider',
+    'mtn_money': 'payments.providers.MockPaymentProvider',
+}
+
+# What a mobile money booking pays up front, in Guinean francs. Global for now;
+# per-establishment pricing is a product decision, not a client-supplied value.
+RESERVATION_DEPOSIT_AMOUNT = Decimal(
+    config('RESERVATION_DEPOSIT_AMOUNT', default='50000')
+)
 AVAILABILITY_SLOT_MINUTES = 30
+
+# How long a table is held for someone who has not arrived, per kind of venue.
+# A lounge table is not lost at minute 16; a restaurant table held through a
+# dinner service costs more in refused walk-ins than the deposit protects.
+# Read only through reservations.no_show.no_show_window(), and captured on a
+# booking when it is taken — never re-read live once the booking exists.
+NO_SHOW_WINDOW_MINUTES = {
+    'restaurant': config('NO_SHOW_WINDOW_RESTAURANT', default=30, cast=int),
+    'lounge': config('NO_SHOW_WINDOW_LOUNGE', default=90, cast=int),
+}
 AVAILABILITY_WINDOW_START = '12:00'
 AVAILABILITY_WINDOW_END = '23:00'
+
+
+# --- Notifications --------------------------------------------------------
+# Same shape as PAYMENT_PROVIDERS: swapping the console stub for a real SMS
+# aggregator is a settings change, not a code change.
+NOTIFIERS = {
+    'sms': config(
+        'SMS_NOTIFIER',
+        default='accounts.notifications.ConsoleSmsNotifier',
+    ),
+    'email': config(
+        'EMAIL_NOTIFIER',
+        default='accounts.notifications.EmailNotifier',
+    ),
+}
+
+# Console in development, so a reset code is readable in the terminal without
+# anything actually leaving the machine.
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@sylibooking.gn')
+
+
+# --- Task queue -----------------------------------------------------------
+# Work that is not a request: reminders, the no-show sweep, payment polling.
+# Introduced empty on purpose — see config/celery.py.
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='')
+
+# Run tasks in-process during tests rather than needing a broker: the suite
+# tests what a task *does*, and a queue in the middle of that only adds a way
+# for it to be flaky. The tests that care about queueing say so explicitly.
+CELERY_TASK_ALWAYS_EAGER = config(
+    'CELERY_TASK_ALWAYS_EAGER', default=False, cast=bool
+)
+# Eager mode swallows exceptions by default, which would let a broken task
+# pass its own test.
+CELERY_TASK_EAGER_PROPAGATES = True
+
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = TIME_ZONE
+
+# A worker that never gives up holds a slot for ever. Nothing here is so
+# important that it should outlive the shift it belongs to.
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+
+# Losing a queued reminder because a worker restarted is worse than sending
+# one twice — and every task here is written to be safe to run twice.
+CELERY_TASK_ACKS_LATE = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Fail fast when the broker is unreachable rather than retrying inside the
+# request that is trying to queue. Callers already treat "could not queue" as
+# survivable — losing the work, not the booking — and that promise is worth
+# nothing if making it takes ten seconds.
+CELERY_BROKER_CONNECTION_RETRY = False
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 0
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'socket_connect_timeout': 2,
+    'socket_timeout': 2,
+}
+
+# What runs without anyone asking. Both are cheap and both are safe to run
+# repeatedly, which is what lets them run this often.
+CELERY_BEAT_SCHEDULE = {
+    'queue-due-reminders': {
+        'task': 'notifications.tasks.queue_due_reminders',
+        'schedule': 300.0,
+    },
+    'sweep-no-shows': {
+        'task': 'notifications.tasks.sweep_no_shows',
+        'schedule': 600.0,
+    },
+    # Often, because the task itself decides which payments are actually due
+    # — a tight beat with a decaying per-payment interval chases a fresh
+    # payment hard without hammering the provider for a stale one.
+    'poll-pending-payments': {
+        'task': 'notifications.tasks.poll_pending_payments',
+        'schedule': 30.0,
+    },
+}
+
+
+# --- Reminders ------------------------------------------------------------
+
+#: How long before a booking the customer is reminded.
+REMINDER_LEAD_HOURS = config('REMINDER_LEAD_HOURS', default=3, cast=int)
+
+#: Hours in which a reminder waits for morning instead of ringing a phone.
+#: A reminder that wakes somebody is worse than no reminder at all.
+REMINDER_QUIET_START = config('REMINDER_QUIET_START', default='22:00')
+REMINDER_QUIET_END = config('REMINDER_QUIET_END', default='07:00')
+
+#: How long a payment may sit pending before it is written off. Nobody
+#: approves a mobile money prompt half an hour later.
+PAYMENT_ABANDON_AFTER_MINUTES = config(
+    'PAYMENT_ABANDON_AFTER_MINUTES', default=30, cast=int
+)
+
+
+# --- Observability --------------------------------------------------------
+#
+# When something breaks in Conakry, the point is to find out from a dashboard
+# rather than from a merchant on the phone.
+
+#: JSON log lines in production, plain text where a person is reading them.
+STRUCTURED_LOGGING = config(
+    'STRUCTURED_LOGGING', default=DJANGO_ENV == 'production', cast=bool
+)
+LOG_LEVEL = config('LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO')
+
+from config.logging import logging_config  # noqa: E402
+
+LOGGING = logging_config(structured=STRUCTURED_LOGGING, level=LOG_LEVEL)
+
+#: Empty everywhere but production. See config/errors.py: with no DSN the
+#: reporter writes to the log, which is a real destination rather than a
+#: silent one.
+SENTRY_DSN = config('SENTRY_DSN', default='')
+
+
+# --- Production hardening -------------------------------------------------
+#
+# Only in production. Turning these on locally would mean a redirect to https
+# on a development server that does not speak it, which reads as the app
+# being broken.
+
+if DJANGO_ENV == 'production':
+    # TLS is terminated by the platform in front of this process, so Django
+    # has to be told to believe the header rather than the socket — without
+    # this it sees http, decides the request is insecure, and redirects
+    # forever.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+
+    # Six months. Deliberately not preloaded: preload is close to
+    # irreversible, and committing every future subdomain to https before
+    # there is a domain at all is a decision made too early.
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=15552000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = False
+
+    # Django warns about the line above (security.W021), and the warning is
+    # right in general and wrong here. Preloading is close to irreversible —
+    # browsers ship the list — and it commits every future subdomain to https
+    # before this project has a domain at all. Silenced rather than obeyed,
+    # so the rest of the deployment checklist can fail the build.
+    SILENCED_SYSTEM_CHECKS = ['security.W021']
+
+    # The session cookie is only used by /admin/ and the browsable API — the
+    # apps carry a token in a header — but /admin/ is the account that can
+    # read every booking on the platform.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+
+    # Trusted origins for CSRF, which /admin/ needs once it is behind a
+    # domain rather than localhost.
+    CSRF_TRUSTED_ORIGINS = config(
+        'CSRF_TRUSTED_ORIGINS', default='', cast=Csv()
+    )
+
+
+#: How a push is actually sent. The console sender runs everywhere until a
+#: Firebase project exists; swapping this is configuration, not a rewrite.
+PUSH_SENDER = config(
+    'PUSH_SENDER', default='notifications.push.ConsolePushSender'
+)

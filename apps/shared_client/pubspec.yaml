@@ -12,6 +12,11 @@ dependencies:
     sdk: flutter
   google_fonts: ^8.2.0
   http: ^1.2.2
+  # Push. Both apps register a device token against /api/devices/; the
+  # backend half has been ready since Slice 7. See push_registrar.dart for
+  # why an app without a Firebase project still runs.
+  firebase_core: ^4.1.1
+  firebase_messaging: ^16.0.2
 
 dev_dependencies:
   flutter_test:

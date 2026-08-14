@@ -4,12 +4,21 @@ django-cors-headers==4.9.0
 Pillow==12.3.0
 psycopg2-binary==2.9.10
 python-decouple==3.8
+
+# Talking to Orange Money, MTN, the SMS gateway and WhatsApp. One HTTP
+# client for all of them, so timeouts and error handling are decided once.
+requests==2.32.5
 celery==5.5.3
 redis==6.4.0
 
 # Deployment. Only exercised when DJANGO_ENV=production, but installed
 # everywhere so the production path is importable in CI rather than being
 # discovered on the day it first runs.
+# Push. Imported lazily by notifications/push.py, so a checkout without a
+# Firebase project still runs — but installed everywhere so the production
+# path is importable in CI rather than discovered on the day it first runs.
+firebase-admin==6.6.0
+
 gunicorn==23.0.0
 whitenoise==6.9.0
 django-storages==1.14.6

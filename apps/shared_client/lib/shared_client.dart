@@ -18,5 +18,6 @@ export 'src/layout.dart';
 export 'src/locale_controller.dart';
 export 'src/models.dart';
 export 'src/order_models.dart';
+export 'src/push_registrar.dart';
 export 'src/segmented_toggle.dart';
 export 'src/status_badge.dart';

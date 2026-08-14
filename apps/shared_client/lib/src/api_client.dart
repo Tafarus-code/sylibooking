@@ -1198,6 +1198,29 @@ class SylibookingApi {
     return utf8.decode(response.bodyBytes);
   }
 
+  /// Claim this handset for the signed-in account.
+  ///
+  /// The server keys on the token, not on (user, token): a shared tablet
+  /// signed out of one venue and into another must move rather than alert
+  /// both.
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  }) async {
+    await _post('/devices/', {'token': token, 'platform': platform});
+  }
+
+  /// Give it up again. Idempotent, so signing out twice is not an error.
+  Future<void> unregisterDevice(String token) async {
+    await _send(
+      () => _http.delete(
+        _uri('/devices/'),
+        headers: _headers,
+        body: jsonEncode({'token': token}),
+      ),
+    );
+  }
+
   void close() => _http.close();
 }
 

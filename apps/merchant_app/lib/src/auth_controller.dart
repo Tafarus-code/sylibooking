@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -14,10 +15,21 @@ enum AuthState {
 
 /// Holds who is signed in, and keeps the token in sync with storage.
 class AuthController extends ChangeNotifier {
-  AuthController({required this.api, required this.tokenStore});
+  AuthController({
+    required this.api,
+    required this.tokenStore,
+    PushRegistrar? push,
+  }) : push = push ?? const NoPushRegistrar();
 
   final SylibookingApi api;
   final TokenStore tokenStore;
+
+  /// Registers this handset for alerts once somebody is signed in.
+  ///
+  /// Defaults to the no-op: an app without a Firebase project works in every
+  /// other respect, and a merchant who has not finished a console wizard
+  /// should still be able to run their desk.
+  final PushRegistrar push;
 
   AuthState state = AuthState.unknown;
   MerchantUser? user;
@@ -119,6 +131,10 @@ class AuthController extends ChangeNotifier {
     try {
       user = await api.me();
       await _loadVenues();
+      // A returning session registers too: Firebase rotates tokens, and a
+      // merchant who never signs out again would otherwise stop hearing
+      // anything the first time it does.
+      unawaited(push.register(api));
     } on ApiException catch (e) {
       // A rejected token means the session is over; anything else (a 500, say)
       // should not silently sign the merchant out mid-service.
@@ -149,6 +165,9 @@ class AuthController extends ChangeNotifier {
       await tokenStore.write(result.token);
       user = result.user;
       await _loadVenues();
+      // After the venues, not before: a merchant waiting on a permission
+      // prompt should already be looking at their desk.
+      unawaited(push.register(api));
       return true;
     } on ApiException catch (e) {
       throttled = e.isThrottled;
@@ -168,6 +187,10 @@ class AuthController extends ChangeNotifier {
     busy = true;
     notifyListeners();
     try {
+      // Before the token is thrown away, because unregistering needs it. A
+      // token left behind keeps another venue's bookings arriving on a
+      // handset that has been handed to somebody else.
+      await push.unregister(api);
       await api.logout();
     } on ApiUnreachableException {
       // Sign out locally regardless — the merchant asked to be signed out.

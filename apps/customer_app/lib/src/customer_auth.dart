@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_client/shared_client.dart';
 
@@ -17,11 +18,17 @@ class CustomerAuth extends ChangeNotifier {
     required this.api,
     required this.store,
     required this.tokenStore,
-  });
+    PushRegistrar? push,
+  }) : push = push ?? const NoPushRegistrar();
 
   final SylibookingApi api;
   final BookingStore store;
   final CustomerTokenStore tokenStore;
+
+  /// Registers this phone for booking reminders once there is an account to
+  /// attach them to. The no-op default keeps an app without a Firebase
+  /// project working in every other respect.
+  final PushRegistrar push;
 
   CustomerAuthState _state = CustomerAuthState.unknown;
   CustomerAccount? _customer;
@@ -99,6 +106,9 @@ class CustomerAuth extends ChangeNotifier {
       // it. Best effort: a failure here must not turn a successful sign-in
       // into an error message.
       await _adoptWhatIsOnThisPhone();
+      // After the claim, so a reminder can only ever be about a booking the
+      // account already owns.
+      unawaited(push.register(api));
       return true;
     } on ApiException catch (e) {
       _error = e.message;
@@ -131,6 +141,9 @@ class CustomerAuth extends ChangeNotifier {
 
   Future<void> signOut() async {
     try {
+      // While the token still works: unregistering afterwards is a request
+      // nobody is authorised to make.
+      await push.unregister(api);
       await api.logout();
     } on ApiException {
       // A dead token is a successful sign-out as far as the app cares.

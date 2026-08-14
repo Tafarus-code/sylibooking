@@ -60,6 +60,17 @@ COPY --chown=sylibooking:sylibooking design/ /app/design/
 COPY --chown=sylibooking:sylibooking deploy/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# The directories the app writes into, owned by the user that writes into
+# them.
+#
+# `COPY --chown` sets ownership on what it copies, not on /app itself — and
+# /app was created by WORKDIR, as root. So collectstatic, running unprivileged,
+# could not create /app/staticfiles inside a root-owned directory.
+#
+# Deliberately not `chown -R`: the copied files already have the right owner,
+# and recursing would duplicate the whole tree into another layer for nothing.
+RUN mkdir -p /app/staticfiles /app/media && chown sylibooking:sylibooking /app /app/staticfiles /app/media
+
 USER sylibooking
 
 # Static files are baked in rather than collected at boot: every replica would

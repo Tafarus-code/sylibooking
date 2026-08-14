@@ -843,6 +843,23 @@ if DJANGO_ENV == 'production':
         'SECURE_SSL_REDIRECT', default='test' not in sys.argv, cast=bool
     )
 
+    # The health probes, exempt from that redirect.
+    #
+    # A platform's health checker reaches the container directly rather than
+    # through the proxy that terminates TLS, so the request arrives as plain
+    # http with no X-Forwarded-Proto to say otherwise. Django does exactly
+    # what it was told and answers 301; the platform reads that as unhealthy,
+    # restarts a perfectly good container, and does it again.
+    #
+    # Exempting only these two paths keeps the redirect everywhere it
+    # matters. Nothing here is secret — one answers "the process is alive"
+    # and the other names which dependency is not — and neither takes input,
+    # so there is nothing for the plain-text hop to leak.
+    #
+    # Patterns are matched against the path with its leading slash stripped,
+    # which is why there is none here.
+    SECURE_REDIRECT_EXEMPT = [r'^api/health/']
+
     # Six months. Deliberately not preloaded: preload is close to
     # irreversible, and committing every future subdomain to https before
     # there is a domain at all is a decision made too early.

@@ -27,10 +27,13 @@ from notifications.models import Notification
 from orders.models import Order
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
 from payments.models import Payment
 from reservations.models import Reservation
+
+from .throttling import hits_since
 
 #: How far back the numbers look, unless asked otherwise.
 DEFAULT_WINDOW_HOURS = 24
@@ -101,6 +104,14 @@ def collect(since):
             'delivery_rate': _ratio(
                 notification_counts['sent'], notification_counts['attempted']
             ),
+        },
+        # What the ceilings actually refused. Every scope is listed, including
+        # the ones at zero: a scope missing from this dict would be read as
+        # "never hit", and "never hit" and "not being counted" are the two
+        # answers that must not look alike.
+        'throttle_hits': {
+            scope: hits_since(scope, since)
+            for scope in api_settings.DEFAULT_THROTTLE_RATES
         },
     }
 

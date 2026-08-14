@@ -18,13 +18,65 @@ test that signs in twice fighting a counter that outlives it, and the tests
 that actually care switch it back on explicitly.
 """
 
+from datetime import timedelta
+
 from django.conf import settings
+from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.settings import api_settings
 from rest_framework.throttling import (
     AnonRateThrottle,
     SimpleRateThrottle,
     UserRateThrottle,
 )
+
+#: How long a refusal stays countable. Long enough to cover the widest
+#: window the metrics endpoint will answer for, and no longer.
+HIT_RETENTION = 60 * 60 * 24 * 31
+
+#: Where a scope's refusals for one hour are counted.
+HIT_KEY = 'throttle-hits:%(scope)s:%(hour)s'
+
+
+def hit_key(scope, when):
+    return HIT_KEY % {'scope': scope, 'hour': when.strftime('%Y%m%d%H')}
+
+
+def record_hit(scope, when=None):
+    """Count one refusal, in the hour it happened.
+
+    Hourly buckets rather than a running total: a lifetime counter cannot
+    answer "is this rate too tight *now*", which is the only question anybody
+    tunes a rate from. Summing a window of buckets can.
+
+    Counted in the cache the throttles already depend on, not in the database.
+    A refusal is cheap to lose and must be cheaper still to record — a write
+    per rejected request is exactly the load an abuser is trying to create,
+    and turning that into database writes would hand them the outage the
+    throttle exists to prevent.
+    """
+    key = hit_key(scope, when or timezone.now())
+    # add-then-incr rather than get-then-set: two requests refused in the same
+    # moment must count twice, and incr is atomic where a read-modify-write is
+    # not.
+    if not cache.add(key, 1, HIT_RETENTION):
+        try:
+            cache.incr(key)
+        except ValueError:
+            # Expired between the add and the incr. One lost count is not
+            # worth a lock.
+            pass
+
+
+def hits_since(scope, since, now=None):
+    """How many refusals this scope has had since `since`."""
+    now = now or timezone.now()
+    total = 0
+    hour = since.replace(minute=0, second=0, microsecond=0)
+    while hour <= now:
+        total += cache.get(hit_key(scope, hour)) or 0
+        hour += timedelta(hours=1)
+    return total
 
 
 class _Switchable:
@@ -48,6 +100,19 @@ class _Switchable:
         if self.scope in rates:
             return rates[self.scope]
         return super().get_rate()
+
+    def allow_request(self, request, view):
+        """Count what gets refused, so the rate can be argued about later.
+
+        Every throttle in this module goes through here, which is the point:
+        a rate nobody can see being hit is a rate nobody can defend
+        tightening — or loosening, which is the direction that actually costs
+        a customer their booking.
+        """
+        allowed = super().allow_request(request, view)
+        if not allowed:
+            record_hit(self.scope)
+        return allowed
 
 
 class _SwitchableThrottle(_Switchable, SimpleRateThrottle):

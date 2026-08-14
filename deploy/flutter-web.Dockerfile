@@ -1,0 +1,67 @@
+# A Flutter app, built for the web and served by nginx.
+#
+# One file for both apps: which one is built is the APP build argument, so
+# the merchant and customer services differ by a variable rather than by a
+# duplicated Dockerfile that will drift.
+#
+# **This is a second distribution channel, not a replacement for the stores.**
+# The Android builds remain how most people will use this — see RELEASE.md.
+# What the web build buys is a venue with a laptop and no wish to install
+# anything, and a link somebody can open before they have decided to trust
+# you enough to install an app.
+#
+#   docker build -f deploy/flutter-web.Dockerfile \
+#     --build-arg APP=merchant_app \
+#     --build-arg API_BASE_URL=https://api.sylibooking.gn/api \
+#     -t sylibooking-merchant-web .
+#
+# The build context is the repository root, because `shared_client` is a path
+# dependency of both apps and lives beside them. The root .dockerignore
+# excludes apps/ for the backend image's sake, so this file has its own —
+# see flutter-web.Dockerfile.dockerignore.
+
+ARG FLUTTER_VERSION=3.38.5
+
+FROM ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION} AS build
+
+# Which app. No default: building the wrong one and finding out from the
+# login screen is a worse afternoon than a failed build.
+ARG APP
+RUN test -n "$APP" || (echo "APP build argument is required" && exit 1)
+
+# Where this build talks to. Baked in at compile time, because a web build
+# has no equivalent of an emulator's 10.0.2.2 and no settings screen to ask.
+# Wrong here means an app that loads and can do nothing.
+ARG API_BASE_URL
+
+WORKDIR /src
+# The shared package first, so a change to an app does not re-resolve it.
+COPY apps/shared_client /src/apps/shared_client
+COPY apps/${APP} /src/apps/${APP}
+
+WORKDIR /src/apps/${APP}
+RUN flutter pub get
+RUN flutter build web --release \
+    --dart-define=API_BASE_URL="${API_BASE_URL}"
+
+# Pre-compressed, because the payload is the whole argument here: the main
+# bundle is about 8MB raw and 1.5MB gzipped, and this market pays for every
+# one of those megabytes. gzip_static below serves these without spending CPU
+# per request.
+RUN find build/web -type f \
+        \( -name '*.js' -o -name '*.css' -o -name '*.html' \
+           -o -name '*.json' -o -name '*.wasm' -o -name '*.svg' \) \
+        -exec gzip -9 -k {} \;
+
+
+FROM nginx:1.27-alpine AS runtime
+
+# nginx's own template mechanism: files here are envsubst'd into conf.d at
+# startup, which is how the container learns the port the platform routes to.
+COPY deploy/flutter-web.nginx.conf.template /etc/nginx/templates/default.conf.template
+
+ARG APP
+COPY --from=build /src/apps/${APP}/build/web /usr/share/nginx/html
+
+ENV PORT=8080
+EXPOSE 8080

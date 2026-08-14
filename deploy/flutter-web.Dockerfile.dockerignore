@@ -1,0 +1,31 @@
+# What the Flutter web image needs, which is almost the opposite of what the
+# backend image needs.
+#
+# BuildKit looks for `<dockerfile>.dockerignore` before falling back to the
+# root one — and the root one excludes apps/ entirely, for the backend
+# image's sake. Without this file that exclusion applies here too and the
+# build fails on a context with no source in it.
+
+# The backend is a different image.
+backend/
+deploy/render.yaml
+
+# Build output and local state. Copying a previous build/web into the context
+# is the slowest possible way to have it overwritten.
+**/build/
+**/.dart_tool/
+**/android/
+**/ios/
+**/linux/
+**/macos/
+**/windows/
+.venv/
+.env
+**/.env
+
+.git/
+.github/
+.claude/
+design/
+*.docx
+*.html

@@ -1,0 +1,57 @@
+# Serving a Flutter web build.
+#
+# `${PORT}` is substituted at startup by nginx's own template mechanism, so
+# the container listens on whatever the platform routes to rather than on a
+# number this file guessed.
+
+server {
+    listen       ${PORT};
+    server_name  _;
+    root         /usr/share/nginx/html;
+
+    # The build wrote .gz beside every compressible file, so this serves them
+    # without re-compressing per request. The main bundle is 8MB raw and
+    # 1.5MB gzipped; on the connections this product is for, that difference
+    # is most of the first visit.
+    gzip_static  on;
+
+    # Belt and braces for anything the build did not pre-compress.
+    gzip              on;
+    gzip_types        text/plain text/css application/javascript application/json
+                      image/svg+xml application/wasm;
+    gzip_min_length   1024;
+
+    # Flutter fingerprints its assets, so they can be cached hard and
+    # forever. index.html and the service worker cannot: they are how a
+    # browser finds out there is a new version at all, and caching them is
+    # how somebody keeps running last month's app.
+    location = /index.html {
+        add_header Cache-Control "no-cache, must-revalidate";
+    }
+    location = /flutter_service_worker.js {
+        add_header Cache-Control "no-cache, must-revalidate";
+    }
+    location = /version.json {
+        add_header Cache-Control "no-cache, must-revalidate";
+    }
+
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+    location /canvaskit/ {
+        # The largest single thing a visitor downloads, and it changes only
+        # with the Flutter version. Caching it for a year is the difference
+        # between a slow first visit and a slow every visit.
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # A single-page app: every route that is not a file is the app itself,
+    # or a deep link into it lands on nginx's 404 rather than on the screen
+    # somebody was sent to.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Nothing here is a secret, but there is no reason to name the server.
+    server_tokens off;
+}

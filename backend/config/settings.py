@@ -801,7 +801,14 @@ if DJANGO_ENV == 'production':
     # this it sees http, decides the request is insecure, and redirects
     # forever.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    # Off while running tests, the same way THROTTLING_ENABLED is, and for
+    # the same reason: the test client speaks http, so a redirect turns every
+    # single request into a 301 and the whole production suite tests nothing
+    # but Django's ability to redirect. This is why the PostgreSQL job has
+    # been red — 370 failures, all of them this.
+    SECURE_SSL_REDIRECT = config(
+        'SECURE_SSL_REDIRECT', default='test' not in sys.argv, cast=bool
+    )
 
     # Six months. Deliberately not preloaded: preload is close to
     # irreversible, and committing every future subdomain to https before

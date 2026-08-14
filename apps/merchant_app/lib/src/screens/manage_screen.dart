@@ -10,6 +10,7 @@ import 'branding_screen.dart';
 import 'hours_screen.dart';
 import 'menu_screen.dart';
 import 'photos_screen.dart';
+import 'insights_screen.dart';
 import 'spaces_screen.dart';
 import 'profile_screen.dart';
 import 'staff_screen.dart';
@@ -72,6 +73,19 @@ class ManageScreen extends StatelessWidget {
             ),
           ),
 
+
+          // Not a sixth destination on the rail. The five there are things a
+          // merchant touches during service — the desk, the queue, the money,
+          // the reviews, the settings — and the rail was deliberately capped
+          // at five. Insights is read once a week, sitting down, which is
+          // exactly what Manage is for.
+          _Entry(
+            tile: asTiles,
+            icon: Icons.insights_outlined,
+            title: l.insights,
+            subtitle: l.insightsSubtitle,
+            onTap: () => _open(context, InsightsScreen(auth: auth)),
+          ),
 
           // Above the hours on purpose: a venue is defined by its rooms
           // before it is defined by when they are open.

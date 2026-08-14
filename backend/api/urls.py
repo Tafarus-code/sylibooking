@@ -20,6 +20,7 @@ from .dashboard import PaymentDashboardView
 from .devices import DeviceRegistrationView
 from .featured import FeaturedItemsView
 from .health import LivenessView, ReadinessView
+from .insights import MerchantInsightsView
 from .merchant import (
     MerchantEstablishmentProfileView,
     MerchantEstablishmentsView,
@@ -185,6 +186,11 @@ urlpatterns = [
         'merchant/establishments/<int:pk>/spaces/<int:space_id>/',
         MerchantSpaceItemView.as_view(),
         name='merchant-space-item',
+    ),
+    path(
+        'merchant/establishments/<int:pk>/insights/',
+        MerchantInsightsView.as_view(),
+        name='merchant-insights',
     ),
     path(
         'merchant/establishments/<int:pk>/reviews/',

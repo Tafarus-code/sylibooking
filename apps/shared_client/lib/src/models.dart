@@ -1173,3 +1173,206 @@ class LoginResult {
         user: MerchantUser.fromJson(json['user'] as Map<String, dynamic>),
       );
 }
+
+/// What a venue can learn about itself, over one window.
+///
+/// Mirrors `backend/api/insights.py`. Rates arrive as null rather than zero
+/// wherever there was nothing to take a share of — a venue with no finished
+/// sittings has no no-show rate, and a screen that draws 0% has said
+/// something reassuring and false. Every `double?` here means that.
+class VenueInsights {
+  const VenueInsights({
+    required this.days,
+    required this.covers,
+    required this.attendance,
+    required this.peakHours,
+    required this.dishesByQuantity,
+    required this.dishesByRevenue,
+    required this.repeatCustomers,
+  });
+
+  final int days;
+  final CoverCounts covers;
+  final AttendanceCounts attendance;
+  final List<PeakHour> peakHours;
+  final List<DishSales> dishesByQuantity;
+  final List<DishSales> dishesByRevenue;
+  final RepeatCustomers repeatCustomers;
+
+  factory VenueInsights.fromJson(Map<String, dynamic> json) {
+    final dishes = json['dishes'] as Map<String, dynamic>? ?? const {};
+    List<DishSales> shape(String key) =>
+        (dishes[key] as List<dynamic>? ?? const [])
+            .map((e) => DishSales.fromJson(e as Map<String, dynamic>))
+            .toList();
+
+    return VenueInsights(
+      days: (json['window'] as Map<String, dynamic>?)?['days'] as int? ?? 30,
+      covers: CoverCounts.fromJson(
+        json['covers'] as Map<String, dynamic>? ?? const {},
+      ),
+      attendance: AttendanceCounts.fromJson(
+        json['attendance'] as Map<String, dynamic>? ?? const {},
+      ),
+      peakHours: (json['peak_hours'] as List<dynamic>? ?? const [])
+          .map((e) => PeakHour.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      dishesByQuantity: shape('by_quantity'),
+      dishesByRevenue: shape('by_revenue'),
+      repeatCustomers: RepeatCustomers.fromJson(
+        json['repeat_customers'] as Map<String, dynamic>? ?? const {},
+      ),
+    );
+  }
+}
+
+class CoverCounts {
+  const CoverCounts({
+    required this.total,
+    required this.bookings,
+    required this.byWeekday,
+    this.averagePartySize,
+  });
+
+  /// People, not bookings: two tables of two and one of four are the same
+  /// night's work.
+  final int total;
+  final int bookings;
+  final double? averagePartySize;
+
+  /// Always seven entries, Monday first. A weekday missing from a chart
+  /// reads as a rendering bug rather than a quiet night.
+  final List<WeekdayCovers> byWeekday;
+
+  bool get isEmpty => bookings == 0;
+
+  factory CoverCounts.fromJson(Map<String, dynamic> json) => CoverCounts(
+        total: json['total'] as int? ?? 0,
+        bookings: json['bookings'] as int? ?? 0,
+        averagePartySize: (json['average_party_size'] as num?)?.toDouble(),
+        byWeekday: (json['by_weekday'] as List<dynamic>? ?? const [])
+            .map((e) => WeekdayCovers.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class WeekdayCovers {
+  const WeekdayCovers({
+    required this.weekday,
+    required this.covers,
+    required this.bookings,
+  });
+
+  /// 0 is Monday, matching `DateTime.weekday - 1`.
+  final int weekday;
+  final int covers;
+  final int bookings;
+
+  factory WeekdayCovers.fromJson(Map<String, dynamic> json) => WeekdayCovers(
+        weekday: json['weekday'] as int? ?? 0,
+        covers: json['covers'] as int? ?? 0,
+        bookings: json['bookings'] as int? ?? 0,
+      );
+}
+
+class AttendanceCounts {
+  const AttendanceCounts({
+    required this.total,
+    required this.served,
+    required this.missed,
+    required this.cancelled,
+    this.missedRate,
+    this.cancelledRate,
+  });
+
+  final int total;
+  final int served;
+
+  /// Nobody came and nobody said. The table was held for a stranger.
+  final int missed;
+
+  /// The customer told the venue. A different event, and reported apart on
+  /// purpose — added together they teach a merchant to distrust the people
+  /// who behaved well.
+  final int cancelled;
+
+  final double? missedRate;
+  final double? cancelledRate;
+
+  bool get isEmpty => total == 0;
+
+  factory AttendanceCounts.fromJson(Map<String, dynamic> json) =>
+      AttendanceCounts(
+        total: json['total'] as int? ?? 0,
+        served: json['served'] as int? ?? 0,
+        missed: json['missed'] as int? ?? 0,
+        cancelled: json['cancelled'] as int? ?? 0,
+        missedRate: (json['missed_rate'] as num?)?.toDouble(),
+        cancelledRate: (json['cancelled_rate'] as num?)?.toDouble(),
+      );
+}
+
+class PeakHour {
+  const PeakHour({
+    required this.hour,
+    required this.bookings,
+    required this.covers,
+  });
+
+  final int hour;
+  final int bookings;
+  final int covers;
+
+  factory PeakHour.fromJson(Map<String, dynamic> json) => PeakHour(
+        hour: json['hour'] as int? ?? 0,
+        bookings: json['bookings'] as int? ?? 0,
+        covers: json['covers'] as int? ?? 0,
+      );
+}
+
+class DishSales {
+  const DishSales({
+    required this.id,
+    required this.name,
+    required this.quantity,
+    required this.revenue,
+  });
+
+  final int id;
+  final String name;
+  final int quantity;
+
+  /// A string, like every other amount: nobody here rounds money.
+  final String revenue;
+
+  factory DishSales.fromJson(Map<String, dynamic> json) => DishSales(
+        id: json['id'] as int? ?? 0,
+        name: json['name'] as String? ?? '',
+        quantity: json['quantity'] as int? ?? 0,
+        revenue: '${json['revenue'] ?? ''}',
+      );
+}
+
+class RepeatCustomers {
+  const RepeatCustomers({
+    required this.bookings,
+    required this.returningBookings,
+    required this.returningCustomers,
+    this.returningRate,
+  });
+
+  final int bookings;
+  final int returningBookings;
+  final int returningCustomers;
+  final double? returningRate;
+
+  bool get isEmpty => bookings == 0;
+
+  factory RepeatCustomers.fromJson(Map<String, dynamic> json) =>
+      RepeatCustomers(
+        bookings: json['bookings'] as int? ?? 0,
+        returningBookings: json['returning_bookings'] as int? ?? 0,
+        returningCustomers: json['returning_customers'] as int? ?? 0,
+        returningRate: (json['returning_rate'] as num?)?.toDouble(),
+      );
+}

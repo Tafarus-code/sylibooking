@@ -662,5 +662,81 @@
   "walkInTotal": "Total",
   "walkInSend": "Send to the kitchen",
   "walkInSent": "Order sent to the kitchen.",
-  "walkInNoMenu": "This venue has no items on its menu yet."
+  "walkInNoMenu": "This venue has no items on its menu yet.",
+  "insights": "Insights",
+  "insightsSubtitle": "Covers, no-shows, what sells, who comes back.",
+  "insightsWindow7": "7 days",
+  "insightsWindow30": "30 days",
+  "insightsWindow90": "90 days",
+  "coversTitle": "Covers",
+  "coversTotal": "{count} people",
+  "@coversTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "coversBookings": "over {count} bookings",
+  "@coversBookings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "averageParty": "Average party of {size}",
+  "@averageParty": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "coversByWeekday": "By day of the week",
+  "coversEmpty": "No sittings yet in this period.",
+  "coversEmptyWhy": "Covers count people who came. Confirm a booking and mark the guests arrived, and they will show here.",
+  "attendanceTitle": "Tables held for nobody",
+  "attendanceMissed": "Missed",
+  "attendanceMissedWhy": "Nobody came, and nobody said.",
+  "attendanceCancelled": "Cancelled",
+  "attendanceCancelledWhy": "The customer told you first.",
+  "attendanceEmpty": "No bookings in this period.",
+  "attendanceEmptyWhy": "There is nothing to work out a rate from yet.",
+  "peakHoursTitle": "When the room fills",
+  "peakHoursEmpty": "No sittings yet in this period.",
+  "dishesTitle": "What sells",
+  "dishesByQuantity": "Most ordered",
+  "dishesByRevenue": "Earns the most",
+  "dishesEmpty": "No orders in this period.",
+  "dishesEmptyWhy": "Only restaurants take orders ahead, and only completed ones count here.",
+  "dishesLoungeWhy": "Lounges do not take orders ahead, so there is nothing to rank.",
+  "repeatTitle": "People who came back",
+  "repeatRate": "{percent} of bookings",
+  "@repeatRate": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatCustomers": "{count} returning customers",
+  "@repeatCustomers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "repeatEmpty": "No bookings with a phone number in this period.",
+  "repeatEmptyWhy": "Customers are recognised by their phone number, so a booking without one cannot be matched.",
+  "insightsFailed": "Could not load insights",
+  "ofBookings": "of {count} bookings",
+  "@ofBookings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

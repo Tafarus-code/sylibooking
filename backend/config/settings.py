@@ -351,21 +351,63 @@ REST_FRAMEWORK = {
     ],
     # See api/throttling.py for why each of these is keyed the way it is.
     #
-    # The two surface rates and the browse rate are provisional. A blanket
-    # ceiling wants real traffic to size and there is none yet, so they are
-    # set loose enough that no honest use should ever meet them, and tightened
-    # once Slice 20 makes throttle hits visible.
+    # Every rate below now carries either a measurement or an argument, and
+    # the two are labelled differently on purpose. Where it says *measured*,
+    # the number came from driving the API the way the apps drive it and
+    # counting; where it says *argued*, there is no traffic to measure and the
+    # figure is reasoning about what the endpoint costs when abused.
+    #
+    # The measuring corrected an assumption worth recording: the surface rates
+    # were described as "loose enough that no honest use should ever meet
+    # them". They were not. Painting one browse list costs 22 requests,
+    # because the list carries no cover photo and the app fetches one per
+    # venue — so four customers on one café connection in the same minute came
+    # within a few requests of a ceiling meant for abusers.
+    #
+    # Loosening a limit is not the direction anybody expects to move a
+    # throttle, which is exactly why it needs the number written next to it.
     'DEFAULT_THROTTLE_RATES': {
-        'anon_surface': '90/min',
+        # Measured: 22 requests to paint one browse list (1 list + 20 covers +
+        # detail). At 90/min a shared connection ran out at four sessions.
+        # 180 buys eight, which covers a cybercafé; the real fix is to stop
+        # asking twenty times, and that is an API change, not a rate.
+        'anon_surface': '180/min',
+        # Measured: a merchant desk load is up to 25 requests — reservations
+        # paginate and `allReservations` walks up to 20 pages — plus a poll
+        # every 60s. A merchant working quickly through a Friday evening can
+        # reach ~100/min. Left where it is: 240 is about twice the worst
+        # honest minute, and the cost of being wrong is a merchant locked out
+        # of their own desk mid-service.
         'user_surface': '240/min',
+        # Measured: 6 browse-scope requests per session, so 300/hour is 50
+        # sessions from one address. Left alone — that is generous for a
+        # person and mean enough to make scraping the catalogue tedious,
+        # which is all this was ever meant to do.
         'browse': '300/hour',
+        # Argued: a real person mistypes a password two or three times, not
+        # ten. Both keys stay because they answer different attacks — the IP
+        # one stops a spray, the username one stops a rotation.
         'login_ip': '10/min',
         'login_username': '5/min',
+        # Argued: signing up is a once-ever act. Five an hour from one address
+        # is already far past a household sharing a phone, and tightening
+        # further would start refusing families rather than abusers.
         'register': '5/hour',
         'password_reset': '5/hour',
         'password_reset_identifier': '3/hour',
-        'booking_ip': '30/hour',
-        'booking_phone': '5/hour',
+        # Tightened, 30 -> 15. Argued: even a busy shared connection books a
+        # handful of tables an hour; thirty was a number nobody had reasoned
+        # about. Fifteen still leaves several times honest peak.
+        'booking_ip': '15/hour',
+        # Tightened, 5 -> 3, and the one that matters most.
+        #
+        # This is not about junk rows. Once a real gateway is attached, each
+        # booking pushes a payment prompt to whatever number was typed — so
+        # this rate is the ceiling on how often a stranger can make one
+        # person's phone ring, billed to us. A real customer books that number
+        # once, occasionally twice. Three is honest peak plus one, and every
+        # unit above it is somebody else's evening.
+        'booking_phone': '3/hour',
     },
 }
 

@@ -699,13 +699,20 @@ if DJANGO_ENV == 'production' and _redis_url:
             'KEY_PREFIX': 'sylibooking',
         }
     }
-elif DJANGO_ENV == 'production':
-    raise ImproperlyConfigured(
-        'Production needs REDIS_URL (or CELERY_BROKER_URL): the cache holds '
-        'throttle counters and in-flight payment context, and a per-process '
-        'cache makes both wrong once there is a second worker.'
-    )
 else:
+    # No Redis. In development that is correct; in production it is a
+    # misconfiguration, and it is reported by a deployment check rather than
+    # by raising here.
+    #
+    # Raising at import made every management command explode — including
+    # `check --deploy`, whose entire job is to *tell* you about this. A
+    # traceback in place of a checklist is worse than the thing it was
+    # guarding against, and it hid the message inside forty lines of Django
+    # internals.
+    #
+    # The runtime guard now lives where a server actually starts: the
+    # entrypoint runs `check --deploy` before gunicorn, so a container with
+    # this wrong still refuses to serve.
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',

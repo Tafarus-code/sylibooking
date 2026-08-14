@@ -14,6 +14,17 @@ if [ "${RUN_MIGRATIONS:-yes}" = "yes" ]; then
   python manage.py migrate --noinput
 fi
 
+# Refuse to serve a misconfigured deployment.
+#
+# This is where the guard belongs. Raising from settings breaks every
+# management command including the one that reports configuration problems;
+# checking here stops a container that would have run with a per-process
+# cache, an unset callback secret, or DEBUG left on — and says which.
+if [ "${DJANGO_ENV:-local}" = "production" ]; then
+  echo "Checking deployment configuration..."
+  python manage.py check --deploy --fail-level ERROR
+fi
+
 # The compiled French catalogue is committed, but a .po edited without
 # recompiling is the silent failure the language tests were written to catch.
 # Cheap enough to redo at boot, and it fails loudly here rather than serving

@@ -245,6 +245,18 @@ on every deploy and takes the photos with it.
 4. Give the bucket a public domain: **Settings → Public access → connect a
    domain** (e.g. `media.sylibooking.gn`). Without this the API endpoint is
    not publicly readable and every image 403s.
+
+   **A custom domain, not the `pub-<id>.r2.dev` one.** Cloudflare offers the
+   r2.dev subdomain in the same panel and it is the quicker click, but it is
+   rate-limited, documented as "intended for non-production traffic", and
+   outside the CDN cache — and CORS response headers are only documented for
+   custom domains, which is the difference between the apps showing pictures
+   and not. Caching is not a nicety on the connections this market runs on;
+   it is why a gallery loads at all.
+
+   Switching later costs one variable. The database stores the object key,
+   not the URL — `MEDIA_CUSTOM_DOMAIN` is applied when a URL is built, so
+   every existing row follows the change with no migration and no re-upload.
 5. Give that same bucket a **CORS policy** — see below. The web apps fetch
    images with XHR, so without one every picture is blocked in the browser
    even when the object is there and public.

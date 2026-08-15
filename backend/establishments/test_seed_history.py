@@ -12,15 +12,16 @@ the same database rather than needing its own.
 """
 
 from datetime import timedelta
+from itertools import pairwise
 
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 from orders.models import Order
-from payments.models import Payment
 
 from establishments.models import Establishment, Review
+from payments.models import Payment
 from reservations.models import Reservation
 
 
@@ -110,7 +111,7 @@ class SeededHistoryTests(TestCase):
         clashes = []
         for space_id, times in by_space.items():
             times.sort()
-            for earlier, later in zip(times, times[1:]):
+            for earlier, later in pairwise(times):
                 if later - earlier < duration:
                     clashes.append((space_id, earlier, later))
 

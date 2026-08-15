@@ -5,6 +5,8 @@ it arrive: which devices a message goes to, and what happens to a token for a
 handset that no longer exists.
 """
 
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -13,7 +15,12 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from notifications.devices import DeviceToken
-from notifications.push import ConsolePushSender, get_push_sender, push_to_user
+from notifications.push import (
+    ConsolePushSender,
+    FirebasePushSender,
+    get_push_sender,
+    push_to_user,
+)
 
 SENT = []
 
@@ -175,8 +182,20 @@ class SenderFallbackTests(TestCase):
 
     @override_settings(PUSH_SENDER='notifications.push.FirebasePushSender')
     def test_an_unbuildable_sender_falls_back_to_the_console(self):
-        # No Firebase project here, so building the real sender raises.
-        sender = get_push_sender()
+        """The real sender, when its credentials will not load.
+
+        Forced rather than assumed. This test used to rely on the SDK being
+        absent, which stopped being true once firebase-admin joined
+        requirements.txt — and `initialize_app` resolves credentials lazily,
+        so on a machine with no project the sender now builds happily and
+        fails at send time instead. The fallback still has to work.
+        """
+        with mock.patch.object(
+            FirebasePushSender,
+            '__init__',
+            side_effect=ValueError('could not load default credentials'),
+        ):
+            sender = get_push_sender()
 
         self.assertIsInstance(sender, ConsolePushSender)
 

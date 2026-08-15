@@ -189,6 +189,13 @@ wrong app.
 fallback and no settings screen; wrong here is an app that loads and can do
 nothing. Point it at the API service's domain, including `/api`.
 
+The `/api` is not decoration — the whole API is mounted under it, so a bare
+host sends every call one level too high and each one comes back a 404 page.
+The build now refuses that value, along with a missing scheme and a trailing
+slash. **Changing the variable is not enough on its own: redeploy.** These
+are build arguments, so the running image keeps whatever it was compiled
+with until it is rebuilt.
+
 ### Then tell the API about them
 
 The browser enforces same-origin; Android never did. Production reads an

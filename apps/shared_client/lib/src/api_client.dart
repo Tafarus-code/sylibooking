@@ -36,9 +36,24 @@ class ApiException implements Exception {
       isThrottled ? whenThrottled : message;
   bool get isNotFound => statusCode == 404;
 
+  /// A body that is markup rather than JSON, so not the API answering.
+  ///
+  /// Covers a web server's own 404 page and a single-page app's index.html,
+  /// which is what a base URL pointing at the wrong host returns.
+  bool get _isDocument => rawBody.trimLeft().startsWith('<');
+
   String get message {
     if (errors.isEmpty) {
-      return rawBody.isEmpty ? 'Request failed ($statusCode)' : rawBody;
+      if (rawBody.isEmpty) return 'Request failed ($statusCode)';
+      // Pasting an HTML document into a snackbar tells the reader nothing
+      // and hides what actually happened: the app reached *something*, and
+      // it was not this API. Name that instead — it is the one error whose
+      // cause is configuration rather than anything the user did.
+      if (_isDocument) {
+        return 'That address answered with a web page rather than the API '
+            '(HTTP $statusCode). Check the API base URL.';
+      }
+      return rawBody;
     }
     if (errors['detail'] case final detail?) return detail.toString();
 

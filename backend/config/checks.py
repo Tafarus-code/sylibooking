@@ -120,3 +120,39 @@ def database_must_be_configured(app_configs, **kwargs):
             id='sylibooking.E003',
         )
     ]
+
+
+@register(Tags.compatibility, deploy=True)
+def push_needs_its_credentials(app_configs, **kwargs):
+    """A Firebase sender with no key sends nothing, and says so to nobody.
+
+    The failure is silent by construction: notifications are logged as failed
+    and no customer complains about a reminder they never expected. Worth
+    catching at boot rather than discovering from a merchant who says the app
+    never tells them anything.
+    """
+    import os
+
+    if getattr(settings, 'DJANGO_ENV', '') != 'production':
+        return []
+
+    sender = getattr(settings, 'PUSH_SENDER', '')
+    if 'Firebase' not in sender:
+        return []
+
+    path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+    if path and os.path.exists(path):
+        return []
+
+    return [
+        Error(
+            'Push is set to Firebase but its credentials are not readable.',
+            hint=(
+                'Set FIREBASE_SERVICE_ACCOUNT to the service account JSON — '
+                'the entrypoint writes it to GOOGLE_APPLICATION_CREDENTIALS '
+                'at boot. Without it every push fails silently, which is the '
+                'one failure nobody reports.'
+            ),
+            id='sylibooking.E004',
+        )
+    ]

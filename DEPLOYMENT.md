@@ -430,14 +430,27 @@ simply is not pushed to**. That is why this step can wait.
 
 ### Server
 
+On **api, worker and beat** — all three can send:
+
 ```
 PUSH_SENDER=notifications.push.FirebasePushSender
-GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
+FIREBASE_SERVICE_ACCOUNT=<the whole service account JSON, pasted>
 ```
 
-On Railway, add the service account JSON as a file via a volume, or paste its
-contents into a variable and write it out in `entrypoint.sh`. **Do not commit
-it** — it can send push to every device you have.
+Paste the file's entire contents as the value. The entrypoint writes it to
+`GOOGLE_APPLICATION_CREDENTIALS` at boot (defaulting to
+`/app/firebase-service-account.json`) and locks it to 600, because Railway
+has no way to mount a file and the SDK wants a path.
+
+Leave `FIREBASE_SERVICE_ACCOUNT` unset and nothing breaks — the console
+sender keeps logging, which is the normal state until you have a project.
+
+**Do not commit that JSON.** It can send push to every device you have.
+
+If `PUSH_SENDER` names Firebase and the credentials are missing, the
+container refuses to start with `sylibooking.E004` rather than running and
+silently sending nothing — the one failure nobody reports, because no
+customer complains about a reminder they never expected.
 
 ### Apps
 

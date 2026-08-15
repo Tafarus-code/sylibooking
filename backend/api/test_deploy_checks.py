@@ -6,10 +6,15 @@ version of this guard raised at import, which broke the very command whose
 job is to report it.
 """
 
+import os
+import tempfile
+from unittest import mock
+
 from config.checks import (
     cache_must_be_shared,
     database_must_be_configured,
     payment_callbacks_need_secrets,
+    push_needs_its_credentials,
 )
 from django.test import TestCase, override_settings
 
@@ -167,3 +172,43 @@ class DatabaseCheckTests(TestCase):
     @override_settings(DJANGO_ENV='local', DATABASES=MISSING)
     def test_development_is_left_alone(self):
         self.assertEqual(database_must_be_configured(None), [])
+
+
+class PushCredentialsCheckTests(TestCase):
+    FIREBASE = 'notifications.push.FirebasePushSender'
+    CONSOLE = 'notifications.push.ConsolePushSender'
+
+    @override_settings(DJANGO_ENV='production', PUSH_SENDER=FIREBASE)
+    @mock.patch.dict(os.environ, {'GOOGLE_APPLICATION_CREDENTIALS': ''})
+    def test_firebase_without_credentials_is_an_error(self):
+        """**Silent by construction.**
+
+        Every push fails, nothing is logged where anybody looks, and no
+        customer complains about a reminder they never expected. The only
+        report is a merchant saying the app never tells them anything.
+        """
+        problems = push_needs_its_credentials(None)
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].id, 'sylibooking.E004')
+        self.assertIn('FIREBASE_SERVICE_ACCOUNT', problems[0].hint)
+
+    @override_settings(DJANGO_ENV='production', PUSH_SENDER=CONSOLE)
+    def test_the_console_sender_needs_nothing(self):
+        self.assertEqual(push_needs_its_credentials(None), [])
+
+    @override_settings(DJANGO_ENV='production', PUSH_SENDER=FIREBASE)
+    def test_a_readable_credentials_file_passes(self):
+        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as handle:
+            handle.write(b'{}')
+            path = handle.name
+        self.addCleanup(os.unlink, path)
+
+        with mock.patch.dict(
+            os.environ, {'GOOGLE_APPLICATION_CREDENTIALS': path}
+        ):
+            self.assertEqual(push_needs_its_credentials(None), [])
+
+    @override_settings(DJANGO_ENV='local', PUSH_SENDER=FIREBASE)
+    def test_development_is_left_alone(self):
+        self.assertEqual(push_needs_its_credentials(None), [])

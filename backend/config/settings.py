@@ -213,12 +213,18 @@ if DJANGO_ENV == 'production':
     if _database_url:
         DATABASES = {'default': _database_from_url(_database_url)}
     else:
+        # The five-variable form, for hosts that do not hand out a URL.
+        #
+        # Defaults rather than required, so a missing database is reported by
+        # `check --deploy` naming DATABASE_URL — the variable somebody
+        # actually sets — instead of raising about DB_NAME, which on Railway,
+        # Render and Fly nobody has ever heard of. See config/checks.py.
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
-                'NAME': config('DB_NAME'),
-                'USER': config('DB_USER'),
-                'PASSWORD': config('DB_PASSWORD'),
+                'NAME': config('DB_NAME', default=''),
+                'USER': config('DB_USER', default=''),
+                'PASSWORD': config('DB_PASSWORD', default=''),
                 'HOST': config('DB_HOST', default='localhost'),
                 'PORT': config('DB_PORT', default='5432'),
             }
@@ -795,6 +801,20 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # A worker that never gives up holds a slot for ever. Nothing here is so
 # important that it should outlive the shift it belongs to.
+# How many processes a worker forks.
+#
+# Celery's default is the host's CPU count, and a container platform reports
+# the underlying machine rather than your share of it — Railway booted this
+# with `concurrency: 48 (prefork)`, which is 48 full copies of Django waiting
+# for three small tasks a minute. On a container this size that is either an
+# OOM kill under load or a memory bill for processes that are never busy.
+#
+# Two, for the same reason WEB_CONCURRENCY exists: the platform knows how big
+# the container is and the default does not. Raise it when a task starts
+# taking real time — the payment poller is 40ms and the reminders are an HTTP
+# call each.
+CELERY_WORKER_CONCURRENCY = config('CELERY_WORKER_CONCURRENCY', default=2, cast=int)
+
 CELERY_TASK_TIME_LIMIT = 300
 CELERY_TASK_SOFT_TIME_LIMIT = 240
 

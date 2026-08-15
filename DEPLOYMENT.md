@@ -441,24 +441,39 @@ it** — it can send push to every device you have.
 
 ### Apps
 
-Two changes, both of which need the `google-services.json` above to exist
-first or the Android build fails:
+**The code is already wired.** Both apps build a `FirebasePushRegistrar` in
+`main()`, it works out its own platform, and it disables itself when there is
+no Firebase project — so a build without `google-services.json` runs
+perfectly and simply is not pushed to. What is left is the Android plumbing
+that file needs.
 
-1. `apps/<app>/android/settings.gradle.kts` — add to the plugins block:
+For **each** of `apps/merchant_app` and `apps/customer_app`:
+
+1. `android/settings.gradle.kts` — in the `plugins` block:
    ```kotlin
    id("com.google.gms.google-services") version "4.4.2" apply false
    ```
-2. `apps/<app>/android/app/build.gradle.kts` — add to its plugins block:
+2. `android/app/build.gradle.kts` — in its `plugins` block:
    ```kotlin
    id("com.google.gms.google-services")
    ```
 
-Then switch the registrar on where each app builds its auth controller —
-`FirebasePushRegistrar()` in place of the default. Grep for `NoPushRegistrar`;
-there are two call sites.
+**Do the Gradle edit and the JSON together.** The plugin without the file
+fails the Android build on any machine, including CI.
 
-**Do the gradle edit and the JSON together.** The plugin without the file is a
-build that fails on a machine that is not yours.
+### Web push is a separate job
+
+Both apps are also deployed as web services, and web push is not covered by
+the above. It needs a `firebase-messaging-sw.js` service worker and the
+Firebase JS config in each app's `web/` directory, neither of which
+`google-services.json` provides.
+
+Until that is done the web builds behave exactly as an unconfigured Android
+build does: everything works, `Firebase.initializeApp` fails, the failure is
+caught, and no push arrives. Nothing breaks — the feature is simply absent.
+
+Worth deciding rather than assuming: a merchant on a laptop is arguably the
+person who most wants an alert, and they are the likeliest web user.
 
 ---
 

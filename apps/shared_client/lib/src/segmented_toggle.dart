@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'app_theme.dart';
+import 'baseline_theme.dart';
 
 /// Two views of the same place, with one of them showing.
 ///
@@ -49,7 +49,7 @@ class SegmentedToggle extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(dense ? 2 : 4),
         decoration: BoxDecoration(
-          color: SylibookingTokens.deepwoodSoft,
+          color: CustomerBaselineTokens.pruneClair,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -92,12 +92,13 @@ class _Option extends StatelessWidget {
       selected: selected,
       // Material + InkWell rather than Ink: an `Ink` decoration is painted
       // onto the nearest Material ancestor, which here is the page behind the
-      // toggle's own dark background — so the ember fill was drawn *under*
-      // the deepwood pill and never seen, leaving the selected label as dark
-      // brown on dark green. A Material of its own gives the fill somewhere
-      // to land and still lets the tap ripple.
+      // toggle's own dark background — so the accent fill was drawn *under*
+      // the pill and never seen, leaving the selected label unreadable on it.
+      // A Material of its own gives the fill somewhere to land and still lets
+      // the tap ripple.
       child: Material(
-        color: selected ? SylibookingTokens.ember : Colors.transparent,
+        color:
+            selected ? CustomerBaselineTokens.bissap : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -120,8 +121,8 @@ class _Option extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: selected
-                        ? SylibookingTokens.onEmber
-                        : SylibookingTokens.ivoryDim,
+                        ? CustomerBaselineTokens.onBissap
+                        : CustomerBaselineTokens.blush,
                   ),
                 ),
               ),

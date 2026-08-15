@@ -25,7 +25,6 @@ from django.db import transaction
 from django.utils import timezone
 from orders.models import Order, OrderItem
 from PIL import Image, ImageDraw
-from reservations.no_show import no_show_window
 
 from establishments.favourites import Favourite
 from establishments.models import (
@@ -39,6 +38,7 @@ from establishments.models import (
 )
 from payments.models import Payment
 from reservations.models import Reservation
+from reservations.no_show import no_show_window
 
 User = get_user_model()
 

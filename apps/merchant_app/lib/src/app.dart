@@ -81,9 +81,14 @@ class _MerchantAppState extends State<MerchantApp> {
       builder: (context, _) => MaterialApp(
         onGenerateTitle: (context) => L.of(context).appTitle,
         debugShowCheckedModeBanner: false,
-        // Same house style as the customer app; the chrome should not look
-        // like two different products.
-        theme: sylibookingAppTheme(),
+        // The merchant app's own look — Indigo Ledger. The two apps no longer
+        // share one house style: a customer browsing lounges at night and a
+        // manager working a counter in daylight are different rooms, and the
+        // palettes now say so.
+        //
+        // Not one of the five venue presets, one of which is called "Indigo
+        // Soir" — see the note at the top of baseline_theme.dart.
+        theme: merchantBaselineTheme(),
         locale: _locale.locale,
         supportedLocales: L.supportedLocales,
         localizationsDelegates: const [
@@ -101,7 +106,19 @@ class _MerchantAppState extends State<MerchantApp> {
             slow: L.of(context).connectionSlow,
             unreachable: L.of(context).connectionFailed,
           );
-          return child ?? const SizedBox.shrink();
+          // The canvas, once, under everything — the same arrangement the
+          // customer app uses, and for the same reason: a sibling of the
+          // navigator is painted once and survives every push. It covers the
+          // tablet and the phone layouts alike, because both are Scaffolds
+          // made transparent by the baseline theme.
+          //
+          // Nothing is ever blurred over this one. See FrostedPanel.
+          return Stack(
+            children: [
+              const Positioned.fill(child: MerchantBaselineBackground()),
+              child ?? const SizedBox.shrink(),
+            ],
+          );
         },
         home: !_locale.isLoaded
             ? const _Splash()

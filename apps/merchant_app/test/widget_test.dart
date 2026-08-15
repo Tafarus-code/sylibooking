@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -822,7 +823,11 @@ void main() {
       // The navigation is the app, not the venue.
       final scheme =
           Theme.of(tester.element(find.text('Payments'))).colorScheme;
-      expect(scheme.primary, SylibookingTokens.ember);
+      expect(scheme.primary, MerchantBaselineTokens.copper);
+      expect(
+        scheme.primary,
+        isNot(establishmentThemePresetFor('bissap').accent),
+      );
     });
   });
 
@@ -997,15 +1002,30 @@ void main() {
       return Theme.of(tester.element(find.text('Reservations').first));
     }
 
-    testWidgets('the merchant app runs on the same Ember baseline',
+    testWidgets('the merchant app runs on Indigo Ledger', (tester) async {
+      final theme = await signedInTheme(tester);
+
+      // The two apps deliberately no longer share one baseline: a customer
+      // browsing lounges at night and a manager working a counter in daylight
+      // are different rooms.
+      expect(theme.colorScheme.primary, MerchantBaselineTokens.copper);
+      expect(theme.colorScheme.surface, MerchantBaselineTokens.parchment);
+      expect(theme.colorScheme.onSurface, MerchantBaselineTokens.indigo);
+    });
+
+    testWidgets('and is neither Ember nor the customer baseline',
         (tester) async {
       final theme = await signedInTheme(tester);
 
-      // Was a teal seed before: two apps in one product should not look like
-      // two products.
-      expect(theme.colorScheme.primary, SylibookingTokens.ember);
-      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
-      expect(theme.colorScheme.onSurface, SylibookingTokens.onIvory);
+      expect(theme.colorScheme.primary, isNot(SylibookingTokens.ember));
+      expect(
+        theme.colorScheme.primary,
+        isNot(CustomerBaselineTokens.bissap),
+      );
+      expect(
+        theme.colorScheme.surface,
+        isNot(CustomerBaselineTokens.blush),
+      );
     });
 
     testWidgets('merchant type comes from the house faces', (tester) async {
@@ -1013,11 +1033,17 @@ void main() {
 
       expect(
         theme.textTheme.bodyMedium?.fontFamily,
-        contains(SylibookingTokens.bodyFont),
+        contains(MerchantBaselineTokens.bodyFont),
       );
+      // Sora, where the customer app takes Playfair Display. Manrope is the
+      // one face the two still share.
       expect(
         theme.textTheme.titleLarge?.fontFamily,
-        contains(SylibookingTokens.displayFont),
+        contains(MerchantBaselineTokens.displayFont),
+      );
+      expect(
+        MerchantBaselineTokens.bodyFont,
+        CustomerBaselineTokens.bodyFont,
       );
     });
 
@@ -1040,7 +1066,9 @@ void main() {
 
       final scheme =
           Theme.of(tester.element(find.text('Choose a venue'))).colorScheme;
-      expect(scheme.primary, SylibookingTokens.ember);
+      // One of these venues wears the preset keyed 'bissap'; the chrome is
+      // the merchant baseline regardless.
+      expect(scheme.primary, MerchantBaselineTokens.copper);
     });
 
     testWidgets('the login screen is themed before any venue is known',
@@ -1055,7 +1083,7 @@ void main() {
 
       final scheme =
           Theme.of(tester.element(find.text('Sign in'))).colorScheme;
-      expect(scheme.primary, SylibookingTokens.ember);
+      expect(scheme.primary, MerchantBaselineTokens.copper);
     });
   });
 
@@ -6419,6 +6447,212 @@ void main() {
       expect(find.text('Could not export the file.'), findsOneWidget);
     });
   });
+
+  // ==========================================================================
+  // Indigo Ledger — the palette at both widths, and the two things a recolour
+  // must not be allowed to take with it: the status vocabulary, and who can
+  // see which tile.
+  // ==========================================================================
+  group('the merchant app wears Indigo Ledger', () {
+    double luminance(Color colour) {
+      double linearise(double channel) => channel <= 0.03928
+          ? channel / 12.92
+          : math.pow((channel + 0.055) / 1.055, 2.4).toDouble();
+      return 0.2126 * linearise(colour.r) +
+          0.7152 * linearise(colour.g) +
+          0.0722 * linearise(colour.b);
+    }
+
+    double contrast(Color a, Color b) {
+      final lighter = math.max(luminance(a), luminance(b));
+      final darker = math.min(luminance(a), luminance(b));
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    /// Signed in at [size], on the desk.
+    Future<ThemeData> desk(
+      WidgetTester tester, {
+      Size size = phoneSize,
+      String role = 'owner',
+      String preset = 'ember',
+    }) async {
+      final (:auth, :backend) =
+          buildAuth(tester, storedToken: 'stored-token', size: size);
+      backend.on('GET', '/api/auth/me/', user());
+      backend.on('GET', '/api/merchant/establishments/', {
+        'results': [
+          {...venueJson(role: role), 'theme_preset': preset},
+        ],
+      });
+      backend.on('GET', '/api/reservations/', {
+        'count': 1,
+        'next': null,
+        'results': [paidBooking()],
+      });
+      backend.on('GET', '/api/merchant/orders/', {'results': []});
+
+      await tester.pumpWidget(MerchantApp(
+        auth: auth,
+        localeStore: InMemoryLocaleStore(),
+      ));
+      await tester.pumpAndSettle();
+      return Theme.of(tester.element(find.text('Payments')));
+    }
+
+    for (final (name, size) in <(String, Size)>[
+      ('a phone', phoneSize),
+      ('a tablet', tabletSize),
+    ]) {
+      testWidgets('the palette reaches the desk on $name', (tester) async {
+        final theme = await desk(tester, size: size);
+
+        expect(theme.colorScheme.primary, MerchantBaselineTokens.copper);
+        expect(theme.colorScheme.secondary, MerchantBaselineTokens.slateBlue);
+        expect(theme.colorScheme.tertiary, MerchantBaselineTokens.sage);
+        expect(theme.colorScheme.surface, MerchantBaselineTokens.parchment);
+      });
+
+      testWidgets('a field grid stays readable on $name', (tester) async {
+        final theme = await desk(tester, size: size);
+        final scheme = theme.colorScheme;
+
+        expect(
+          contrast(scheme.onSurface, scheme.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          contrast(scheme.onSurfaceVariant, scheme.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+        // A copper button carries a label; this is the pair that measured
+        // 4.46 and failed when it was indigo.
+        expect(
+          contrast(scheme.onPrimary, scheme.primary),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+
+      testWidgets('the canvas is behind it on $name', (tester) async {
+        await desk(tester, size: size);
+
+        expect(find.byType(MerchantBaselineBackground), findsOneWidget);
+      });
+    }
+
+    testWidgets('the rail is indigo with copper on the active item',
+        (tester) async {
+      final theme = await desk(tester, size: tabletSize);
+      final rail = theme.navigationRailTheme;
+
+      expect(rail.backgroundColor, MerchantBaselineTokens.indigo);
+      expect(rail.indicatorColor, MerchantBaselineTokens.copper);
+      expect(
+        contrast(
+          MerchantBaselineTokens.parchment,
+          MerchantBaselineTokens.indigo,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    testWidgets('the customer app keeps its own rail, not this one',
+        (tester) async {
+      // Both apps share AdaptiveScaffold, so the rail is styled by theme
+      // rather than by the widget. This is what keeps the merchant indigo
+      // spine out of the customer app on a tablet.
+      final merchant = merchantBaselineTheme().navigationRailTheme;
+      final customer = customerBaselineTheme().navigationRailTheme;
+
+      expect(merchant.backgroundColor, MerchantBaselineTokens.indigo);
+      expect(customer.backgroundColor, CustomerBaselineTokens.blush);
+      expect(customer.backgroundColor, isNot(merchant.backgroundColor));
+    });
+
+    testWidgets('nothing in this app is ever blurred', (tester) async {
+      await desk(tester, size: tabletSize);
+
+      expect(find.byType(FrostedPanel), findsNothing);
+      expect(find.byType(BackdropFilter), findsNothing);
+    });
+
+    testWidgets('and not on a phone either', (tester) async {
+      await desk(tester, size: phoneSize);
+
+      expect(find.byType(FrostedPanel), findsNothing);
+      expect(find.byType(BackdropFilter), findsNothing);
+    });
+
+    testWidgets('paid stays green, whatever the palette does', (tester) async {
+      // **The one the recolour nearly broke.** This badge read its colours
+      // from the scheme, where primaryContainer happened to be deepwood — so
+      // paid was green by coincidence, and became indigo the moment the
+      // palette changed, while the customer app kept green.
+      await desk(tester);
+
+      const settled = Color(0xFF1F6B44);
+      expect(StatusBadge.foregroundOf(StatusTone.paid), settled);
+
+      final paid = tester
+          .widgetList<Text>(find.byType(Text))
+          .where((text) => text.style?.color == settled);
+      expect(
+        paid,
+        isNotEmpty,
+        reason: 'the paid badge no longer uses the fixed settled green',
+      );
+    });
+
+    testWidgets('and the status vocabulary is not the merchant palette',
+        (tester) async {
+      // Stated as an inequality so a future tidy-up that maps tones onto
+      // scheme roles fails here rather than in a lounge at 23:00.
+      for (final tone in StatusTone.values) {
+        expect(
+          StatusBadge.foregroundOf(tone),
+          isNot(MerchantBaselineTokens.copper),
+        );
+        expect(
+          StatusBadge.backgroundOf(tone),
+          isNot(MerchantBaselineTokens.parchment),
+        );
+      }
+    });
+
+    testWidgets('the recolour did not hand staff a tile they had not earned',
+        (tester) async {
+      // Role gating is logic and this slice is paint. Asserted anyway,
+      // because "the palette change touched nothing else" is exactly the
+      // claim that is easy to make and easy to be wrong about.
+      await desk(tester, role: 'staff');
+      await tester.tap(find.text('Manage'));
+      await tester.pumpAndSettle();
+
+      // The same labels the role-gating group asserts, deliberately: a tile
+      // named here that does not exist there would pass by being absent for
+      // the wrong reason.
+      expect(find.text('Menu'), findsOneWidget);
+      expect(find.text('Who has access'), findsNothing);
+      expect(find.text('Branding'), findsNothing);
+      expect(find.text('Opening hours'), findsNothing);
+    });
+
+    testWidgets('while an owner still sees all of them', (tester) async {
+      await desk(tester, role: 'owner');
+      await tester.tap(find.text('Manage'));
+      await tester.pumpAndSettle();
+
+      // Manage is taller than a 360x900 phone, so a tile this role may use
+      // still has to be scrolled to before it is in the tree at all — the
+      // same reason the role-gating group scrolls. An absent tile stays
+      // absent however far you scroll, which is why the staff test above
+      // does not need this.
+      for (final tile in ['Opening hours', 'Branding', 'Who has access']) {
+        await tester.scrollUntilVisible(find.text(tile), 200);
+        expect(find.text(tile), findsOneWidget, reason: tile);
+      }
+    });
+  });
+
 }
 
 /// An export sink that records, or refuses.

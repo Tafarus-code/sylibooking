@@ -225,10 +225,19 @@ happens.
 1. Add **Redis** to the Railway project. It sets `REDIS_URL`.
 2. Add two more services from the same repo, changing only the start command:
 
-| Service | Start command | Also set |
+| Service | Config as code | Also set |
 |---|---|---|
-| worker | `celery -A config worker -l info` | `RUN_MIGRATIONS=no` |
-| beat | `celery -A config beat -l info` | `RUN_MIGRATIONS=no` |
+| worker | `deploy/railway-worker.json` | `RUN_MIGRATIONS=no` |
+| beat | `deploy/railway-beat.json` | `RUN_MIGRATIONS=no` |
+
+Set **Settings → Config as code** to that path and the start command comes
+with it — there is nothing to type into a dashboard field.
+
+**Those two files declare no health check, and that is the point.** The root
+`railway.json` checks `/api/health/`, and a service using it that serves no
+HTTP fails every probe: the deploy is marked failed while the process it
+started is running perfectly and logging tasks succeeding. Nothing about
+that failure names the health check as the cause.
 
 `RUN_MIGRATIONS=no` matters: the entrypoint migrates on boot, and three
 services racing the same migration is how a half-applied schema happens. The

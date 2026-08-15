@@ -447,19 +447,36 @@ no Firebase project — so a build without `google-services.json` runs
 perfectly and simply is not pushed to. What is left is the Android plumbing
 that file needs.
 
-For **each** of `apps/merchant_app` and `apps/customer_app`:
+**The Gradle plugin is applied in both apps too** — declared in
+`android/settings.gradle.kts`, applied in `android/app/build.gradle.kts`.
+Verified by building both APKs: the plugin reads the JSON and generates
+`google_app_id`, `project_id` and `google_api_key` into the build.
 
-1. `android/settings.gradle.kts` — in the `plugins` block:
-   ```kotlin
-   id("com.google.gms.google-services") version "4.4.2" apply false
-   ```
-2. `android/app/build.gradle.kts` — in its `plugins` block:
-   ```kotlin
-   id("com.google.gms.google-services")
-   ```
+So the only thing a machine needs is the file itself.
 
-**Do the Gradle edit and the JSON together.** The plugin without the file
-fails the Android build on any machine, including CI.
+### google-services.json is not in the repository
+
+It is git-ignored, per app. Google does not treat it as a secret — it is
+compiled into the APK and anyone can read it out of one — but this
+repository is public, and publishing a project id and an API key invites
+scanners for no benefit.
+
+The consequence is real and worth knowing: **a fresh clone cannot build the
+Android apps.** Gradle fails with a message about a missing
+`google-services.json`. Anyone building them needs to download both from
+console.firebase.google.com first, into:
+
+```
+apps/merchant_app/android/app/google-services.json
+apps/customer_app/android/app/google-services.json
+```
+
+CI does not build Android — it runs `flutter test` and `flutter analyze`,
+neither of which touches Gradle — so this does not affect the pipeline.
+
+The file that must **never** be committed under any circumstances is the
+service account key from *Project settings → Service accounts*. That one can
+push to every device you have.
 
 ### Web push is a separate job
 

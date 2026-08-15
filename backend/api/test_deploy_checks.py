@@ -107,3 +107,32 @@ class CallbackSecretCheckTests(TestCase):
     @override_settings(DJANGO_ENV='local', PAYMENT_PROVIDERS=LIVE)
     def test_development_is_left_alone(self):
         self.assertEqual(payment_callbacks_need_secrets(None), [])
+
+
+class StorageIndependenceTests(TestCase):
+    """Static storage must not depend on where media is kept.
+
+    They were one block once. Turning USE_S3_MEDIA on also switched static
+    files to the manifest backend — and the image collects static with media
+    storage off, so no manifest was ever written. The first deploy with R2
+    enabled answered 500 to every HTML page while the JSON API kept working,
+    which is a confusing way to learn that a photo setting decides how CSS is
+    served.
+    """
+
+    def test_the_static_backend_is_the_same_either_way(self):
+        from django.conf import settings
+
+        # Whatever this deployment does with media, the collect that happened
+        # at build time and the storage that reads it at runtime agree.
+        self.assertIn(
+            'ManifestStaticFilesStorage',
+            settings.STORAGES['staticfiles']['BACKEND'],
+        )
+
+    def test_media_storage_is_the_only_thing_use_s3_media_decides(self):
+        """Named so the coupling cannot come back by accident."""
+        import config.settings as conf
+
+        self.assertIn('BACKEND', conf._media_storage)
+        self.assertNotIn('staticfiles', conf._media_storage)

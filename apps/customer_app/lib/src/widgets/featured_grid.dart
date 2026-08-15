@@ -138,7 +138,7 @@ class _DishCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: sylibookingPriceStyle(context, fontSize: 12)
-                          .copyWith(color: const Color(0xFF1F4A34)),
+                          .copyWith(color: CustomerBaselineTokens.pruneClair),
                     ),
                   ],
                 ),
@@ -159,11 +159,11 @@ class _NoPhoto extends StatelessWidget {
     // A flat wash rather than a broken-image glyph: most dishes will never
     // have a photo, and an error icon on the common case reads as a fault.
     return Container(
-      color: const Color(0xFF1F4A34),
+      color: CustomerBaselineTokens.pruneClair,
       alignment: Alignment.center,
       child: const Icon(
         Icons.restaurant,
-        color: Color(0x66F7F1E4),
+        color: Color(0x66FBF2EC),
         size: 28,
       ),
     );

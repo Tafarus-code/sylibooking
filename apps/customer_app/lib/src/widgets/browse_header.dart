@@ -62,8 +62,8 @@ class BrowseHeader extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    SylibookingTokens.ember.withValues(alpha: 0.22),
-                    SylibookingTokens.ember.withValues(alpha: 0.0),
+                    CustomerBaselineTokens.gold.withValues(alpha: 0.22),
+                    CustomerBaselineTokens.gold.withValues(alpha: 0.0),
                   ],
                 ),
               ),
@@ -102,20 +102,29 @@ class BrowseHeader extends StatelessWidget {
                 ),
               ],
               SizedBox(height: short ? 8 : 14),
-              TextField(
-                controller: controller,
-                onChanged: onChanged,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: l.searchByName,
-                  prefixIcon: const Icon(Icons.search),
-                  isDense: true,
-                  suffixIcon: controller.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: onClear,
-                        ),
+              // The second and last frosted surface in this app. It sits on
+              // the canvas rather than on a list, and it does not scroll —
+              // both of which are why it may be blurred at all.
+              FrostedPanel(
+                borderRadius: BorderRadius.circular(28),
+                child: TextField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: l.searchByName,
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    // The frost is the fill. A filled field on top of it
+                    // would be an opaque rectangle over a blur.
+                    filled: false,
+                    suffixIcon: controller.text.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: onClear,
+                          ),
+                  ),
                 ),
               ),
             ],

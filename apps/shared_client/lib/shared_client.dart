@@ -7,6 +7,7 @@ library;
 export 'src/adaptive_scaffold.dart';
 export 'src/api_client.dart';
 export 'src/app_theme.dart';
+export 'src/baseline_background.dart';
 export 'src/baseline_theme.dart';
 export 'src/booking_options.dart';
 export 'src/crash_reporting.dart';

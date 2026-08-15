@@ -60,6 +60,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return AdaptiveScaffold(
       selectedIndex: _index,
       onDestinationSelected: (index) => setState(() => _index = index),
+      // One of exactly two frosted surfaces in this app — the other is the
+      // search field. The bar is fixed and the canvas behind it is static, so
+      // the blur is composited once rather than re-read as a list moves.
+      frostedBar: true,
       destinations: [
         AdaptiveDestination(
           label: l.navBrowse,

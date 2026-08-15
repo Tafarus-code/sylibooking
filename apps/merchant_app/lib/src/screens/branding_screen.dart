@@ -19,7 +19,7 @@ class BrandingScreen extends StatefulWidget {
 }
 
 class _BrandingScreenState extends State<BrandingScreen> {
-  late String _selected = defaultThemePresetKey;
+  late String _selected = defaultEstablishmentThemePresetKey;
   String? _saved;
   bool _loading = true;
   bool _saving = false;
@@ -117,7 +117,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
                     ),
                   ),
                 ),
-                for (final preset in themePresets)
+                for (final preset in establishmentThemePresets)
                   _PresetCard(
                     preset: preset,
                     venueName: venueName,
@@ -180,7 +180,7 @@ class _PresetCard extends StatelessWidget {
     this.onTap,
   });
 
-  final ThemePreset preset;
+  final EstablishmentThemePreset preset;
   final String venueName;
   final bool selected;
   final VoidCallback? onTap;

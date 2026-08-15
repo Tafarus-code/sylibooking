@@ -68,7 +68,7 @@ void main() {
     test('the baseline accent is the ember preset accent', () {
       // Not a coincidence to be maintained by hand: the app's own accent and
       // the default venue preset are the same colour by design.
-      expect(SylibookingTokens.ember, themePresetFor('ember').accent);
+      expect(SylibookingTokens.ember, establishmentThemePresetFor('ember').accent);
     });
   });
 

@@ -250,7 +250,7 @@ class MerchantVenue {
     required this.roleDisplay,
     this.type = '',
     this.tagline = '',
-    this.themePreset = defaultThemePresetKey,
+    this.themePreset = defaultEstablishmentThemePresetKey,
   });
 
   final int id;
@@ -275,7 +275,7 @@ class MerchantVenue {
         type: json['type'] as String? ?? '',
         tagline: json['tagline'] as String? ?? '',
         themePreset:
-            json['theme_preset'] as String? ?? defaultThemePresetKey,
+            json['theme_preset'] as String? ?? defaultEstablishmentThemePresetKey,
         role: MerchantRole.parse(json['role'] as String?),
         roleDisplay: json['role_display'] as String? ?? '',
       );

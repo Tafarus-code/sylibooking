@@ -6,8 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 /// Mirrors `design/theme_presets.json`, which the backend reads directly. A
 /// test compares the two, so they cannot drift apart. Merchants pick a key;
 /// nothing here is merchant-editable, which is what keeps every venue legible.
-class ThemePreset {
-  const ThemePreset({
+class EstablishmentThemePreset {
+  const EstablishmentThemePreset({
     required this.key,
     required this.name,
     required this.description,
@@ -84,11 +84,11 @@ const _rawPresets = <Map<String, String>>[
 ];
 
 /// The key a venue has until someone chooses otherwise.
-const defaultThemePresetKey = 'ember';
+const defaultEstablishmentThemePresetKey = 'ember';
 
-final List<ThemePreset> themePresets = [
+final List<EstablishmentThemePreset> establishmentThemePresets = [
   for (final raw in _rawPresets)
-    ThemePreset(
+    EstablishmentThemePreset(
       key: raw['key']!,
       name: raw['name']!,
       description: raw['description']!,
@@ -103,10 +103,10 @@ final List<ThemePreset> themePresets = [
 ///
 /// An unknown key means the server knows a preset this build does not — a
 /// newer preset, most likely. Falling back beats rendering nothing.
-ThemePreset themePresetFor(String? key) => themePresets.firstWhere(
+EstablishmentThemePreset establishmentThemePresetFor(String? key) => establishmentThemePresets.firstWhere(
       (preset) => preset.key == key,
-      orElse: () => themePresets.firstWhere(
-        (preset) => preset.key == defaultThemePresetKey,
+      orElse: () => establishmentThemePresets.firstWhere(
+        (preset) => preset.key == defaultEstablishmentThemePresetKey,
       ),
     );
 
@@ -121,14 +121,14 @@ ThemePreset themePresetFor(String? key) => themePresets.firstWhere(
 /// Separate because it is pure: it can be asserted on anywhere, whereas
 /// resolving a Google font needs a binding and either a network or bundled
 /// assets.
-ColorScheme colorSchemeForPreset(ThemeData base, ThemePreset preset) =>
+ColorScheme colorSchemeForEstablishmentPreset(ThemeData base, EstablishmentThemePreset preset) =>
     ColorScheme.fromSeed(
       seedColor: preset.accent,
       brightness: base.brightness,
     ).copyWith(primary: preset.accent, onPrimary: preset.onAccent);
 
-ThemeData themeForPreset(ThemeData base, ThemePreset preset) {
-  final scheme = colorSchemeForPreset(base, preset);
+ThemeData themeForEstablishmentPreset(ThemeData base, EstablishmentThemePreset preset) {
+  final scheme = colorSchemeForEstablishmentPreset(base, preset);
 
   final bodyTheme = GoogleFonts.getTextTheme(preset.bodyFont, base.textTheme);
   final displayTheme =
@@ -167,9 +167,9 @@ class EstablishmentThemeScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final preset = themePresetFor(presetKey);
+    final preset = establishmentThemePresetFor(presetKey);
     return Theme(
-      data: themeForPreset(Theme.of(context), preset),
+      data: themeForEstablishmentPreset(Theme.of(context), preset),
       child: child,
     );
   }

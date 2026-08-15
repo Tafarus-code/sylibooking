@@ -6,6 +6,28 @@
 # looks like data corruption rather than a failed deploy.
 set -e
 
+# Firebase credentials, written from the environment.
+#
+# The SDK wants a file path; platforms hand out environment variables; and a
+# service account key must never be committed. So the JSON travels as
+# FIREBASE_SERVICE_ACCOUNT and is written out here, before anything that
+# might want to send a push.
+#
+# printf rather than echo: the key inside that JSON contains backslash-n
+# escapes, and echo mangles them on some shells — producing a file that is
+# valid JSON with an unusable key, which fails much later and says only
+# "invalid grant".
+#
+# Absent variable means push is simply not configured, which is a normal
+# state and not an error: the sender falls back to logging.
+if [ -n "${FIREBASE_SERVICE_ACCOUNT:-}" ]; then
+  credentials="${GOOGLE_APPLICATION_CREDENTIALS:-/app/firebase-service-account.json}"
+  printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$credentials"
+  chmod 600 "$credentials"
+  export GOOGLE_APPLICATION_CREDENTIALS="$credentials"
+  echo "Firebase credentials written to $credentials"
+fi
+
 # Migrations run on the web role only. Three replicas racing the same
 # migration is how a half-applied schema happens; the worker and beat are
 # given a different command and skip this.

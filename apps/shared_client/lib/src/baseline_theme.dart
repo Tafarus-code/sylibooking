@@ -304,22 +304,10 @@ ThemeData merchantBaselineTheme() => _baselineTheme(
       railUnselected: MerchantBaselineTokens.parchment,
     );
 
-/// Money, set in the mono face, for either baseline.
-///
-/// Prices are read as figures rather than as words: a column of them should
-/// line up, and 150000 next to 15000 should differ visibly in width rather
-/// than only in a digit. Both baselines name the same mono family, so this
-/// takes it from the customer tokens and would need a parameter only if that
-/// ever stopped being true.
-TextStyle baselinePriceStyle(BuildContext context, {double? fontSize}) {
-  final theme = Theme.of(context);
-  return GoogleFonts.getFont(
-    CustomerBaselineTokens.monoFont,
-    textStyle: theme.textTheme.titleMedium,
-    fontSize: fontSize,
-    fontWeight: FontWeight.w600,
-  );
-}
+// Money is set by `sylibookingPriceStyle` in app_theme.dart, and stays
+// there: it chooses the mono face and nothing else, both baselines name the
+// same one, and it is already called from both apps. A baseline-flavoured
+// copy of it would be two functions with one behaviour.
 
 // ---------------------------------------------------------------------------
 // Contrast notes, measured rather than assumed. Tests assert all of these.

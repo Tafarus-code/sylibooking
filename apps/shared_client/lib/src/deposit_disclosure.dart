@@ -50,8 +50,11 @@ class DepositDisclosure extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFFBF3E4),
-          border: Border.all(color: const Color(0xFFEED9A9)),
+          // The gold family, which is what the customer baseline offers for
+          // a notice. Not the status vocabulary: this is a term of the
+          // booking, not the state of one.
+          color: const Color(0xFFFDF3E0),
+          border: Border.all(color: const Color(0xFFEFD9A6)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text.rich(
@@ -61,7 +64,7 @@ class DepositDisclosure extends StatelessWidget {
                 text: headline(deposit, windowMinutes),
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF8A5C1C),
+                  color: Color(0xFF6B4A12),
                 ),
               ),
               const TextSpan(text: ' '),
@@ -71,7 +74,7 @@ class DepositDisclosure extends StatelessWidget {
           style: const TextStyle(
             fontSize: 13,
             height: 1.5,
-            color: Color(0xFF6B5424),
+            color: Color(0xFF5B4A24),
           ),
         ),
       ),

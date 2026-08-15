@@ -4,11 +4,24 @@ import 'package:google_fonts/google_fonts.dart';
 /// The original single house style, shared by both apps. Named after Ember:
 /// deepwood, ivory, ember.
 ///
-/// **Superseded, and still here on purpose.** Each app now has a baseline of
-/// its own — `CustomerBaselineTokens` (Bissap Bloom) and
-/// `MerchantBaselineTokens` (Indigo Ledger) in `baseline_theme.dart`. This
-/// stays until both apps are moved across, and is what the `ember` preset is
-/// still derived against.
+/// **Superseded. No app code reads these any more** — each app has a baseline
+/// of its own, `CustomerBaselineTokens` (Bissap Bloom) and
+/// `MerchantBaselineTokens` (Indigo Ledger) in `baseline_theme.dart`.
+///
+/// Kept for two reasons, and worth deleting when neither holds:
+///
+///  * `SylibookingTokens.ember` is still the accent of the `ember` *preset*,
+///    which is a venue's choice and the default a new venue gets. That value
+///    has to keep existing somewhere; the preset file reads it from the same
+///    design JSON.
+///  * The tests that assert each baseline is *not* Ember need something to
+///    compare against. A colour nothing can name cannot be ruled out.
+///
+/// `sylibookingAppTheme` and `sylibookingColorScheme` below have no callers
+/// left in either app. They are the part that is genuinely dead, and removing
+/// them means deciding what happens to the `base` block of
+/// `design/theme_presets.json` and the test that mirrors it — a call worth
+/// making deliberately rather than as a side effect of a recolour.
 ///
 /// Mirrors the `base` block of `design/theme_presets.json`; a test compares
 /// the two.

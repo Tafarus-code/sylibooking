@@ -174,7 +174,7 @@ void main() {
         return material.color;
       }
 
-      expect(fillUnder('Commandes'), SylibookingTokens.ember);
+      expect(fillUnder('Commandes'), CustomerBaselineTokens.bissap);
       expect(fillUnder('Réservations'), Colors.transparent);
     });
 
@@ -197,7 +197,7 @@ void main() {
           .ancestor(
             of: find.text('Réservations'),
             matching: find.byWidgetPredicate(
-              (w) => w is Material && w.color == SylibookingTokens.ember,
+              (w) => w is Material && w.color == CustomerBaselineTokens.bissap,
             ),
           )
           .first;
@@ -206,10 +206,10 @@ void main() {
             w is Container &&
             w.decoration is BoxDecoration &&
             (w.decoration! as BoxDecoration).color ==
-                SylibookingTokens.deepwoodSoft,
+                CustomerBaselineTokens.pruneClair,
       );
 
-      // The ember Material is a descendant of the dark pill, so it paints
+      // The accent Material is a descendant of the dark pill, so it paints
       // over it rather than under it.
       expect(
         find.descendant(of: pill, matching: fill),
@@ -287,10 +287,13 @@ void main() {
       final box = tester.widget<Container>(find.byType(Container).first);
       final decoration = box.decoration! as BoxDecoration;
 
-      expect(decoration.color, const Color(0xFFFBF3E4));
+      // The gold family of the customer baseline, which is the app this
+      // disclosure appears in. Still a notice rather than a status: it is a
+      // term of the booking, not the state of one.
+      expect(decoration.color, const Color(0xFFFDF3E0));
       expect(
         (decoration.border! as Border).top.color,
-        const Color(0xFFEED9A9),
+        const Color(0xFFEFD9A6),
       );
     });
   });

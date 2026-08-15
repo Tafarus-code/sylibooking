@@ -175,4 +175,157 @@ void main() {
       expect(build(null).themePreset, 'ember');
     });
   });
+
+  // ==========================================================================
+  // The two systems, layered.
+  //
+  // A venue preset is scoped over a baseline, not merged into it. That rule
+  // predates the recolour, and these assert it against the *new* baselines
+  // specifically — an isolation test written when both apps were Ember could
+  // pass by accident, because the thing leaking and the thing leaked into
+  // were the same colour.
+  // ==========================================================================
+  group('a venue preset over each new baseline', () {
+    // Colour halves throughout. The full theme builders resolve Google fonts,
+    // which needs a binding and a network; the schemes are split out from
+    // them for exactly this reason, and every other test here uses them.
+    ThemeData baselineOf(ColorScheme scheme) => ThemeData(colorScheme: scheme);
+
+    ColorScheme scoped(ColorScheme baseline, String key) =>
+        colorSchemeForEstablishmentPreset(
+          baselineOf(baseline),
+          establishmentThemePresetFor(key),
+        );
+
+    test('the preset wins inside its own scope, on the customer baseline', () {
+      final baseline = customerBaselineColorScheme();
+      final venue = scoped(baseline, 'palm_night');
+
+      expect(
+        venue.primary,
+        establishmentThemePresetFor('palm_night').accent,
+      );
+      expect(venue.primary, isNot(baseline.primary));
+    });
+
+    test('and on the merchant baseline', () {
+      final baseline = merchantBaselineColorScheme();
+      final venue = scoped(baseline, 'harmattan');
+
+      expect(
+        venue.primary,
+        establishmentThemePresetFor('harmattan').accent,
+      );
+      expect(venue.primary, isNot(baseline.primary));
+    });
+
+    test('the baseline it was derived from is not changed', () {
+      // The scope returns a new scheme; the chrome around it keeps its own.
+      final baseline = merchantBaselineColorScheme();
+
+      scoped(baseline, 'bissap');
+
+      expect(baseline.primary, MerchantBaselineTokens.copper);
+      expect(merchantBaselineColorScheme().primary, baseline.primary);
+    });
+
+    test('every preset stays itself over either baseline', () {
+      // The strong form: a preset resolves to its own accent regardless of
+      // which app it is being shown in.
+      for (final preset in establishmentThemePresets) {
+        expect(
+          scoped(customerBaselineColorScheme(), preset.key).primary,
+          preset.accent,
+          reason: '${preset.key} over Bissap Bloom',
+        );
+        expect(
+          scoped(merchantBaselineColorScheme(), preset.key).primary,
+          preset.accent,
+          reason: '${preset.key} over Indigo Ledger',
+        );
+      }
+    });
+
+    test('the two colliding names stay four different colours', () {
+      // The whole reason for the rename, stated as values. Nothing here may
+      // ever be equal to anything else here.
+      final colours = <String, Color>{
+        'customer baseline bissap': CustomerBaselineTokens.bissap,
+        'venue preset bissap': establishmentThemePresetFor('bissap').accent,
+        'merchant baseline indigo': MerchantBaselineTokens.indigo,
+        'venue preset indigo_soir':
+            establishmentThemePresetFor('indigo_soir').accent,
+      };
+
+      expect(colours.values.toSet().length, colours.length);
+    });
+
+    test('one venue looks the same in both apps', () {
+      // The preset seeds its own scheme, so a venue's own screens are the
+      // venue's — not tinted by whichever app happens to be showing them.
+      final overCustomer = scoped(customerBaselineColorScheme(), 'ember');
+      final overMerchant = scoped(merchantBaselineColorScheme(), 'ember');
+
+      expect(overCustomer.primary, overMerchant.primary);
+    });
+
+    test('no preset accent is a baseline colour', () {
+      // Restated here, next to the scoping rules, because this is the file
+      // somebody reads when they wonder whether the systems overlap.
+      final baselineColours = <Color>{
+        CustomerBaselineTokens.aubergine,
+        CustomerBaselineTokens.bissap,
+        CustomerBaselineTokens.gold,
+        CustomerBaselineTokens.pruneClair,
+        CustomerBaselineTokens.blush,
+        MerchantBaselineTokens.indigo,
+        MerchantBaselineTokens.copper,
+        MerchantBaselineTokens.slateBlue,
+        MerchantBaselineTokens.sage,
+        MerchantBaselineTokens.parchment,
+      };
+
+      for (final preset in establishmentThemePresets) {
+        expect(baselineColours, isNot(contains(preset.accent)));
+      }
+    });
+  });
+
+  group('nothing is still wearing Ember', () {
+    test('neither baseline shares a colour with the old house style', () {
+      final ember = <Color>{
+        SylibookingTokens.deepwood,
+        SylibookingTokens.deepwoodSoft,
+        SylibookingTokens.ivory,
+        SylibookingTokens.ivoryDim,
+        SylibookingTokens.ember,
+        SylibookingTokens.emberBright,
+      };
+
+      for (final colour in <Color>[
+        CustomerBaselineTokens.aubergine,
+        CustomerBaselineTokens.bissap,
+        CustomerBaselineTokens.gold,
+        CustomerBaselineTokens.pruneClair,
+        CustomerBaselineTokens.blush,
+        MerchantBaselineTokens.indigo,
+        MerchantBaselineTokens.copper,
+        MerchantBaselineTokens.slateBlue,
+        MerchantBaselineTokens.sage,
+        MerchantBaselineTokens.parchment,
+      ]) {
+        expect(ember, isNot(contains(colour)));
+      }
+    });
+
+    test('the ember preset is untouched, because it is a venue choice', () {
+      // The house style leaving the apps does not remove the preset a venue
+      // may have picked. It is still the default a new venue gets.
+      expect(
+        establishmentThemePresetFor('ember').accent,
+        SylibookingTokens.ember,
+      );
+      expect(defaultEstablishmentThemePresetKey, 'ember');
+    });
+  });
 }

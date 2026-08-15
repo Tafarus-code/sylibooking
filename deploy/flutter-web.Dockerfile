@@ -34,6 +34,36 @@ RUN test -n "$APP" || (echo "APP build argument is required" && exit 1)
 # Wrong here means an app that loads and can do nothing.
 ARG API_BASE_URL
 
+# Checked at build time, because nothing downstream treats a bad value as an
+# error. Dart's Uri.parse reads "api.example.com/api" as a *relative path*, so
+# every request is resolved against the page's own origin and the app calls
+# itself: POST gets 405 from nginx, GET gets index.html and a spinner that
+# never resolves. Neither symptom points anywhere near this variable.
+#
+# The trailing-slash case is the same class of quiet wrong: the client builds
+# URLs as "$baseUrl$path" and every path already starts with "/".
+RUN set -e; \
+    if [ -z "$API_BASE_URL" ]; then \
+        echo "API_BASE_URL build argument is required"; \
+        echo "  e.g. --build-arg API_BASE_URL=https://api.example.com/api"; \
+        exit 1; \
+    fi; \
+    case "$API_BASE_URL" in \
+        http://*|https://*) ;; \
+        *) \
+            echo "API_BASE_URL must be absolute, starting http:// or https://"; \
+            echo "  got: '$API_BASE_URL'"; \
+            echo "  without a scheme every request is sent to the app's own origin."; \
+            exit 1 ;; \
+    esac; \
+    case "$API_BASE_URL" in \
+        */) \
+            echo "API_BASE_URL must not end in '/'"; \
+            echo "  got: '$API_BASE_URL'"; \
+            echo "  request paths already begin with one."; \
+            exit 1 ;; \
+    esac
+
 WORKDIR /src
 # The shared package first, so a change to an app does not re-resolve it.
 COPY apps/shared_client /src/apps/shared_client

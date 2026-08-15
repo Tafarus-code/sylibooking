@@ -12,6 +12,7 @@ from unittest import mock
 
 from config.checks import (
     cache_must_be_shared,
+    cors_origins_need_a_scheme,
     database_must_be_configured,
     payment_callbacks_need_secrets,
     push_needs_its_credentials,
@@ -172,6 +173,47 @@ class DatabaseCheckTests(TestCase):
     @override_settings(DJANGO_ENV='local', DATABASES=MISSING)
     def test_development_is_left_alone(self):
         self.assertEqual(database_must_be_configured(None), [])
+
+
+class CorsOriginCheckTests(TestCase):
+    """A bare hostname in CORS_ALLOWED_ORIGINS matches nothing.
+
+    The symptom is a browser blocking a response the server reports as 200,
+    which sends people looking at the API rather than at one variable.
+    """
+
+    @override_settings(
+        DJANGO_ENV='production',
+        CORS_ALLOWED_ORIGINS=['merchant.example.com'],
+    )
+    def test_a_scheme_less_origin_is_reported(self):
+        problems = cors_origins_need_a_scheme(None)
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].id, 'sylibooking.W005')
+        self.assertIn('merchant.example.com', problems[0].msg)
+
+    @override_settings(
+        DJANGO_ENV='production',
+        CORS_ALLOWED_ORIGINS=[
+            'https://merchant.example.com',
+            'http://localhost:8080',
+        ],
+    )
+    def test_proper_origins_pass(self):
+        """http is legitimate — it is how localhost is served."""
+        self.assertEqual(cors_origins_need_a_scheme(None), [])
+
+    @override_settings(DJANGO_ENV='production', CORS_ALLOWED_ORIGINS=[])
+    def test_nothing_configured_is_not_a_problem_here(self):
+        """An empty list is a different decision, not a malformed one."""
+        self.assertEqual(cors_origins_need_a_scheme(None), [])
+
+    @override_settings(
+        DJANGO_ENV='local', CORS_ALLOWED_ORIGINS=['merchant.example.com']
+    )
+    def test_development_is_left_alone(self):
+        self.assertEqual(cors_origins_need_a_scheme(None), [])
 
 
 class PushCredentialsCheckTests(TestCase):

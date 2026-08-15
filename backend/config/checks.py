@@ -122,6 +122,47 @@ def database_must_be_configured(app_configs, **kwargs):
     ]
 
 
+@register(Tags.security, deploy=True)
+def cors_origins_need_a_scheme(app_configs, **kwargs):
+    """A browser origin is scheme + host + port, and never a bare hostname.
+
+    django-cors-headers compares `CORS_ALLOWED_ORIGINS` against the browser's
+    `Origin` header as an exact string. "merchant.example.com" matches no
+    origin any browser will ever send, so the entry is not wrong so much as
+    inert — the header is simply never added, and the request fails in the
+    browser with the server reporting a perfectly ordinary 200.
+
+    Same shape of mistake as a scheme-less API base URL, and just as quiet:
+    nothing in Django, in the settings, or in the response says the value was
+    ignored.
+    """
+    if getattr(settings, 'DJANGO_ENV', '') != 'production':
+        return []
+
+    origins = getattr(settings, 'CORS_ALLOWED_ORIGINS', []) or []
+    bad = [
+        origin
+        for origin in origins
+        if not origin.startswith(('http://', 'https://'))
+    ]
+    if not bad:
+        return []
+
+    return [
+        Warning(
+            'CORS_ALLOWED_ORIGINS has entries with no scheme: '
+            + ', '.join(repr(origin) for origin in bad),
+            hint=(
+                'Write each one as the browser sends it — '
+                'https://merchant.example.com, with no trailing slash and no '
+                'path. An entry without a scheme matches nothing, so the '
+                'browser blocks the response while the server logs a 200.'
+            ),
+            id='sylibooking.W005',
+        )
+    ]
+
+
 @register(Tags.compatibility, deploy=True)
 def push_needs_its_credentials(app_configs, **kwargs):
     """A Firebase sender with no key sends nothing, and says so to nobody.

@@ -180,18 +180,35 @@ class PushCredentialsCheckTests(TestCase):
 
     @override_settings(DJANGO_ENV='production', PUSH_SENDER=FIREBASE)
     @mock.patch.dict(os.environ, {'GOOGLE_APPLICATION_CREDENTIALS': ''})
-    def test_firebase_without_credentials_is_an_error(self):
-        """**Silent by construction.**
+    def test_firebase_without_credentials_warns(self):
+        """Reported, but never fatal.
 
-        Every push fails, nothing is logged where anybody looks, and no
-        customer complains about a reminder they never expected. The only
-        report is a merchant saying the app never tells them anything.
+        Silent failure is what this was written to catch — every push fails,
+        nothing is logged where anybody looks, and nobody complains about a
+        reminder they never expected. But a notification feature must not be
+        able to take the API down with it, so it warns and the sender falls
+        back to logging.
         """
         problems = push_needs_its_credentials(None)
 
         self.assertEqual(len(problems), 1)
-        self.assertEqual(problems[0].id, 'sylibooking.E004')
+        self.assertEqual(problems[0].id, 'sylibooking.W004')
         self.assertIn('FIREBASE_SERVICE_ACCOUNT', problems[0].hint)
+
+    @override_settings(DJANGO_ENV='production', PUSH_SENDER=FIREBASE)
+    @mock.patch.dict(os.environ, {'GOOGLE_APPLICATION_CREDENTIALS': ''})
+    def test_it_does_not_stop_the_container(self):
+        """**The point of the downgrade.**
+
+        The entrypoint runs `check --deploy --fail-level ERROR`, so anything
+        at Warning lets the deploy proceed. A venue can take bookings all
+        evening without alerts and none at all without the API.
+        """
+        from django.core.checks import Warning as CheckWarning
+
+        problems = push_needs_its_credentials(None)
+
+        self.assertIsInstance(problems[0], CheckWarning)
 
     @override_settings(DJANGO_ENV='production', PUSH_SENDER=CONSOLE)
     def test_the_console_sender_needs_nothing(self):

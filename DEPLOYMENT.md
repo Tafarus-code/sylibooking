@@ -447,10 +447,11 @@ sender keeps logging, which is the normal state until you have a project.
 
 **Do not commit that JSON.** It can send push to every device you have.
 
-If `PUSH_SENDER` names Firebase and the credentials are missing, the
-container refuses to start with `sylibooking.E004` rather than running and
-silently sending nothing — the one failure nobody reports, because no
-customer complains about a reminder they never expected.
+If `PUSH_SENDER` names Firebase and the credentials are missing, the deploy
+warns (`sylibooking.W004`) and the sender falls back to logging, saying so
+loudly in the log. It does not stop the container: a venue can take bookings
+all evening without alerts and none at all without the API, so a
+notification key must never be able to take the product offline.
 
 ### Apps
 

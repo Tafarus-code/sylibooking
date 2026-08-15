@@ -14,6 +14,7 @@ from config.checks import (
     cache_must_be_shared,
     cors_origins_need_a_scheme,
     database_must_be_configured,
+    media_domain_must_not_have_a_scheme,
     payment_callbacks_need_secrets,
     push_needs_its_credentials,
 )
@@ -214,6 +215,61 @@ class CorsOriginCheckTests(TestCase):
     )
     def test_development_is_left_alone(self):
         self.assertEqual(cors_origins_need_a_scheme(None), [])
+
+
+class MediaDomainCheckTests(TestCase):
+    """A scheme on MEDIA_CUSTOM_DOMAIN makes every photo URL unopenable.
+
+    `https://https://bucket/photo.jpg` is malformed enough that the browser
+    never sends a request, so nothing 404s and nothing is logged anywhere —
+    the gallery is simply blank while every part of the system reports
+    success.
+    """
+
+    PROD = {'DJANGO_ENV': 'production', 'USE_S3_MEDIA': True}
+
+    def check_with(self, value):
+        with mock.patch.dict(os.environ, {'MEDIA_CUSTOM_DOMAIN': value}):
+            return media_domain_must_not_have_a_scheme(None)
+
+    @override_settings(**PROD)
+    def test_a_domain_carrying_https_is_reported(self):
+        problems = self.check_with('https://pub-abc123.r2.dev')
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].id, 'sylibooking.W006')
+        self.assertIn('pub-abc123.r2.dev', problems[0].msg)
+
+    @override_settings(**PROD)
+    def test_http_is_reported_too(self):
+        self.assertEqual(len(self.check_with('http://media.example.gn')), 1)
+
+    @override_settings(**PROD)
+    def test_a_trailing_slash_is_reported(self):
+        """It doubles the separator, which is a different key in the bucket."""
+        self.assertEqual(len(self.check_with('media.example.gn/')), 1)
+
+    @override_settings(**PROD)
+    def test_a_bare_host_passes(self):
+        self.assertEqual(self.check_with('media.example.gn'), [])
+
+    @override_settings(**PROD)
+    def test_an_r2_public_host_passes(self):
+        self.assertEqual(self.check_with('pub-abc123.r2.dev'), [])
+
+    @override_settings(**PROD)
+    def test_nothing_configured_is_not_a_problem_here(self):
+        """Unset is a different decision — django-storages then signs URLs."""
+        self.assertEqual(self.check_with(''), [])
+
+    @override_settings(DJANGO_ENV='production', USE_S3_MEDIA=False)
+    def test_the_check_is_silent_without_s3(self):
+        """On container disk there is no custom domain to get wrong."""
+        self.assertEqual(self.check_with('https://media.example.gn'), [])
+
+    @override_settings(DJANGO_ENV='local', USE_S3_MEDIA=True)
+    def test_development_is_left_alone(self):
+        self.assertEqual(self.check_with('https://media.example.gn'), [])
 
 
 class PushCredentialsCheckTests(TestCase):

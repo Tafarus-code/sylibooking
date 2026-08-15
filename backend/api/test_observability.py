@@ -412,3 +412,59 @@ class DatabaseUrlTests(SimpleTestCase):
         parsed = self.parse('postgres://user:secret@db.internal/syli')
 
         self.assertGreater(parsed['CONN_MAX_AGE'], 0)
+
+
+class MediaDomainTests(SimpleTestCase):
+    """The public host in front of the bucket.
+
+    Also copied and pasted rather than typed — out of a dashboard that
+    displays it as a URL — and the paste is what makes it wrong. Every photo
+    URL is built from this, so one stray scheme empties every gallery in both
+    apps while uploads keep succeeding and the API keeps answering 200.
+    """
+
+    def domain(self, value):
+        import os
+        from unittest import mock
+
+        from config.settings import _media_domain
+
+        with mock.patch.dict(os.environ, {'MEDIA_CUSTOM_DOMAIN': value}):
+            return _media_domain()
+
+    def test_a_bare_host_is_left_alone(self):
+        self.assertEqual(self.domain('media.example.gn'), 'media.example.gn')
+
+    def test_https_is_stripped(self):
+        """**The one that emptied the galleries.** django-storages adds the
+        scheme itself, so keeping this one yields https://https://…"""
+        self.assertEqual(
+            self.domain('https://pub-abc123.r2.dev'), 'pub-abc123.r2.dev'
+        )
+
+    def test_http_is_stripped_too(self):
+        self.assertEqual(self.domain('http://media.example.gn'), 'media.example.gn')
+
+    def test_a_trailing_slash_goes(self):
+        """It doubles the separator django-storages adds, and `//key` is a
+        different object than `/key`."""
+        self.assertEqual(self.domain('media.example.gn/'), 'media.example.gn')
+
+    def test_both_at_once(self):
+        self.assertEqual(
+            self.domain('https://media.example.gn/'), 'media.example.gn'
+        )
+
+    def test_surrounding_whitespace_goes(self):
+        """A value pasted into a dashboard field carries what came with it."""
+        self.assertEqual(self.domain('  media.example.gn  '), 'media.example.gn')
+
+    def test_unset_is_none_rather_than_empty(self):
+        """django-storages tests this for None; '' would be a custom domain
+        of nothing and every URL would start at the key."""
+        self.assertIsNone(self.domain(''))
+
+    def test_a_host_that_merely_contains_http_is_not_mangled(self):
+        self.assertEqual(
+            self.domain('https-media.example.gn'), 'https-media.example.gn'
+        )

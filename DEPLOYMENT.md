@@ -255,9 +255,21 @@ AWS_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
 MEDIA_CUSTOM_DOMAIN=media.sylibooking.gn
 ```
 
+**`MEDIA_CUSTOM_DOMAIN` is a hostname, not a URL.** Cloudflare displays the
+public bucket address as `https://pub-<id>.r2.dev` and pasting it whole is
+the obvious thing to do — but django-storages adds the scheme itself, so the
+value becomes `https://https://pub-<id>.r2.dev/…`, which no browser will even
+attempt. Nothing fails: uploads succeed, the bucket fills, the API answers
+200 with that URL in it, and every gallery is blank. Settings now strips a
+scheme and a trailing slash, and `check --deploy` reports it, but write it as
+the bare host.
+
 **Set these before the first real upload, not after.** Photos written to
 container disk are gone at the next deploy, and the database rows that point
-at them are not.
+at them are not. Rows written before R2 was switched on keep pointing at keys
+the bucket never received: the URLs are well-formed, the objects are absent,
+and every one of them 404s. Nothing can recover those files — the fix is to
+re-upload, or to re-seed a demo database.
 
 ### After switching R2 on
 

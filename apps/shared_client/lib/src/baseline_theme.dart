@@ -190,6 +190,10 @@ ThemeData _baselineTheme({
   required String bodyFont,
   required Color appBarBackground,
   required Color appBarForeground,
+  required Color railBackground,
+  required Color railIndicator,
+  required Color railSelected,
+  required Color railUnselected,
 }) {
   final base = ThemeData(colorScheme: scheme, useMaterial3: true);
 
@@ -225,6 +229,23 @@ ThemeData _baselineTheme({
       indicatorColor: scheme.primary.withValues(alpha: 0.14),
       elevation: 0,
     ),
+    // The rail is the one piece of chrome the two apps style differently,
+    // and it is styled here rather than in AdaptiveScaffold because they
+    // share that widget. The merchant's rail is the deep base with the accent
+    // on the active item, as the design document draws it; the customer's is
+    // the ordinary light surface, since a customer only ever sees a rail on a
+    // tablet and it is not the spine of their app.
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: railBackground,
+      indicatorColor: railIndicator,
+      selectedIconTheme: IconThemeData(color: railSelected),
+      unselectedIconTheme: IconThemeData(color: railUnselected),
+      selectedLabelTextStyle: TextStyle(
+        color: railSelected,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelTextStyle: TextStyle(color: railUnselected),
+    ),
     chipTheme: ChipThemeData(
       backgroundColor: Colors.transparent,
       side: BorderSide(color: scheme.outline),
@@ -257,6 +278,10 @@ ThemeData customerBaselineTheme() => _baselineTheme(
       bodyFont: CustomerBaselineTokens.bodyFont,
       appBarBackground: CustomerBaselineTokens.aubergine,
       appBarForeground: CustomerBaselineTokens.onAubergine,
+      railBackground: CustomerBaselineTokens.blush,
+      railIndicator: CustomerBaselineTokens.bissap,
+      railSelected: CustomerBaselineTokens.onBissap,
+      railUnselected: CustomerBaselineTokens.pruneClair,
     );
 
 /// The merchant app's baseline theme. Palette: Indigo Ledger.
@@ -270,6 +295,13 @@ ThemeData merchantBaselineTheme() => _baselineTheme(
       bodyFont: MerchantBaselineTokens.bodyFont,
       appBarBackground: MerchantBaselineTokens.parchment,
       appBarForeground: MerchantBaselineTokens.onParchment,
+      // Indigo, with copper on the active item: the rail is the spine of the
+      // merchant app, and the design document draws it as the one permanently
+      // dark surface on the tablet.
+      railBackground: MerchantBaselineTokens.indigo,
+      railIndicator: MerchantBaselineTokens.copper,
+      railSelected: MerchantBaselineTokens.onCopper,
+      railUnselected: MerchantBaselineTokens.parchment,
     );
 
 /// Money, set in the mono face, for either baseline.

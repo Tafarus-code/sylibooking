@@ -12,18 +12,25 @@ import '../labels.dart';
 /// giving a role the green that means *paid* would invite a merchant to read
 /// a staff list as a payment list for the half-second before they focus.
 ///
-/// The three colours are the design system's own, and they carry meaning in
-/// their own right: owner takes the ember family because an owner is the
-/// account that can give the venue away; manager takes the same blue as a
-/// completed reservation, a settled and unremarkable state; staff takes the
-/// neutral stone of a thing that has not been acted on.
+/// The three colours carry meaning in their own right: owner takes the warm
+/// accent family because an owner is the account that can give the venue
+/// away; manager takes the same blue as a completed reservation, a settled
+/// and unremarkable state; staff takes the neutral stone of a thing that has
+/// not been acted on.
+///
+/// Only the owner pill moved with the Indigo Ledger recolour — it was the
+/// ember family, and ember is no longer in this app. Manager and staff did
+/// not: their blue and stone are borrowed from the status vocabulary, which
+/// is fixed by design, and a role list read beside an order list should keep
+/// using one language for "settled" and "not yet touched".
 class RolePill extends StatelessWidget {
   const RolePill({super.key, required this.role});
 
   final MerchantRole role;
 
   static const _palettes = <MerchantRole, (Color, Color)>{
-    MerchantRole.owner: (Color(0xFFFBF0DC), Color(0xFF8A5C1C)),
+    // Copper's own tint, replacing the ember pair. 6.32:1 on its background.
+    MerchantRole.owner: (Color(0xFFF6E7D8), Color(0xFF7A4718)),
     MerchantRole.manager: (Color(0xFFE3EAF2), Color(0xFF2F5B8A)),
     MerchantRole.staff: (Color(0xFFEDEAE0), Color(0xFF6B6656)),
   };

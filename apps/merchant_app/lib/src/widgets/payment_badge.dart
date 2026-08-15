@@ -75,8 +75,15 @@ _BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme, L l) {
       label: l.paidWith(provider),
       shortLabel: l.paidWith(provider),
       icon: Icons.check_circle,
-      background: scheme.primaryContainer,
-      foreground: scheme.onPrimaryContainer,
+      // The fixed vocabulary, not the colour scheme. These read from the
+      // theme once, and the recolour to Indigo Ledger is what showed why they
+      // must not: primaryContainer was deepwood under the old house style, so
+      // "paid" happened to be green — and became indigo the moment the
+      // palette changed, quietly turning the settled state into a blue one
+      // while the customer app kept green. A badge's meaning has to survive
+      // its surroundings.
+      background: StatusBadge.backgroundOf(StatusTone.paid),
+      foreground: StatusBadge.foregroundOf(StatusTone.paid),
       border: null,
     );
   }
@@ -89,8 +96,11 @@ _BadgeStyle _styleFor(Reservation reservation, ColorScheme scheme, L l) {
           : l.awaitingPaymentWith(reservation.paymentProviderDisplay),
       shortLabel: failed ? l.paymentFailedShort : l.unpaid,
       icon: failed ? Icons.error : Icons.hourglass_top,
-      background: scheme.errorContainer,
-      foreground: scheme.onErrorContainer,
+      // Same reasoning as paid. This pair happened to survive the recolour
+      // unchanged, both baselines carrying the same error container — which
+      // is luck rather than a guarantee, and not what a status should rest on.
+      background: StatusBadge.backgroundOf(StatusTone.unpaid),
+      foreground: StatusBadge.foregroundOf(StatusTone.unpaid),
       border: null,
     );
   }

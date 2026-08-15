@@ -102,7 +102,26 @@ def get_push_sender():
         'PUSH_SENDER',
         'notifications.push.ConsolePushSender',
     )
-    return import_string(path)()
+
+    try:
+        return import_string(path)()
+    except Exception as error:  # noqa: BLE001
+        # A sender that cannot be built falls back to logging rather than
+        # taking the caller down with it.
+        #
+        # This is the same decision the client registrar makes: a venue can
+        # work all evening without alerts and cannot work at all without the
+        # API, so a missing Firebase key must not be able to stop a booking
+        # being taken. Loud, because the alternative — pushing into nothing
+        # and reporting success — is the failure nobody notices, since no
+        # customer complains about a reminder they never expected.
+        logger.error(
+            'Push sender %s could not be built (%s). Falling back to the '
+            'console sender: no push will be delivered until this is fixed.',
+            path,
+            error,
+        )
+        return ConsolePushSender()
 
 
 def push_to_user(user, title, body, data=None):

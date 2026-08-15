@@ -12,7 +12,7 @@ entrypoint and stay out of the way of ordinary work.
 """
 
 from django.conf import settings
-from django.core.checks import Error, Tags, register
+from django.core.checks import Error, Tags, Warning, register
 
 
 @register(Tags.caches, deploy=True)
@@ -145,7 +145,13 @@ def push_needs_its_credentials(app_configs, **kwargs):
         return []
 
     return [
-        Error(
+        # A Warning, not an Error, so `check --deploy --fail-level ERROR` in
+        # the entrypoint lets the container start. Push is a feature; the API
+        # is the product, and a missing notification key must not be able to
+        # take bookings offline. The sender falls back to logging and says so
+        # loudly, which keeps this from being the silent failure it was made
+        # to catch.
+        Warning(
             'Push is set to Firebase but its credentials are not readable.',
             hint=(
                 'Set FIREBASE_SERVICE_ACCOUNT to the service account JSON — '
@@ -153,6 +159,6 @@ def push_needs_its_credentials(app_configs, **kwargs):
                 'at boot. Without it every push fails silently, which is the '
                 'one failure nobody reports.'
             ),
-            id='sylibooking.E004',
+            id='sylibooking.W004',
         )
     ]

@@ -168,3 +168,23 @@ class RegistrationTests(APITestCase):
         self.assertEqual(
             self.register().status_code, status.HTTP_401_UNAUTHORIZED
         )
+
+
+class SenderFallbackTests(TestCase):
+    """A sender that cannot be built must not take the caller down."""
+
+    @override_settings(PUSH_SENDER='notifications.push.FirebasePushSender')
+    def test_an_unbuildable_sender_falls_back_to_the_console(self):
+        # No Firebase project here, so building the real sender raises.
+        sender = get_push_sender()
+
+        self.assertIsInstance(sender, ConsolePushSender)
+
+    @override_settings(PUSH_SENDER='notifications.push.NotAThing')
+    def test_a_misspelled_sender_falls_back_too(self):
+        """A typo in a variable is not worth an outage."""
+        self.assertIsInstance(get_push_sender(), ConsolePushSender)
+
+    @override_settings(PUSH_SENDER='notifications.push.ConsolePushSender')
+    def test_the_configured_sender_is_used_when_it_builds(self):
+        self.assertIsInstance(get_push_sender(), ConsolePushSender)

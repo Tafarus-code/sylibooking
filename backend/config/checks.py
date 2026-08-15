@@ -163,6 +163,47 @@ def cors_origins_need_a_scheme(app_configs, **kwargs):
     ]
 
 
+@register(Tags.files, deploy=True)
+def media_domain_must_not_have_a_scheme(app_configs, **kwargs):
+    """The mirror of the CORS mistake, and quieter still.
+
+    `MEDIA_CUSTOM_DOMAIN` is a bare host. django-storages builds a photo URL
+    as scheme + '//' + custom_domain + key, so a value that brings its own
+    scheme yields `https://https://bucket.example/photo.jpg` — malformed
+    enough that a browser will not attempt it, which means no request, no
+    404, and nothing in any log at either end.
+
+    Every symptom points away from the cause. Uploads succeed, the bucket
+    fills, the API answers 200 with a URL in it, and the apps show empty
+    frames. Settings corrects the value so the deployment works; this says
+    where it came from, so the next deploy does not need correcting.
+    """
+    if getattr(settings, 'DJANGO_ENV', '') != 'production':
+        return []
+
+    if not getattr(settings, 'USE_S3_MEDIA', False):
+        return []
+
+    import os
+
+    raw = os.environ.get('MEDIA_CUSTOM_DOMAIN', '').strip()
+    if not raw.startswith(('http://', 'https://')) and not raw.endswith('/'):
+        return []
+
+    return [
+        Warning(
+            f'MEDIA_CUSTOM_DOMAIN is a URL, not a host: {raw!r}',
+            hint=(
+                'Write it as a bare hostname — media.example.com, or '
+                'pub-<id>.r2.dev — with no scheme, no trailing slash and no '
+                'path. Settings strips those so images still load, but the '
+                'variable itself is what the next deploy reads.'
+            ),
+            id='sylibooking.W006',
+        )
+    ]
+
+
 @register(Tags.compatibility, deploy=True)
 def push_needs_its_credentials(app_configs, **kwargs):
     """A Firebase sender with no key sends nothing, and says so to nobody.

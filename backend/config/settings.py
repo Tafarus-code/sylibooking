@@ -326,6 +326,30 @@ _media_storage = {
     'BACKEND': 'django.core.files.storage.FileSystemStorage',
 }
 
+
+def _media_domain():
+    """The public host in front of the bucket, as a *host* and nothing else.
+
+    django-storages builds every photo URL as scheme + '//' + custom_domain +
+    key, so a value carrying its own scheme produces `https://https://host/…`
+    — a URL no browser will even attempt. Nothing raises: uploads keep
+    succeeding, the API keeps answering 200, and every gallery is empty.
+
+    Corrected rather than merely reported, because there is exactly one thing
+    a scheme here can mean and the alternative is serving unusable URLs until
+    somebody notices. `media_domain_must_not_have_a_scheme` in checks.py says
+    so at deploy time, so the variable gets fixed at its source too.
+    """
+    domain = config('MEDIA_CUSTOM_DOMAIN', default='').strip()
+    for scheme in ('https://', 'http://'):
+        if domain.startswith(scheme):
+            domain = domain[len(scheme):]
+            break
+    # A trailing slash doubles the one django-storages adds, and R2 treats
+    # `//establishments/…` as a different key than `/establishments/…`.
+    return domain.rstrip('/') or None
+
+
 if USE_S3_MEDIA:
     _media_storage = {
         'BACKEND': 'storages.backends.s3.S3Storage',
@@ -350,7 +374,7 @@ if USE_S3_MEDIA:
             # django-storages builds URLs against the S3 API endpoint, which
             # on R2 is not publicly readable — every photo would 401 while
             # looking perfectly configured.
-            'custom_domain': config('MEDIA_CUSTOM_DOMAIN', default='') or None,
+            'custom_domain': _media_domain(),
             # A photo never changes once uploaded — the filename carries a
             # uuid — so it can be cached hard. On the connections this market
             # runs on, that is the difference between a venue's gallery

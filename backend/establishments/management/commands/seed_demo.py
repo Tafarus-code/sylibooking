@@ -12,11 +12,12 @@ Nothing here deletes anything.
 """
 
 import random
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from io import BytesIO
 
 from accounts.models import CustomerProfile
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
@@ -24,6 +25,7 @@ from django.db import transaction
 from django.utils import timezone
 from orders.models import Order, OrderItem
 from PIL import Image, ImageDraw
+from reservations.no_show import no_show_window
 
 from establishments.favourites import Favourite
 from establishments.models import (
@@ -158,6 +160,66 @@ REVIEW_LINES = [
 
 PRESETS = ['ember', 'palm_night', 'harmattan', 'bissap', 'indigo_soir']
 
+# --- The long history -------------------------------------------------------
+#
+# Everything below shapes `--months` of trading. The near-term seeding further
+# down fills today and the week either side, which proves a list renders. It
+# proves nothing about the screens that look backwards: insights offers a
+# 90-day window, and the payments dashboard and CSV export take arbitrary date
+# ranges. Against six weeks of thin data all three draw a half-empty chart,
+# which reads as a broken screen rather than a quiet month.
+
+#: How busy each weekday is against an average one, Monday first. A Friday is
+#: not a Tuesday, and "which nights are worth opening for" — the question the
+#: insights screen exists to answer — has no answer in uniform data.
+WEEKDAY_WEIGHT = [0.55, 0.6, 0.75, 0.95, 1.5, 1.6, 1.05]
+
+#: Bookings per venue on an average day, before weekday, popularity and trend.
+BASE_COVERS_PER_DAY = 3.0
+
+#: What became of a booking whose time has passed.
+#:
+#: NO_SHOW is in here because the insights screen reports a no-show rate and
+#: the seed has never produced one — so the single number the grace-period
+#: settings exist to move has always been null. A venue that never loses a
+#: table is not a venue.
+PAST_OUTCOMES = [
+    (Reservation.Status.COMPLETED, 78),
+    (Reservation.Status.CANCELLED, 14),
+    (Reservation.Status.NO_SHOW, 8),
+]
+
+#: Faces that come back. Returning customers are counted by phone number, so a
+#: history of strangers reports every venue as having no regulars — which is
+#: false, and looks like a metric that does not work.
+REGULARS_PER_VENUE = 22
+
+#: How often a booking is made by somebody the venue has served before.
+REGULAR_SHARE = 0.62
+
+#: Orders per restaurant on an average day, before the same shaping.
+BASE_ORDERS_PER_DAY = 2.5
+
+ORDER_OUTCOMES = [(Order.Status.COMPLETED, 88), (Order.Status.CANCELLED, 12)]
+
+#: Service hours bookings actually land in, by venue type. Weighted by
+#: repetition rather than by a distribution, because the shape wanted here is
+#: "two services with peaks", which a flat random hour does not give.
+SERVICE_HOURS = {
+    True: [18, 19, 20, 20, 21, 21, 21, 22, 22, 23],   # lounge
+    False: [12, 12, 13, 13, 14, 19, 19, 20, 20, 21],  # kitchen
+}
+
+#: Bookings per venue per month above which a window counts as already
+#: seeded. Comfortably above what the near-term seeding leaves behind (a
+#: dozen or so in total) and comfortably below what a month of history writes
+#: (fifty at the quietest venue), so the two are never confused.
+SEEDED_PER_MONTH = 25
+
+#: Rows written per database round trip. Six months across twenty-two venues is
+#: tens of thousands of rows; one INSERT each turns a seed into a coffee break.
+BATCH = 500
+
 
 def swatch(name, width=1200, height=800, seed=0):
     """A generated placeholder image.
@@ -196,6 +258,17 @@ class Command(BaseCommand):
             default='sylibooking',
             help='Password for every seeded merchant account.',
         )
+        parser.add_argument(
+            '--months',
+            type=int,
+            default=6,
+            help=(
+                'Months of trading history to generate behind today. '
+                'Default 6, which covers the longest insights window (90 '
+                'days) twice over and gives the dashboard and CSV export a '
+                'real range to be asked for. 0 skips it.'
+            ),
+        )
 
     def handle(self, *args, **options):
         self.rng = random.Random(SEED)
@@ -205,7 +278,12 @@ class Command(BaseCommand):
             'skipped': 0,
             'customers': 0,
             'customers_skipped': 0,
+            'history_bookings': 0,
+            'history_orders': 0,
+            'history_skipped': 0,
         }
+
+        months = max(0, options['months'])
 
         with transaction.atomic():
             venues = self.seed_venues()
@@ -218,8 +296,13 @@ class Command(BaseCommand):
             self.seed_reservations(venues)
             self.seed_orders(venues)
             customers = self.seed_customers(venues)
+            # Last, and deliberately: the near-term seeding above skips a
+            # venue that already has bookings, so filling in six months first
+            # would leave today empty — the one day a demo opens on.
+            self.seed_history(venues, months)
 
-        self.report(venues, customers)
+        if options['verbosity']:
+            self.report(venues, customers, months)
 
     # --- Venues -----------------------------------------------------------
 
@@ -754,6 +837,346 @@ class Command(BaseCommand):
                     unit_price_at_order=item.price,
                 )
 
+    # --- Six months behind us ---------------------------------------------
+
+    def pick(self, outcomes):
+        """One value from (value, weight) pairs."""
+        return self.rng.choices(
+            [value for value, _ in outcomes],
+            weights=[weight for _, weight in outcomes],
+        )[0]
+
+    def shaped_count(self, base, popularity, day, start, span):
+        """How many things happen at this venue on this day.
+
+        Three multipliers, each answering a question a merchant would ask of
+        the insights screen: which nights are busy (weekday), is this venue
+        busier than that one (popularity), and are we growing (trend). The
+        fractional remainder is spent as a probability rather than rounded
+        away, so a venue expecting 0.4 covers on a Monday gets one about two
+        Mondays in five instead of never.
+        """
+        trend = 0.75 + 0.45 * ((day - start).days / span)
+        expected = base * popularity * WEEKDAY_WEIGHT[day.weekday()] * trend
+        whole = int(expected)
+        return whole + (1 if self.rng.random() < expected - whole else 0)
+
+    def occupies(self, space_id, when, duration):
+        """Every quarter-hour bucket a booking on this space would hold.
+
+        There is no database constraint against double-booking — the rule
+        lives in the availability logic the API goes through, and bulk_create
+        does not go through it. Without this a seeded history would contain
+        the exact clashes the product exists to prevent, and a merchant
+        opening a busy Saturday would find two parties on one table.
+
+        Both ends are snapped down to a fixed grid so that bookings made on
+        arbitrary minutes — which the near-term seeding above produces — land
+        in comparable buckets. Two bookings overlap exactly when their bucket
+        sets intersect; snapping the *last* bucket from `start + duration - 1`
+        rather than from `start` is what keeps the tail of a booking made at
+        21:17 from being lost.
+        """
+        step = 15
+
+        def snap(moment):
+            moment = moment.replace(second=0, microsecond=0)
+            return moment - timedelta(minutes=moment.minute % step)
+
+        buckets = []
+        cursor = snap(when)
+        last = snap(when + timedelta(minutes=duration - 1))
+        while cursor <= last:
+            buckets.append((space_id, cursor))
+            cursor += timedelta(minutes=step)
+        return buckets
+
+    def seed_history(self, venues, months):
+        """Fill the months behind today with trading that has shape.
+
+        Additive and idempotent on the same terms as everything else: a venue
+        whose window is already full is left alone, so this tops a database up
+        rather than doubling it.
+        """
+        if months <= 0:
+            return
+
+        today = timezone.localdate()
+        # 30.4 rather than 30: six months should reach back six months, and
+        # the accumulated fortnight matters at the far end of a 90-day window.
+        start = today - timedelta(days=round(months * 30.4))
+        span = max((today - start).days, 1)
+        tz = timezone.get_current_timezone()
+        duration = settings.RESERVATION_DURATION_MINUTES
+        window_start = timezone.make_aware(
+            datetime.combine(start, time(0, 0)), tz
+        )
+
+        planned = []
+        for venue in venues:
+            spaces = list(venue.spaces.all())
+            if not spaces:
+                continue
+
+            existing = list(
+                Reservation.objects.filter(
+                    space__establishment=venue
+                ).values_list('space_id', 'datetime')
+            )
+
+            # Volume in the window, not age, decides whether this venue has
+            # been done. Age cannot tell the two apart: with `--months 1` the
+            # whole history lands inside the 45 days the near-term seeding
+            # already writes into, and an age test would either skip every
+            # venue or seed them all twice.
+            if (
+                sum(1 for _, when in existing if when >= window_start)
+                >= SEEDED_PER_MONTH * months
+            ):
+                self.created['history_skipped'] += 1
+                continue
+
+            grace = no_show_window(venue)
+            popularity = self.rng.uniform(0.7, 1.6)
+            regulars = [self.person() for _ in range(REGULARS_PER_VENUE)]
+            hours = SERVICE_HOURS[venue.type == Establishment.Type.LOUNGE]
+            closed = set(
+                venue.hours.filter(is_closed=True).values_list(
+                    'day_of_week', flat=True
+                )
+            )
+
+            # Pre-load what is already booked, or the history would clash with
+            # the near-term bookings written minutes ago — which occupy the
+            # same weeks and were never checked against anything.
+            taken = set()
+            for space_id, when in existing:
+                taken.update(self.occupies(space_id, when, duration))
+
+            day = start
+            while day < today:
+                if day.weekday() in closed:
+                    day += timedelta(days=1)
+                    continue
+
+                for _ in range(
+                    self.shaped_count(
+                        BASE_COVERS_PER_DAY, popularity, day, start, span
+                    )
+                ):
+                    name, phone = (
+                        self.rng.choice(regulars)
+                        if self.rng.random() < REGULAR_SHARE
+                        else self.person()
+                    )
+                    space = self.rng.choice(spaces)
+                    when = timezone.make_aware(
+                        datetime.combine(
+                            day,
+                            time(
+                                self.rng.choice(hours),
+                                self.rng.choice([0, 0, 30]),
+                            ),
+                        ),
+                        tz,
+                    )
+
+                    buckets = self.occupies(space.id, when, duration)
+                    if any(bucket in taken for bucket in buckets):
+                        continue
+                    taken.update(buckets)
+
+                    status = self.pick(PAST_OUTCOMES)
+                    booking = Reservation(
+                        space=space,
+                        customer_name=name,
+                        customer_phone=phone,
+                        datetime=when,
+                        party_size=self.rng.randint(1, 6),
+                        status=status,
+                        # bulk_create does not call save(), so the grace
+                        # period this booking was taken under has to be set
+                        # here or every historical row reads as "taken before
+                        # the field existed" and the no-show sweep skips it.
+                        no_show_after_minutes=grace,
+                        arrived_at=(
+                            when + timedelta(minutes=self.rng.randint(-5, 25))
+                            if status == Reservation.Status.COMPLETED
+                            else None
+                        ),
+                    )
+                    planned.append(
+                        (
+                            booking,
+                            venue,
+                            self.rng.random() < 0.38,
+                            status == Reservation.Status.COMPLETED
+                            and self.rng.random() < 0.22,
+                        )
+                    )
+
+                day += timedelta(days=1)
+
+        if planned:
+            Reservation.objects.bulk_create(
+                [booking for booking, _, _, _ in planned], batch_size=BATCH
+            )
+            self.created['history_bookings'] = len(planned)
+            self.attach_money_and_verdicts(planned)
+
+        # Outside the guard above: a database whose bookings are already
+        # seeded may still have no kitchen history, and the two are counted
+        # separately.
+        self.seed_order_history(venues, months, start, span, today, tz)
+
+    def attach_money_and_verdicts(self, planned):
+        """Payments and reviews for the history just written.
+
+        Separate pass because both hang off a reservation id, and there are
+        no ids until the bookings are in.
+        """
+        payments, reviews = [], []
+        for booking, venue, wants_payment, wants_review in planned:
+            if wants_payment:
+                paid = self.rng.random() < 0.82
+                payment = Payment(
+                    reservation=booking,
+                    provider=self.rng.choice(
+                        [Payment.Provider.ORANGE_MONEY, Payment.Provider.MTN_MONEY]
+                    ),
+                    amount=Decimal('50000.00'),
+                    status=(
+                        Payment.Status.COMPLETED
+                        if paid
+                        else Payment.Status.FAILED
+                    ),
+                    provider_reference=f'SEED-H{booking.pk:08d}',
+                )
+                payments.append(
+                    (
+                        payment,
+                        booking.datetime
+                        - timedelta(hours=self.rng.randint(1, 72)),
+                    )
+                )
+
+            if wants_review:
+                comment, rating = self.rng.choice(REVIEW_LINES)
+                review = Review(
+                    establishment=venue,
+                    reservation=booking,
+                    rating=rating,
+                    comment=comment,
+                )
+                reviews.append(
+                    (
+                        review,
+                        booking.datetime
+                        + timedelta(hours=self.rng.randint(2, 60)),
+                    )
+                )
+
+        self.write_backdated(Payment, payments)
+        self.write_backdated(Review, reviews)
+
+    def write_backdated(self, model, rows):
+        """Write rows, then put them back where they belong in time.
+
+        `created_at` is auto_now_add. bulk_create honours that through the
+        field's pre_save, which stamps this minute onto the *instance* as well
+        as the row — so setting created_at before the insert is silently
+        undone, and a second pass reading it back finds only now.
+
+        It matters beyond tidiness: the CSV export filters payments by
+        created_at. Left stamped with today, six months of takings would all
+        land on one day and every historical export would come back empty
+        while the screens above it still looked full.
+        """
+        if not rows:
+            return
+
+        objects = [obj for obj, _ in rows]
+        model.objects.bulk_create(objects, batch_size=BATCH)
+        for obj, when in rows:
+            obj.created_at = when
+        model.objects.bulk_update(objects, ['created_at'], batch_size=BATCH)
+
+    def seed_order_history(self, venues, months, start, span, today, tz):
+        """The same months of kitchen work, restaurants only."""
+        window_start = timezone.make_aware(
+            datetime.combine(start, time(0, 0)), tz
+        )
+        lines = []
+        written = 0
+
+        for venue in venues:
+            if venue.type != Establishment.Type.RESTAURANT:
+                continue
+            if (
+                venue.orders.filter(pickup_time__gte=window_start).count()
+                >= SEEDED_PER_MONTH * months
+            ):
+                continue
+            menu = list(venue.menu_items.filter(is_available=True))
+            if not menu:
+                continue
+
+            popularity = self.rng.uniform(0.7, 1.6)
+            planned = []
+
+            day = start
+            while day < today:
+                for _ in range(
+                    self.shaped_count(
+                        BASE_ORDERS_PER_DAY, popularity, day, start, span
+                    )
+                ):
+                    name, phone = self.person()
+                    pickup = timezone.make_aware(
+                        datetime.combine(
+                            day,
+                            time(
+                                self.rng.choice([12, 13, 13, 19, 20, 20, 21]),
+                                self.rng.choice([0, 15, 30, 45]),
+                            ),
+                        ),
+                        tz,
+                    )
+                    order = Order(
+                        establishment=venue,
+                        customer_name=name,
+                        customer_phone=phone,
+                        pickup_time=pickup,
+                        status=self.pick(ORDER_OUTCOMES),
+                    )
+                    planned.append(
+                        (
+                            order,
+                            pickup
+                            - timedelta(minutes=self.rng.randint(20, 180)),
+                        )
+                    )
+                day += timedelta(days=1)
+
+            self.write_backdated(Order, planned)
+            written += len(planned)
+
+            for order, _ in planned:
+                for item in self.rng.sample(
+                    menu, min(len(menu), self.rng.randint(1, 3))
+                ):
+                    lines.append(
+                        OrderItem(
+                            order=order,
+                            menu_item=item,
+                            quantity=self.rng.randint(1, 3),
+                            unit_price_at_order=item.price,
+                        )
+                    )
+
+        OrderItem.objects.bulk_create(lines, batch_size=BATCH)
+        self.created['history_orders'] = written
+
     # --- Report -----------------------------------------------------------
 
     def slug_for(self, venue):
@@ -766,7 +1189,7 @@ class Command(BaseCommand):
             .replace('&', '')[:14]
         )
 
-    def report(self, venues, customers):
+    def report(self, venues, customers, months=0):
         out = self.stdout
         restaurants = sum(
             1 for v in venues if v.type == Establishment.Type.RESTAURANT
@@ -791,6 +1214,19 @@ class Command(BaseCommand):
             f'{self.created["customers"]} new, '
             f'{self.created["customers_skipped"]} already there'
         )
+        if months:
+            first = Reservation.objects.order_by('datetime').first()
+            out.write('')
+            out.write(
+                f'  history       {months} months — '
+                f'{self.created["history_bookings"]} bookings, '
+                f'{self.created["history_orders"]} orders, '
+                f'{self.created["history_skipped"]} venues already had some'
+            )
+            if first is not None:
+                out.write(
+                    f'  oldest        {timezone.localtime(first.datetime):%Y-%m-%d}'
+                )
         out.write('')
         out.write(f'Password for every seeded account: {self.password}')
         out.write('')

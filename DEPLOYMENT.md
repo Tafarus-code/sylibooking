@@ -91,15 +91,63 @@ sessions and password reset tokens; a leaked one is a way into every account.
 
 ### First deploy
 
-Once it is up:
+Once it is up, make yourself an admin account. This has to run **inside** the
+container:
 
 ```bash
-railway run python backend/manage.py createsuperuser
+railway ssh
+python manage.py createsuperuser
 ```
+
+Two traps, both of which look like broken infrastructure rather than a wrong
+command:
+
+- **`railway run` executes on your own machine** — the CLI even aliases it as
+  `local`. It injects Railway's variables, so `DATABASE_URL` points at
+  `postgres.railway.internal`, which only resolves inside Railway's network.
+  The failure is `could not translate host name`, which reads like the
+  database is down.
+- **The path is `manage.py`, not `backend/manage.py`.** The image copies
+  `backend/` to `/app/`, and `railway ssh` may not drop you in `/app` — use
+  `python /app/manage.py ...` if `cd` is a nuisance.
+
+Before either works you need an SSH key *registered with Railway*, which is a
+separate thing from having one on disk:
+
+```bash
+ssh-keygen -t ed25519                      # if ~/.ssh is empty
+railway ssh keys add                       # register it
+```
+
+`railway status` is worth running first, every time. The CLI's project link
+is per-directory and sticky, and its failure mode is silently operating on a
+different project rather than erroring.
 
 Then check `https://<your-app>.up.railway.app/api/health/ready/`. It names
 each part it depends on, so a failure tells you *which* — database, cache or
 storage — rather than just "unhealthy".
+
+### Demo data — dev environments only
+
+```bash
+railway ssh
+python manage.py seed_demo --months 6
+```
+
+Twenty-two venues across Conakry and Labé with staff, menus, photographs,
+spaces and six months of trading behind them. `--months` controls how far
+back: the default 6 covers the longest insights window (90 days) twice over
+and gives the payments dashboard and CSV export a real range to be asked for.
+`--months 0` seeds the venues and skips the history.
+
+It is additive and safe to run twice — a venue whose window is already full
+is left alone. It is still **not for production**: it creates merchant
+accounts with a known password (`sylibooking`, or `--password`), and those
+are a way in.
+
+Expect a few minutes and roughly 35,000 rows. It also generates and uploads
+about 150 placeholder images, so it exercises R2 as a side effect — which
+makes it a reasonable check that storage is wired up.
 
 ### A note on the free tier
 

@@ -246,6 +246,29 @@ on every deploy and takes the photos with it.
    domain** (e.g. `media.sylibooking.gn`). Without this the API endpoint is
    not publicly readable and every image 403s.
 
+   **A custom domain, not the `pub-<id>.r2.dev` one.** Cloudflare offers the
+   r2.dev subdomain in the same panel and it is the quicker click, but it is
+   rate-limited, documented as "intended for non-production traffic", and
+   outside the CDN cache — and CORS response headers are only documented for
+   custom domains, which is the difference between the apps showing pictures
+   and not. Caching is not a nicety on the connections this market runs on;
+   it is why a gallery loads at all.
+
+   Switching later costs one variable. The database stores the object key,
+   not the URL — `MEDIA_CUSTOM_DOMAIN` is applied when a URL is built, so
+   every existing row follows the change with no migration and no re-upload.
+5. Give that same bucket a **CORS policy** — see below. The web apps fetch
+   images with XHR, so without one every picture is blocked in the browser
+   even when the object is there and public.
+
+**The bucket you write to and the bucket you read from must be the same
+one.** Obvious written down, easy to miss in a dashboard: the public address
+is per bucket, so `AWS_STORAGE_BUCKET_NAME` naming one bucket while
+`MEDIA_CUSTOM_DOMAIN` carries another's `pub-<id>.r2.dev` gives uploads that
+succeed, rows that are written, and URLs that 404 forever. Check the public
+address shown on the bucket named in `AWS_STORAGE_BUCKET_NAME` and use that
+one.
+
 ```
 USE_S3_MEDIA=True
 AWS_ACCESS_KEY_ID=<R2 access key>
@@ -270,6 +293,57 @@ at them are not. Rows written before R2 was switched on keep pointing at keys
 the bucket never received: the URLs are well-formed, the objects are absent,
 and every one of them 404s. Nothing can recover those files — the fix is to
 re-upload, or to re-seed a demo database.
+
+### The bucket needs a CORS policy
+
+**R2 → your bucket → Settings → CORS policy.** Without one the bucket sends
+no `Access-Control-Allow-Origin` header, and the browser discards every image
+the web apps ask for.
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://merchant-app-dev-dev.up.railway.app",
+      "https://customer-app-dev-dev.up.railway.app"
+    ],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+This surprises people because plain HTML does not need it: an `<img src>` is
+allowed to load cross-origin and always has been. Flutter web does not use
+one — it fetches the bytes with XHR and hands them to the canvas, and an XHR
+is subject to CORS like any other. So the same URL that displays perfectly
+when opened in a tab is blocked inside the app, with the network tab showing
+a request that was made and an image that never appears.
+
+`GET` and `HEAD` only. Nothing in a browser writes to this bucket — uploads
+go to the API, which writes with credentials from the server side and is not
+subject to CORS at all. Add each app's real origin as it gets one; a
+wildcard would let any site on the internet serve its pages from this
+bucket's bandwidth.
+
+### Checking it actually works
+
+```bash
+railway run python backend/manage.py check_media \
+  --origin https://merchant-app-dev-dev.up.railway.app
+```
+
+Writes a 1×1 probe image through the configured storage, reads it back over
+the public URL the way a browser would, and deletes it. Every setting above
+is exercised, and each way of being wrong gets its own answer — a failed
+write means credentials, a 404 means the two halves name different buckets,
+a 403 means public access, and a 200 with no CORS header means the apps will
+show nothing while curl shows everything.
+
+Worth running after any change here. None of these failures raises on its
+own: uploads succeed, rows are written, the API answers 200 with a URL in
+it, and the picture never appears.
 
 ### After switching R2 on
 

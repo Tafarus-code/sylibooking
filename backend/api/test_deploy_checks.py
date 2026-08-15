@@ -6,7 +6,11 @@ version of this guard raised at import, which broke the very command whose
 job is to report it.
 """
 
-from config.checks import cache_must_be_shared, payment_callbacks_need_secrets
+from config.checks import (
+    cache_must_be_shared,
+    database_must_be_configured,
+    payment_callbacks_need_secrets,
+)
 from django.test import TestCase, override_settings
 
 LOCMEM = {
@@ -136,3 +140,30 @@ class StorageIndependenceTests(TestCase):
 
         self.assertIn('BACKEND', conf._media_storage)
         self.assertNotIn('staticfiles', conf._media_storage)
+
+
+class DatabaseCheckTests(TestCase):
+    CONFIGURED = {'default': {'ENGINE': 'x', 'NAME': 'sylibooking'}}
+    MISSING = {'default': {'ENGINE': 'x', 'NAME': ''}}
+
+    @override_settings(DJANGO_ENV='production', DATABASES=MISSING)
+    def test_an_unconfigured_database_names_the_variable_people_set(self):
+        """**The message this replaces pointed at the wrong variable.**
+
+        It raised about DB_NAME — which nobody sets on a platform that hands
+        out DATABASE_URL — and did it as an import-time traceback rather than
+        a line somebody could act on.
+        """
+        problems = database_must_be_configured(None)
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].id, 'sylibooking.E003')
+        self.assertIn('DATABASE_URL', problems[0].hint)
+
+    @override_settings(DJANGO_ENV='production', DATABASES=CONFIGURED)
+    def test_a_configured_database_passes(self):
+        self.assertEqual(database_must_be_configured(None), [])
+
+    @override_settings(DJANGO_ENV='local', DATABASES=MISSING)
+    def test_development_is_left_alone(self):
+        self.assertEqual(database_must_be_configured(None), [])

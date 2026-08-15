@@ -90,3 +90,33 @@ def payment_callbacks_need_secrets(app_configs, **kwargs):
                 )
             )
     return problems
+
+
+@register(Tags.database, deploy=True)
+def database_must_be_configured(app_configs, **kwargs):
+    """Production needs a database, and needs to say so usefully.
+
+    The failure this replaces was an import-time exception naming `DB_NAME`
+    — a variable nobody sets on a platform that hands out `DATABASE_URL`.
+    The message pointed at the fallback rather than at the thing that was
+    actually missing, and it arrived as a traceback rather than as a line.
+    """
+    if getattr(settings, 'DJANGO_ENV', '') != 'production':
+        return []
+
+    if settings.DATABASES.get('default', {}).get('NAME'):
+        return []
+
+    return [
+        Error(
+            'No database is configured.',
+            hint=(
+                'Set DATABASE_URL — Railway, Render and Fly all provide one, '
+                'and on Railway it is a reference to the Postgres service '
+                '(check the service name matches; a wrong reference resolves '
+                'to empty rather than failing). Or set DB_NAME, DB_USER and '
+                'DB_PASSWORD individually.'
+            ),
+            id='sylibooking.E003',
+        )
+    ]

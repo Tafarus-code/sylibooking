@@ -302,47 +302,66 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # is actually payable from Guinea.
 USE_S3_MEDIA = config('USE_S3_MEDIA', default=False, cast=bool)
 
+# Static files and media files are decided independently, and that
+# separation is load-bearing.
+#
+# They used to be one block: turning USE_S3_MEDIA on also switched static
+# files to the manifest backend. The image collects static at build time with
+# media storage off, so no manifest was ever written — and the first deploy
+# with R2 enabled answered 500 to every HTML page, `Missing staticfiles
+# manifest entry`, while the JSON API carried on working. A photo storage
+# setting has no business deciding how CSS is served.
+#
+# The manifest backend is now unconditional, so the collect that happens in
+# the Dockerfile always produces what the runtime always expects. In
+# development DEBUG serves static through the finders and the manifest is
+# never consulted.
+_media_storage = {
+    'BACKEND': 'django.core.files.storage.FileSystemStorage',
+}
+
 if USE_S3_MEDIA:
-    STORAGES = {
-        'default': {
-            'BACKEND': 'storages.backends.s3.S3Storage',
-            'OPTIONS': {
-                'bucket_name': config('AWS_STORAGE_BUCKET_NAME'),
-                # R2 wants 'auto'; AWS wants a real region.
-                'region_name': config('AWS_S3_REGION_NAME', default='auto'),
-                # Blank for AWS itself; set for anyone else.
-                'endpoint_url': config('AWS_S3_ENDPOINT_URL', default='') or None,
-                'access_key': config('AWS_ACCESS_KEY_ID', default=''),
-                'secret_key': config('AWS_SECRET_ACCESS_KEY', default=''),
-                # No ACL. S3 has per-object ACLs and Cloudflare R2 does
-                # not — it rejects the header outright, so asking for
-                # 'public-read' fails every upload rather than making
-                # anything public. On R2 a bucket is served publicly by
-                # attaching a domain to it, which is what the custom domain
-                # below is for; on S3 use a bucket policy.
-                'default_acl': None,
-                # Unsigned URLs. Photos are shown to anyone browsing a venue,
-                # and a signed URL would expire in the middle of a gallery.
-                'querystring_auth': False,
-                # The public hostname in front of the bucket. Without it
-                # django-storages builds URLs against the S3 API endpoint,
-                # which on R2 is not publicly readable — every photo would
-                # 401 while looking perfectly configured.
-                'custom_domain': config('MEDIA_CUSTOM_DOMAIN', default='') or None,
-                # A photo never changes once uploaded — the filename carries a
-                # uuid — so it can be cached hard. On the connections this
-                # market runs on, that is the difference between a venue's
-                # gallery loading and not.
-                'object_parameters': {'CacheControl': 'max-age=86400'},
-                # Never silently overwrite: two venues uploading terrasse.jpg
-                # must not become one photo shown to both.
-                'file_overwrite': False,
-            },
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    _media_storage = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'bucket_name': config('AWS_STORAGE_BUCKET_NAME'),
+            # R2 wants 'auto'; AWS wants a real region.
+            'region_name': config('AWS_S3_REGION_NAME', default='auto'),
+            # Blank for AWS itself; set for anyone else.
+            'endpoint_url': config('AWS_S3_ENDPOINT_URL', default='') or None,
+            'access_key': config('AWS_ACCESS_KEY_ID', default=''),
+            'secret_key': config('AWS_SECRET_ACCESS_KEY', default=''),
+            # No ACL. S3 has per-object ACLs and Cloudflare R2 does not — it
+            # rejects the header outright, so asking for 'public-read' fails
+            # every upload rather than making anything public. On R2 a bucket
+            # is served publicly by attaching a domain to it, which is what
+            # the custom domain below is for; on S3 use a bucket policy.
+            'default_acl': None,
+            # Unsigned URLs. Photos are shown to anyone browsing a venue, and
+            # a signed URL would expire in the middle of a gallery.
+            'querystring_auth': False,
+            # The public hostname in front of the bucket. Without it
+            # django-storages builds URLs against the S3 API endpoint, which
+            # on R2 is not publicly readable — every photo would 401 while
+            # looking perfectly configured.
+            'custom_domain': config('MEDIA_CUSTOM_DOMAIN', default='') or None,
+            # A photo never changes once uploaded — the filename carries a
+            # uuid — so it can be cached hard. On the connections this market
+            # runs on, that is the difference between a venue's gallery
+            # loading and not.
+            'object_parameters': {'CacheControl': 'max-age=86400'},
+            # Never silently overwrite: two venues uploading terrasse.jpg must
+            # not become one photo shown to both.
+            'file_overwrite': False,
         },
     }
+
+STORAGES = {
+    'default': _media_storage,
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # Largest photo a customer or merchant may upload. Phones here produce large
 # files on poor connections, so the limit is enforced rather than hoped for.

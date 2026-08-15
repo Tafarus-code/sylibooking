@@ -21,6 +21,7 @@ class CustomerApp extends StatefulWidget {
     this.imageSource,
     this.locationSource,
     this.directionsLauncher,
+    this.push,
   });
 
   final SylibookingApi api;
@@ -32,6 +33,11 @@ class CustomerApp extends StatefulWidget {
   final ImageSource? imageSource;
   final LocationSource? locationSource;
   final DirectionsLauncher? directionsLauncher;
+
+  /// Registers this phone for reminders. Null means the no-op, which is what
+  /// widget tests get — the real one is passed from main() so a test never
+  /// reaches for a platform channel.
+  final PushRegistrar? push;
 
   @override
   State<CustomerApp> createState() => _CustomerAppState();
@@ -52,6 +58,7 @@ class _CustomerAppState extends State<CustomerApp> {
       api: widget.api,
       store: widget.store,
       tokenStore: widget.tokenStore ?? SharedPreferencesCustomerTokenStore(),
+      push: widget.push,
     );
     _favourites = FavouritesController(
       api: widget.api,

@@ -57,10 +57,26 @@ class NoPushRegistrar implements PushRegistrar {
 
 /// The real one.
 class FirebasePushRegistrar implements PushRegistrar {
-  FirebasePushRegistrar({this.platform = 'android'});
+  FirebasePushRegistrar({String? platform})
+      : platform = platform ?? currentPlatform();
 
-  /// Sent to the server so it knows which sender to use later.
+  /// Sent to the server so it knows which sender to use later. One of
+  /// `android`, `ios` or `web` — the three the API accepts.
   final String platform;
+
+  /// What this build is running on.
+  ///
+  /// Worked out rather than passed in, because every call site would
+  /// otherwise hardcode 'android' and quietly mislabel every web and iOS
+  /// device — which only shows up much later, as a merchant whose alerts go
+  /// to a handset they no longer use.
+  static String currentPlatform() {
+    if (kIsWeb) return 'web';
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => 'ios',
+      _ => 'android',
+    };
+  }
 
   String? _token;
   bool _ready = false;

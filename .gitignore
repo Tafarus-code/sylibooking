@@ -3,6 +3,17 @@
 .env.*
 !.env.example
 
+# Firebase, per app.
+#
+# Not a secret in Google's sense — it is compiled into the APK and anyone can
+# read it out of one — but this repository is public, and publishing a project
+# id and an API key invites scanners for no benefit. The truly dangerous file
+# is the service account key, which never goes near the repository at all.
+#
+# Get them from console.firebase.google.com; see DEPLOYMENT.md section 7.
+apps/*/android/app/google-services.json
+apps/*/ios/Runner/GoogleService-Info.plist
+
 # Python
 venv/
 .venv/

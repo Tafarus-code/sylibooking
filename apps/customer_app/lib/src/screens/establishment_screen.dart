@@ -479,7 +479,7 @@ class _Slot extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: taken
-                  ? const Color(0xFFF4F1E7)
+                  ? theme.colorScheme.surfaceContainerHighest
                   : theme.colorScheme.surface,
               border: Border.all(color: theme.colorScheme.outlineVariant),
               borderRadius: BorderRadius.circular(10),
@@ -499,10 +499,10 @@ class _Slot extends StatelessWidget {
                   label,
                   style: sylibookingPriceStyle(context, fontSize: 13).copyWith(
                     color: taken
-                        ? const Color(0xFFC7C0AC)
+                        ? theme.colorScheme.outline
                         : theme.colorScheme.onSurface,
                     decoration: taken ? TextDecoration.lineThrough : null,
-                    decorationColor: const Color(0xFFC7C0AC),
+                    decorationColor: theme.colorScheme.outline,
                   ),
                 ),
               ],

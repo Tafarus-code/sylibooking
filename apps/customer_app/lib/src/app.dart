@@ -86,12 +86,14 @@ class _CustomerAppState extends State<CustomerApp> {
       builder: (context, _) => MaterialApp(
         onGenerateTitle: (context) => L.of(context).appTitle,
         debugShowCheckedModeBanner: false,
-        // The app's own look. Establishment branding is layered on top of
-        // this by EstablishmentThemeScope, and only on a venue's own screens.
+        // The customer app's own look — Bissap Bloom. Establishment branding
+        // is layered on top of this by EstablishmentThemeScope, and only on a
+        // venue's own screens.
         //
-        // Dark app bar: the design system's customer screens all wear the
-        // deepwood band at the top. The merchant app asks for the light one.
-        theme: sylibookingAppTheme(darkAppBar: true),
+        // Not the merchant's baseline and not one of the five venue presets:
+        // see the note at the top of baseline_theme.dart, where the names get
+        // close enough to be worth reading once.
+        theme: customerBaselineTheme(),
         // Null follows the phone, which in this market is usually already
         // French. The toggle is for when the phone is wrong, not a first step.
         locale: _locale.locale,
@@ -111,7 +113,17 @@ class _CustomerAppState extends State<CustomerApp> {
             slow: L.of(context).connectionSlow,
             unreachable: L.of(context).connectionFailed,
           );
-          return child ?? const SizedBox.shrink();
+          // The canvas goes in once, here, under everything the app will ever
+          // push. Every Scaffold below is transparent by theme, so this shows
+          // through all of them — and because it is a sibling of `child`
+          // rather than part of it, navigating between screens never rebuilds
+          // or repaints it.
+          return Stack(
+            children: [
+              const Positioned.fill(child: CustomerBaselineBackground()),
+              child ?? const SizedBox.shrink(),
+            ],
+          );
         },
         // Nothing is fetched until the stored language is known. Reading it
         // takes one frame, and without this wait the very first request goes

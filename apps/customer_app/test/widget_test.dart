@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:customer_app/src/app.dart';
 import 'package:customer_app/src/booking_store.dart';
@@ -2242,14 +2243,23 @@ void main() {
       return Theme.of(tester.element(find.text('Find a table')));
     }
 
-    testWidgets('browse chrome is Ember, not a Material default',
+    testWidgets('browse chrome is Bissap Bloom, not a Material default',
         (tester) async {
       final theme = await browseTheme(tester);
 
-      expect(theme.colorScheme.primary, SylibookingTokens.ember);
-      expect(theme.colorScheme.onPrimary, SylibookingTokens.onEmber);
-      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
-      expect(theme.colorScheme.onSurface, SylibookingTokens.onIvory);
+      expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
+      expect(theme.colorScheme.onPrimary, CustomerBaselineTokens.onBissap);
+      expect(theme.colorScheme.surface, CustomerBaselineTokens.blush);
+      expect(theme.colorScheme.onSurface, CustomerBaselineTokens.aubergine);
+    });
+
+    testWidgets('and is no longer the Ember house style', (tester) async {
+      // Named, because Ember is what every screenshot and every earlier test
+      // in this file was written against.
+      final theme = await browseTheme(tester);
+
+      expect(theme.colorScheme.primary, isNot(SylibookingTokens.ember));
+      expect(theme.colorScheme.surface, isNot(SylibookingTokens.ivory));
     });
 
     testWidgets('body copy is set in the house body face', (tester) async {
@@ -2258,21 +2268,20 @@ void main() {
       // Loose contains: google_fonts appends a weight suffix to the family.
       expect(
         theme.textTheme.bodyMedium?.fontFamily,
-        contains(SylibookingTokens.bodyFont),
+        contains(CustomerBaselineTokens.bodyFont),
       );
     });
 
     testWidgets('headings are set in the house display face', (tester) async {
       final theme = await browseTheme(tester);
 
-      expect(
-        theme.textTheme.headlineSmall?.fontFamily,
-        contains(SylibookingTokens.displayFont),
-      );
-      expect(
-        theme.textTheme.titleLarge?.fontFamily,
-        contains(SylibookingTokens.displayFont),
-      );
+      // google_fonts drops the space: 'Playfair Display' resolves to a
+      // family called PlayfairDisplay, so comparing against the design name
+      // verbatim would fail on a theme that is perfectly correct.
+      const display = 'PlayfairDisplay';
+      expect(CustomerBaselineTokens.displayFont.replaceAll(' ', ''), display);
+      expect(theme.textTheme.headlineSmall?.fontFamily, contains(display));
+      expect(theme.textTheme.titleLarge?.fontFamily, contains(display));
     });
 
     testWidgets('a loud venue preset does not reach the browse chrome',
@@ -2280,8 +2289,17 @@ void main() {
       final theme = await browseTheme(tester, preset: 'bissap');
 
       // The same guarantee the branding tests make, asserted against the
-      // baseline itself rather than merely "not bissap".
-      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      // baseline itself rather than merely "not the preset".
+      //
+      // This pair is the naming collision made concrete: the preset keyed
+      // 'bissap' is a venue's hibiscus red (#9D174D), and the chrome around
+      // it is the customer baseline's own bissap (#D6296B). Two different
+      // colours, two different systems, one word.
+      expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
+      expect(
+        theme.colorScheme.primary,
+        isNot(establishmentThemePresetFor('bissap').accent),
+      );
     });
 
     testWidgets('the greeting names a returning customer', (tester) async {
@@ -2346,7 +2364,13 @@ void main() {
       await tester.pumpAndSettle();
 
       final scheme = Theme.of(tester.element(find.text('Browse'))).colorScheme;
-      expect(scheme.primary, SylibookingTokens.ember);
+      // Same collision as above, the other way round: the venue wears the
+      // preset keyed 'indigo_soir', and the bar stays the customer baseline.
+      expect(scheme.primary, CustomerBaselineTokens.bissap);
+      expect(
+        scheme.primary,
+        isNot(establishmentThemePresetFor('indigo_soir').accent),
+      );
     });
 
     testWidgets('favourites starts empty and says how to fill it',
@@ -5440,6 +5464,193 @@ void main() {
         find.text('Tied to this visit — one review per booking.'),
         findsOneWidget,
       );
+    });
+  });
+
+  // ==========================================================================
+  // Bissap Bloom — the palette, the canvas, and whether anything can be read
+  // against it.
+  //
+  // This background has darkened once already in this project's history, and
+  // the failure that caused was a legibility one rather than a visual one:
+  // everything rendered, and some of it could not be read. So these measure
+  // rather than look.
+  // ==========================================================================
+  group('the customer app wears Bissap Bloom', () {
+    double luminance(Color colour) {
+      double linearise(double channel) => channel <= 0.03928
+          ? channel / 12.92
+          : math.pow((channel + 0.055) / 1.055, 2.4).toDouble();
+      return 0.2126 * linearise(colour.r) +
+          0.7152 * linearise(colour.g) +
+          0.0722 * linearise(colour.b);
+    }
+
+    double contrast(Color a, Color b) {
+      final lighter = math.max(luminance(a), luminance(b));
+      final darker = math.min(luminance(a), luminance(b));
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    Future<ThemeData> open(WidgetTester tester, {Size size = phoneSize}) async {
+      final (:app, :backend, :store) = buildApp(tester, size: size);
+      backend.on('GET', '/api/establishments/', {
+        'count': 1,
+        'next': null,
+        'results': [establishmentJson()],
+      });
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      return Theme.of(tester.element(find.byType(EstablishmentCard).first));
+    }
+
+    for (final (name, size) in <(String, Size)>[
+      ('a 360x900 phone', phoneSize),
+      ('a tablet', tabletSize),
+      ('a laptop', desktopSize),
+      ('a phone on its side', landscapePhoneSize),
+    ]) {
+      testWidgets('the palette reaches the cards on $name', (tester) async {
+        final theme = await open(tester, size: size);
+
+        expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
+        expect(theme.colorScheme.surface, CustomerBaselineTokens.blush);
+        expect(theme.colorScheme.onSurface, CustomerBaselineTokens.aubergine);
+      });
+
+      testWidgets('body copy stays legible on a card on $name',
+          (tester) async {
+        final theme = await open(tester, size: size);
+        final scheme = theme.colorScheme;
+
+        // A card is opaque blush over the canvas, so this is the pair a
+        // customer actually reads venue names and addresses in.
+        expect(
+          contrast(scheme.onSurface, scheme.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          contrast(scheme.onSurfaceVariant, scheme.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+    }
+
+    testWidgets('the canvas is painted once, behind everything',
+        (tester) async {
+      await open(tester);
+
+      // One canvas for the whole app, not one per screen: it is a sibling of
+      // the navigator rather than part of any route.
+      expect(find.byType(CustomerBaselineBackground), findsOneWidget);
+    });
+
+    testWidgets('and it survives a tab change without being rebuilt',
+        (tester) async {
+      await open(tester);
+      final before = tester.element(find.byType(CustomerBaselineBackground));
+
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+
+      // The same Element, so the painter was never re-run. This is the whole
+      // point of hanging it off the app builder rather than off a Scaffold.
+      expect(
+        tester.element(find.byType(CustomerBaselineBackground)),
+        same(before),
+      );
+    });
+
+    testWidgets('every scaffold lets the canvas through', (tester) async {
+      await open(tester);
+
+      // Transparent by theme rather than by each screen remembering to ask.
+      final scaffolds = tester.widgetList<Scaffold>(find.byType(Scaffold));
+      expect(scaffolds, isNotEmpty);
+      final theme = Theme.of(
+        tester.element(find.byType(EstablishmentCard).first),
+      );
+      expect(theme.scaffoldBackgroundColor, Colors.transparent);
+    });
+
+    testWidgets('text on the canvas itself clears AA', (tester) async {
+      // The greeting and the filter chips sit on the canvas, not on a card.
+      // The canvas is a gradient, so the darkest and lightest stops are both
+      // checked — legibility has to hold at either end of it.
+      await open(tester);
+
+      const onCanvas = CustomerBaselineTokens.aubergine;
+      for (final stop in CustomerBaselineBackground.gradientStops) {
+        expect(
+          contrast(onCanvas, stop),
+          greaterThanOrEqualTo(4.5),
+          reason: 'aubergine copy is unreadable on canvas stop $stop',
+        );
+      }
+      expect(
+        contrast(onCanvas, CustomerBaselineBackground.ground),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    testWidgets('frosted glass is used exactly twice, and only there',
+        (tester) async {
+      await open(tester);
+
+      // The search field and the bottom bar. Not the list, not a card, not a
+      // sheet — a blur behind a scrolling list is re-read every frame it
+      // moves, which is the cost this rule exists to refuse.
+      expect(find.byType(FrostedPanel), findsNWidgets(2));
+    });
+
+    testWidgets('and a scrolling list is never behind one', (tester) async {
+      await open(tester);
+
+      // ScrollView subtypes only — ListView, GridView, CustomScrollView.
+      // A TextField carries its own Scrollable for panning a long query
+      // sideways, which is not what this rule is about: it is one line of
+      // text, it moves only while typing, and it is the search field the
+      // frost was specified for in the first place.
+      for (final panel in find.byType(FrostedPanel).evaluate()) {
+        expect(
+          find.descendant(
+            of: find.byWidget(panel.widget),
+            matching: find.bySubtype<ScrollView>(),
+          ),
+          findsNothing,
+          reason: 'a scrolling list is inside a frosted panel',
+        );
+      }
+    });
+
+    testWidgets('the status language is untouched by the recolour',
+        (tester) async {
+      await open(tester);
+
+      // Open stays green whatever the palette around it does, so a customer
+      // who learns the colour in one app keeps it in the other. Asserted by
+      // hunting the actual painted colour rather than by trusting the source.
+      const openGreen = Color(0xFF3FBF7F);
+      final painted = <Color?>[
+        for (final element in find
+            .descendant(
+              of: find.byType(EstablishmentCard).first,
+              matching: find.byType(Container),
+            )
+            .evaluate())
+          switch ((element.widget as Container).decoration) {
+            final BoxDecoration decoration => decoration.color,
+            _ => null,
+          },
+      ];
+
+      expect(
+        painted,
+        contains(openGreen),
+        reason: 'the open/closed dot was recoloured with the palette',
+      );
+      // And it is not any Bissap Bloom colour that happens to look similar.
+      expect(painted, isNot(contains(CustomerBaselineTokens.bissap)));
     });
   });
 }

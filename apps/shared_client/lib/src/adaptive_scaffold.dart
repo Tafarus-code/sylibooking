@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'baseline_background.dart';
 import 'layout.dart';
 
 /// One destination in the app's primary navigation.
@@ -27,6 +28,7 @@ class AdaptiveScaffold extends StatelessWidget {
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.body,
+    this.frostedBar = false,
   });
 
   final List<AdaptiveDestination> destinations;
@@ -34,25 +36,45 @@ class AdaptiveScaffold extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final Widget body;
 
+  /// Blur the painted canvas behind the bottom bar.
+  ///
+  /// Opt-in, and only the customer app opts in. Both apps share this shell,
+  /// and the merchant app must never blur: its tablet split view scrolls two
+  /// panes, and a blur re-reads what is behind it on every composited frame.
+  /// Defaulting to false is what stops that arriving by inheritance.
+  ///
+  /// Ignored at rail widths. A rail is full height beside a scrolling pane,
+  /// which is the case the merchant rule is about.
+  final bool frostedBar;
+
   @override
   Widget build(BuildContext context) {
     final layout = LayoutSize.of(context);
 
     if (!layout.usesRail) {
+      final bar = NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: onDestinationSelected,
+        // The blur supplies the surface; a second opaque one over it would
+        // make the whole exercise invisible.
+        backgroundColor: frostedBar ? Colors.transparent : null,
+        destinations: [
+          for (final destination in destinations)
+            NavigationDestination(
+              icon: Icon(destination.icon),
+              selectedIcon: Icon(destination.selectedIcon),
+              label: destination.label,
+            ),
+        ],
+      );
+
       return Scaffold(
         body: body,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: onDestinationSelected,
-          destinations: [
-            for (final destination in destinations)
-              NavigationDestination(
-                icon: Icon(destination.icon),
-                selectedIcon: Icon(destination.selectedIcon),
-                label: destination.label,
-              ),
-          ],
-        ),
+        // Extended so the canvas runs under the bar rather than stopping at
+        // it — there is nothing to blur otherwise.
+        extendBody: frostedBar,
+        bottomNavigationBar:
+            frostedBar ? FrostedPanel(child: bar) : bar,
       );
     }
 

@@ -185,6 +185,10 @@ class _StatusBadge extends StatelessWidget {
       label: open
           ? l.statusOpenUntil(establishment.closesAtDisplay)
           : l.statusClosed,
+      // Green for open, and it stays green. Open/closed is status language,
+      // which is fixed across both apps and survives any recolour — the same
+      // rule the payment and order badges follow. A customer who learns that
+      // green means open in one app must not have to relearn it in the other.
       dotColour: open
           ? const Color(0xFF3FBF7F)
           : theme.colorScheme.error,
@@ -211,7 +215,7 @@ class _HeartButton extends StatelessWidget {
         tooltip: saved
             ? L.of(context).removeFromFavourites
             : L.of(context).saveToFavourites,
-        style: IconButton.styleFrom(backgroundColor: const Color(0x6610231B)),
+        style: IconButton.styleFrom(backgroundColor: const Color(0x66270C20)),
         onPressed: onPressed,
       );
 }
@@ -231,7 +235,7 @@ class _Badge extends StatelessWidget {
       decoration: BoxDecoration(
         // Deliberately not themed: it sits on an arbitrary photograph, where
         // only a dark scrim guarantees the text can be read.
-        color: const Color(0xCC10231B),
+        color: const Color(0xCC270C20),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

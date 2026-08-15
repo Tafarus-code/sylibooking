@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// The app's own look, before any establishment preset is layered on top.
+/// The original single house style, shared by both apps. Named after Ember:
+/// deepwood, ivory, ember.
 ///
-/// Mirrors the `base` block of `design/theme_presets.json`; a test compares the
-/// two. Named after the Ember house style: deepwood, ivory, ember.
+/// **Superseded, and still here on purpose.** Each app now has a baseline of
+/// its own — `CustomerBaselineTokens` (Bissap Bloom) and
+/// `MerchantBaselineTokens` (Indigo Ledger) in `baseline_theme.dart`. This
+/// stays until both apps are moved across, and is what the `ember` preset is
+/// still derived against.
+///
+/// Mirrors the `base` block of `design/theme_presets.json`; a test compares
+/// the two.
 class SylibookingTokens {
   const SylibookingTokens._();
 
@@ -60,7 +67,7 @@ TextStyle sylibookingPriceStyle(BuildContext context, {double? fontSize}) {
 }
 
 /// The colour half of the app theme, pure so it can be asserted without a
-/// font stack — the same split as `colorSchemeForPreset`.
+/// font stack — the same split as `colorSchemeForEstablishmentPreset`.
 ColorScheme sylibookingColorScheme() => const ColorScheme.light(
       primary: SylibookingTokens.ember,
       onPrimary: SylibookingTokens.onEmber,

@@ -1965,7 +1965,7 @@ void main() {
       // it.
       final scheme =
           Theme.of(tester.element(find.text('Order ahead'))).colorScheme;
-      expect(scheme.primary, themePresetFor('bissap').accent);
+      expect(scheme.primary, establishmentThemePresetFor('bissap').accent);
     });
 
     testWidgets('the menu reuses the venue page component', (tester) async {
@@ -3037,7 +3037,7 @@ void main() {
 
     // One test per preset, so each gets a fresh tester — sharing one leaves
     // the previous screen in the tree and the assertion reads the old theme.
-    for (final preset in themePresets) {
+    for (final preset in establishmentThemePresets) {
       testWidgets('the detail screen renders under ${preset.name}',
           (tester) async {
         await openVenue(tester, preset: preset.key);
@@ -3054,7 +3054,7 @@ void main() {
 
       expect(
         schemeInDetail(tester).primary,
-        themePresetFor('ember').accent,
+        establishmentThemePresetFor('ember').accent,
       );
     });
 
@@ -3066,7 +3066,7 @@ void main() {
       expect(find.text('Available times'), findsOneWidget);
       expect(
         schemeInDetail(tester).primary,
-        themePresetFor('ember').accent,
+        establishmentThemePresetFor('ember').accent,
       );
     });
 
@@ -3089,7 +3089,7 @@ void main() {
           Theme.of(tester.element(find.text('Find a table'))).colorScheme;
       expect(
         browseScheme.primary,
-        isNot(themePresetFor('bissap').accent),
+        isNot(establishmentThemePresetFor('bissap').accent),
       );
     });
 

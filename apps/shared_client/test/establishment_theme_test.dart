@@ -42,35 +42,35 @@ void main() {
 
   group('the preset set', () {
     test('there are five', () {
-      expect(themePresets, hasLength(5));
+      expect(establishmentThemePresets, hasLength(5));
     });
 
     test('they are the expected five, in order', () {
       expect(
-        themePresets.map((p) => p.key),
+        establishmentThemePresets.map((p) => p.key),
         ['ember', 'palm_night', 'harmattan', 'bissap', 'indigo_soir'],
       );
     });
 
     test('ember is the default', () {
-      expect(defaultThemePresetKey, 'ember');
-      expect(themePresetFor(null).key, 'ember');
+      expect(defaultEstablishmentThemePresetKey, 'ember');
+      expect(establishmentThemePresetFor(null).key, 'ember');
     });
 
     test('every key resolves to itself', () {
-      for (final preset in themePresets) {
-        expect(themePresetFor(preset.key).key, preset.key);
+      for (final preset in establishmentThemePresets) {
+        expect(establishmentThemePresetFor(preset.key).key, preset.key);
       }
     });
 
     test('an unknown key falls back rather than failing', () {
       // A newer preset the server knows and this build does not.
-      expect(themePresetFor('neon_disco').key, 'ember');
-      expect(themePresetFor('').key, 'ember');
+      expect(establishmentThemePresetFor('neon_disco').key, 'ember');
+      expect(establishmentThemePresetFor('').key, 'ember');
     });
 
     test('text on accent passes WCAG AA', () {
-      for (final preset in themePresets) {
+      for (final preset in establishmentThemePresets) {
         final ratio = contrastRatio(preset.onAccent, preset.accent);
         expect(
           ratio,
@@ -90,7 +90,7 @@ void main() {
 
   group('the Dart mirror matches the design file', () {
     test('same default', () {
-      expect(loadDesignFile()['default'], defaultThemePresetKey);
+      expect(loadDesignFile()['default'], defaultEstablishmentThemePresetKey);
     });
 
     test('same keys in the same order', () {
@@ -98,7 +98,7 @@ void main() {
           .map((p) => (p as Map)['key'])
           .toList();
 
-      expect(themePresets.map((p) => p.key).toList(), fromFile);
+      expect(establishmentThemePresets.map((p) => p.key).toList(), fromFile);
     });
 
     test('same fonts and colours for every preset', () {
@@ -107,7 +107,7 @@ void main() {
           (preset as Map)['key'] as String: preset,
       };
 
-      for (final preset in themePresets) {
+      for (final preset in establishmentThemePresets) {
         final source = fromFile[preset.key]!;
         expect(preset.name, source['name'], reason: preset.key);
         expect(preset.displayFont, source['display_font'], reason: preset.key);
@@ -126,14 +126,14 @@ void main() {
     });
   });
 
-  group('colorSchemeForPreset', () {
+  group('colorSchemeForEstablishmentPreset', () {
     // The colour half is pure, so it is asserted here. Font resolution needs
     // a real font stack and is covered by the app widget tests instead.
     final base = ThemeData(useMaterial3: true);
 
     test('the accent becomes the primary colour', () {
-      for (final preset in themePresets) {
-        final scheme = colorSchemeForPreset(base, preset);
+      for (final preset in establishmentThemePresets) {
+        final scheme = colorSchemeForEstablishmentPreset(base, preset);
         expect(scheme.primary, preset.accent, reason: preset.key);
         expect(scheme.onPrimary, preset.onAccent, reason: preset.key);
       }
@@ -142,17 +142,17 @@ void main() {
     test('it follows the base brightness rather than forcing one', () {
       final dark = ThemeData(brightness: Brightness.dark);
       expect(
-        colorSchemeForPreset(dark, themePresets.first).brightness,
+        colorSchemeForEstablishmentPreset(dark, establishmentThemePresets.first).brightness,
         Brightness.dark,
       );
     });
 
     test('each preset yields a distinct primary', () {
-      final primaries = themePresets
-          .map((p) => colorSchemeForPreset(base, p).primary)
+      final primaries = establishmentThemePresets
+          .map((p) => colorSchemeForEstablishmentPreset(base, p).primary)
           .toSet();
 
-      expect(primaries, hasLength(themePresets.length));
+      expect(primaries, hasLength(establishmentThemePresets.length));
     });
   });
 

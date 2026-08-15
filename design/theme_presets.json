@@ -34,6 +34,63 @@
     "body_font": "Manrope",
     "mono_font": "IBM Plex Mono"
   },
+  "_app_baselines_comment": [
+    "THE APP-WIDE BASELINE THEMES — one per app. Not to be confused with the",
+    "presets below, which are a different system: a baseline is what an app",
+    "looks like everywhere, and a preset is what one merchant picks for their",
+    "own venue's pages. The collision is real and deliberate to guard against:",
+    "'Bissap Bloom' here is the customer app's whole look, while 'bissap' in",
+    "presets is one hibiscus accent a merchant may choose. In Dart they are",
+    "CustomerBaselineTokens / MerchantBaselineTokens and",
+    "EstablishmentThemePreset respectively, and nothing is named plain",
+    "'Bissap' or 'Indigo' on its own.",
+    "",
+    "Read by the Flutter side only. The backend reads 'presets' and 'default'",
+    "and has no interest in how either app paints itself.",
+    "",
+    "Every on_* value is verified against its background for WCAG AA by tests",
+    "in apps/shared_client/test/baseline_theme_test.dart."
+  ],
+  "app_baselines": {
+    "customer": {
+      "palette_name": "Bissap Bloom",
+      "aubergine": "#3B1230",
+      "bissap": "#D6296B",
+      "gold": "#E8B23D",
+      "prune_clair": "#7A2E5C",
+      "blush": "#FBF2EC",
+      "on_bissap": "#FFFFFF",
+      "on_gold": "#3B1230",
+      "on_prune_clair": "#FBF2EC",
+      "on_aubergine": "#FBF2EC",
+      "on_blush": "#3B1230",
+      "display_font": "Playfair Display",
+      "body_font": "Manrope",
+      "mono_font": "IBM Plex Mono"
+    },
+    "merchant": {
+      "palette_name": "Indigo Ledger",
+      "indigo": "#1E2749",
+      "copper": "#C97C3D",
+      "slate_blue": "#3D5A80",
+      "sage": "#7A9E6E",
+      "parchment": "#F5F1E8",
+      "_on_copper_comment": [
+        "Not Indigo, which measures 4.46:1 against Copper — under the 4.5",
+        "floor for normal text, and Copper carries button labels. This is the",
+        "deepest stop of the merchant background gradient, already a palette",
+        "member, and measures 5.60:1."
+      ],
+      "on_copper": "#0E1428",
+      "on_slate_blue": "#F5F1E8",
+      "on_sage": "#1E2749",
+      "on_indigo": "#F5F1E8",
+      "on_parchment": "#1E2749",
+      "display_font": "Sora",
+      "body_font": "Manrope",
+      "mono_font": "IBM Plex Mono"
+    }
+  },
   "presets": [
     {
       "key": "ember",

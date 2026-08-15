@@ -813,7 +813,7 @@ void main() {
       final scheme = Theme.of(
         tester.element(find.text('Nothing in the queue')),
       ).colorScheme;
-      expect(scheme.primary, themePresetFor('bissap').accent);
+      expect(scheme.primary, establishmentThemePresetFor('bissap').accent);
     });
 
     testWidgets('but the chrome around it does not', (tester) async {
@@ -2418,7 +2418,7 @@ void main() {
     testWidgets('all five presets are offered', (tester) async {
       await openBranding(tester);
 
-      for (final preset in themePresets) {
+      for (final preset in establishmentThemePresets) {
         expect(find.text(preset.name), findsOneWidget, reason: preset.key);
       }
     });
@@ -2450,7 +2450,7 @@ void main() {
       // Preview re-themed, and nothing sent yet.
       final previewScheme =
           Theme.of(tester.element(find.text('Open until 02:00'))).colorScheme;
-      expect(previewScheme.primary, themePresetFor('bissap').accent);
+      expect(previewScheme.primary, establishmentThemePresetFor('bissap').accent);
       expect(backend.requests.where((r) => r.method == 'PATCH'), isEmpty);
       expect(find.text('Save branding'), findsOneWidget);
     });
@@ -2531,7 +2531,7 @@ void main() {
       // The screen around the preview is the app's, not the venue's.
       final chrome =
           Theme.of(tester.element(find.text('Branding').first)).colorScheme;
-      expect(chrome.primary, isNot(themePresetFor('bissap').accent));
+      expect(chrome.primary, isNot(establishmentThemePresetFor('bissap').accent));
     });
   });
 
@@ -5430,7 +5430,7 @@ void main() {
       final scheme = Theme.of(
         tester.element(find.text('Nothing in the queue')),
       ).colorScheme;
-      expect(scheme.primary, themePresetFor('ember').accent);
+      expect(scheme.primary, establishmentThemePresetFor('ember').accent);
     });
   });
 

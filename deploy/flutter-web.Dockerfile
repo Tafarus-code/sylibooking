@@ -62,6 +62,22 @@ RUN set -e; \
             echo "  got: '$API_BASE_URL'"; \
             echo "  request paths already begin with one."; \
             exit 1 ;; \
+    esac; \
+    # And the third shape of quiet wrong: the bare host, with the path left
+    # off. Django mounts the whole API under /api/ (config/urls.py), so a
+    # host-only base sends every call one level too high — /auth/login/
+    # instead of /api/auth/login/ — and each returns a 404 *page*, which the
+    # app then has to show somebody. Nothing here is served from the root, so
+    # there is no build for which a bare host is right.
+    host_and_path="${API_BASE_URL#*://}"; \
+    case "$host_and_path" in \
+        */*) ;; \
+        *) \
+            echo "API_BASE_URL is missing its path"; \
+            echo "  got:  '$API_BASE_URL'"; \
+            echo "  want: '$API_BASE_URL/api'"; \
+            echo "  the API is mounted under /api/, so a bare host 404s."; \
+            exit 1 ;; \
     esac
 
 WORKDIR /src

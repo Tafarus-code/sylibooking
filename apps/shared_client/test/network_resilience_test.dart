@@ -285,4 +285,59 @@ void main() {
       }
     });
   });
+
+  group('an answer that is not the API', () {
+    /// A base URL pointing at the wrong host is answered by whatever *is*
+    /// there, and what is there serves HTML. The app has to say something
+    /// about it, and a 404 page is not that something.
+    http.Client servingHtml(int status) => MockClient((request) async =>
+        http.Response(
+          '<!doctype html>\n<html><head><title>Not Found</title></head>'
+          '<body><h1>Not Found</h1><p>The requested resource was not found '
+          'on this server.</p></body></html>',
+          status,
+          headers: {'content-type': 'text/html; charset=utf-8'},
+        ));
+
+    test('an HTML error page is never shown to the user', () async {
+      try {
+        await SylibookingApi(
+          baseUrl: 'http://localhost:8000/api',
+          httpClient: servingHtml(404),
+        ).establishments();
+        fail('expected an ApiException');
+      } on ApiException catch (e) {
+        expect(e.message, isNot(contains('<')));
+        expect(e.message, isNot(contains('doctype')));
+      }
+    });
+
+    test('and what it says points at the cause', () async {
+      try {
+        await SylibookingApi(
+          baseUrl: 'http://localhost:8000/api',
+          httpClient: servingHtml(404),
+        ).establishments();
+        fail('expected an ApiException');
+      } on ApiException catch (e) {
+        expect(e.message, contains('API base URL'));
+        expect(e.message, contains('404'));
+      }
+    });
+
+    test('a JSON body is still passed through unchanged', () async {
+      // The guard must key on the body being markup, not on the status.
+      final transport = FlakyTransport(
+        status: 404,
+        body: {'detail': 'No Establishment matches the given query.'},
+      );
+
+      try {
+        await apiFor(transport).establishments();
+        fail('expected an ApiException');
+      } on ApiException catch (e) {
+        expect(e.message, 'No Establishment matches the given query.');
+      }
+    });
+  });
 }

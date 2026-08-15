@@ -52,11 +52,34 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 #
 # Appended rather than replacing ALLOWED_HOSTS: a custom domain still has to be
 # listed deliberately.
-for _platform_host in (
+_platform_hosts = [
     config('RAILWAY_PUBLIC_DOMAIN', default=''),
     config('RAILWAY_PRIVATE_DOMAIN', default=''),
     'healthcheck.railway.app',
+]
+
+# On Railway, trust the platform's own domains as a family rather than by
+# name.
+#
+# RAILWAY_PUBLIC_DOMAIN is documented but is not always in the process
+# environment — notably when a domain is generated after the container
+# started. The result is a service whose health check passes (that host is
+# named above) and whose public domain answers 400 to every request, which
+# reads as a broken deploy rather than a missing variable.
+#
+# The leading dot is Django's subdomain wildcard, so this covers
+# <anything>.up.railway.app. What it gives up is host-header pinning against
+# other Railway subdomains, which is worth having only if a forged Host can
+# reach something — and it cannot here: password resets send a code rather
+# than a link, so no email or SMS is built from the request's host.
+#
+# A custom domain still has to be listed in ALLOWED_HOSTS deliberately.
+if config('RAILWAY_ENVIRONMENT', default='') or config(
+    'RAILWAY_PROJECT_ID', default=''
 ):
+    _platform_hosts.append('.railway.app')
+
+for _platform_host in _platform_hosts:
     if _platform_host and _platform_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_platform_host)
 
@@ -66,6 +89,15 @@ if _railway_domain := config('RAILWAY_PUBLIC_DOMAIN', default=''):
     _railway_origin = f'https://{_railway_domain}'
     if _railway_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_railway_origin)
+
+# And the same family, for the same reason. Without this /admin/ presents a
+# login form and then refuses the POST with "CSRF verification failed",
+# which is the next thing somebody meets after the 400 above is fixed.
+if config('RAILWAY_ENVIRONMENT', default='') or config(
+    'RAILWAY_PROJECT_ID', default=''
+):
+    if 'https://*.railway.app' not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append('https://*.railway.app')
 
 
 # Application definition

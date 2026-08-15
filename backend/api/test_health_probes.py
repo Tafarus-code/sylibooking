@@ -52,3 +52,31 @@ class HealthProbeTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+
+
+class PlatformHostTests(TestCase):
+    """A generated domain has to work without anybody setting a variable.
+
+    `RAILWAY_PUBLIC_DOMAIN` is documented but is not always in the process
+    environment — notably when the domain is created after the container
+    started. The symptom is a service whose health check passes and whose
+    public URL answers 400 to everything, which reads as a broken deploy
+    rather than a missing variable.
+    """
+
+    @override_settings(ALLOWED_HOSTS=['.railway.app'])
+    def test_a_generated_railway_domain_is_accepted(self):
+        response = self.client.get(
+            reverse('health'), HTTP_HOST='api-dev-b806.up.railway.app'
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(ALLOWED_HOSTS=['.railway.app'])
+    def test_the_wildcard_does_not_admit_anything_else(self):
+        """A family, not a hole: an unrelated host is still refused."""
+        response = self.client.get(
+            reverse('health'), HTTP_HOST='not-railway.example.com'
+        )
+
+        self.assertEqual(response.status_code, 400)

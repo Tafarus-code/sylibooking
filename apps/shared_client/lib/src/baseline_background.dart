@@ -22,26 +22,38 @@ import 'package:flutter/material.dart';
 
 import 'baseline_theme.dart';
 
-/// The customer app's canvas. Palette: Bissap Bloom.
+/// The customer app's canvas. Palette: Ember Vivid — "golden hour".
+///
+/// The darkened version, not the first near-white draft: at the lighter
+/// weight the ivory cards had nothing to sit against and the whole screen
+/// read as one surface.
+///
+/// **Light on purpose.** Everything the customer app paints on top of this is
+/// dark — [CustomerBaselineTokens.deepwood] at 11.00:1 on the ground, and
+/// better on the two lighter gradient stops. That relationship is asserted in
+/// `contrast_test.dart` rather than left to hold by luck, which is exactly
+/// how the merchant canvas came to be unreadable.
 class CustomerBaselineBackground extends StatelessWidget {
   const CustomerBaselineBackground({super.key});
 
   /// The flat ground under every layer.
-  static const ground = Color(0xFFE6BFD3);
+  static const ground = Color(0xFFE9D6AE);
 
   /// The three stops of the base linear gradient, at 0%, 50% and 100%.
   static const gradientStops = <Color>[
-    Color(0xFFEFD3E0),
-    Color(0xFFE6BFD3),
-    Color(0xFFD9A3C1),
+    Color(0xFFF2E4C4),
+    Color(0xFFE9D6AE),
+    Color(0xFFDDC594),
   ];
+
+  /// The darkest thing the canvas can be, for anything checking legibility
+  /// against the worst case rather than the average one.
+  static const darkestStop = Color(0xFFDDC594);
 
   @override
   Widget build(BuildContext context) => const RepaintBoundary(
         child: CustomPaint(
           painter: _CustomerCanvasPainter(),
-          // Fills whatever it is given; the Stack in the app builder gives it
-          // the whole window.
           child: SizedBox.expand(),
         ),
       );
@@ -139,26 +151,29 @@ class _CustomerCanvasPainter extends CustomPainter {
 
     canvas.drawRect(rect, Paint()..color = CustomerBaselineBackground.ground);
 
-    // CSS lists layers top-first, so the linear gradient — written last —
-    // is the one painted first here.
     canvas.drawRect(
       rect,
       Paint()
         ..shader = const LinearGradient(
-          // 170deg in CSS: almost straight down, leaning slightly right.
-          begin: Alignment(-0.17, -1),
-          end: Alignment(0.17, 1),
+          // Late afternoon: the light falls from the top, a little to one
+          // side, and the bottom of the screen is where the shadow gathers.
+          begin: Alignment(-0.2, -1),
+          end: Alignment(0.2, 1),
           colors: CustomerBaselineBackground.gradientStops,
           stops: [0.0, 0.5, 1.0],
         ).createShader(rect),
     );
 
-    _paintDots(canvas, size, const Color(0x143B1230), 5);
+    // Paper grain. Deepwood at a twentieth, which is a texture rather than a
+    // tint — at full strength it would eat into the contrast the cards need.
+    _paintDots(canvas, size, const Color(0x0D12271F), 5);
 
+    // The amber glow above, the two counterpoints below. Painted in reverse
+    // of how the CSS lists them, so the ember is the layer nearest the eye.
     _paintGlows(canvas, size, const [
-      _Glow(0.04, 0.90, Color(0x2E3B1230), 0.38),
-      _Glow(0.92, 0.80, Color(0x38E8B23D), 0.40),
-      _Glow(0.50, -0.08, Color(0x4DD6296B), 0.46),
+      _Glow(0.06, 0.92, Color(0x1FA8453A), 0.38),
+      _Glow(0.94, 0.78, Color(0x243E8A63), 0.40),
+      _Glow(0.50, -0.06, Color(0x4DD98E2B), 0.48),
     ]);
   }
 
@@ -247,7 +262,7 @@ class FrostedPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final veil = tint ??
-        CustomerBaselineTokens.blush.withValues(alpha: 0.72);
+        CustomerBaselineTokens.ivory.withValues(alpha: 0.82);
 
     return ClipRRect(
       borderRadius: borderRadius,

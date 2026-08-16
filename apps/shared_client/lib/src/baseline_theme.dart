@@ -1,25 +1,36 @@
 /// The app-wide baseline themes — one per app.
 ///
-/// **These are not the establishment presets, and the names collide on
-/// purpose-adjacent ground, so read this once.** There are two theming
-/// systems in this codebase and they answer different questions:
+/// **These are not the establishment presets, so read this once.** There are
+/// two theming systems here and they answer different questions:
 ///
 /// * A **baseline** is what an app looks like everywhere — its chrome, its
-///   empty states, its settings screens. The customer app's baseline is the
-///   palette called *Bissap Bloom*; the merchant app's is *Indigo Ledger*.
-///   Neither is chosen by anybody at runtime; they are the products' faces.
+///   empty states, its settings screens. The customer app's is *Ember Vivid*,
+///   the merchant app's is *Indigo Ledger*. Neither is chosen by anybody at
+///   runtime; they are the products' faces.
 /// * An **establishment preset** is what one merchant picks for their own
-///   venue's pages, from a fixed set of five. Two of those five happen to be
-///   called "Bissap" and "Indigo Soir" — different values, different system,
-///   and they live in `establishment_theme.dart` as
-///   [EstablishmentThemePreset].
+///   venue's pages, from a fixed set of five. They live in
+///   `establishment_theme.dart` as [EstablishmentThemePreset].
 ///
-/// So: `CustomerBaselineTokens.bissap` is the customer app's primary accent,
-/// and the preset with key `bissap` is a hibiscus red one venue may wear.
-/// Nothing in this file is named plain `Bissap` or `Indigo` on its own, and
-/// nothing in the preset file is named `Baseline`. If you are reaching for a
-/// colour and the word "baseline" is not in the name, you are in the venue
-/// branding system rather than the app's own look.
+/// The names still shade into each other in two places, both harmless once
+/// seen. The preset keyed `ember` carries the same accent as the customer
+/// baseline, because the house colour is also offered to venues; the preset
+/// keyed `indigo_soir` is a *different* indigo from the merchant baseline's.
+/// The rule that keeps them apart is naming: everything here says
+/// `Baseline`, nothing in the preset file does.
+///
+/// ## The pairing rule, which is the point of this file
+///
+/// Every colour that text is painted on has its foreground named beside it,
+/// and both are asserted in `contrast_test.dart`. Nothing here relies on a
+/// `ColorScheme` inferring a foreground.
+///
+/// This is not tidiness. A transparent scaffold over a *dark* canvas, with a
+/// light scheme underneath it, renders inherited body text at 1.14:1 — and
+/// where the canvas gradient meets the scheme's own `onSurface`, at 1.00:1,
+/// which is invisible. That shipped in the merchant app. It was latent in the
+/// customer app at the same time and merely happened to look fine, because
+/// that canvas was light. An inherited colour that renders acceptably today
+/// is the same bug either way.
 ///
 /// Both mirror the `app_baselines` block of `design/theme_presets.json`; a
 /// test compares them value for value so the two cannot drift.
@@ -28,40 +39,77 @@ library;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// The customer app's own look. Palette: Bissap Bloom.
+/// The customer app's own look. Palette: Ember Vivid.
+///
+/// **A revert.** Bissap Bloom replaced these and could not be read; this is
+/// where the app was before that, plus [hibiscus], which is new and narrow —
+/// favourites and rating stars, nothing else.
+///
+/// Every value here is half of a stated pair. There is no colour in this
+/// class that is meant to be combined with whatever a `ColorScheme` would
+/// infer: if text goes on it, its `on` colour is named next to it and the
+/// contrast is asserted in `contrast_test.dart`. That discipline is the
+/// actual fix — the palette was never the whole problem.
 class CustomerBaselineTokens {
   const CustomerBaselineTokens._();
 
-  /// The name of the palette, for documentation and design review. Never a
-  /// runtime identifier — see the library comment for why.
-  static const paletteName = 'Bissap Bloom';
+  static const paletteName = 'Ember Vivid';
 
-  /// Deep base. App bars, the dark band at the top of a phone held at night.
-  static const aubergine = Color(0xFF3B1230);
+  // --- Chrome. Dark surfaces; light text on them, always stated. ----------
 
-  /// Primary accent: CTAs, active states, the filled favourite heart.
-  static const bissap = Color(0xFFD6296B);
+  /// The app bar and any band at the top of a phone held at night.
+  static const deepwood = Color(0xFF12271F);
+  static const deepwoodSoft = Color(0xFF1B362A);
 
-  /// Secondary accent: stars and highlights.
-  static const gold = Color(0xFFE8B23D);
+  /// What goes on either of the two above. 13.97:1 on deepwood.
+  static const onDeepwood = Color(0xFFF7F1E4);
 
-  /// Mid-tone, for gradients and borders — and the one to reach for when an
-  /// accent has to carry *small text* on a light surface. See the contrast
-  /// note at the foot of this file.
-  static const pruneClair = Color(0xFF7A2E5C);
+  // --- Content surfaces. Light; dark text on them, always stated. ---------
 
-  /// Light content surface: cards and sheets.
-  static const blush = Color(0xFFFBF2EC);
+  /// Cards and sheets.
+  static const ivory = Color(0xFFF7F1E4);
+  static const ivoryDim = Color(0xFFCFC7B3);
 
-  /// White, at 4.79:1 against [bissap]. [blush] measures 4.33:1 and is under
-  /// the 4.5 floor for normal text, which is what a CTA label is.
-  static const onBissap = Color(0xFFFFFFFF);
-  static const onGold = aubergine;
-  static const onPruneClair = blush;
-  static const onAubergine = blush;
-  static const onBlush = aubergine;
+  /// What goes on ivory. 15.34:1.
+  static const onIvory = Color(0xFF1B1B18);
 
-  static const displayFont = 'Playfair Display';
+  // --- Accents. -----------------------------------------------------------
+
+  /// Primary accent: CTAs, active states.
+  static const ember = Color(0xFFD98E2B);
+
+  /// 5.40:1 on ember. Not white, which measures 2.67 and fails outright.
+  static const onEmber = Color(0xFF3B2508);
+
+  /// Ember dark enough to be read as text on ivory: 5.14:1, where ember
+  /// itself measures 2.38 and cannot be written with at all.
+  static const emberDim = Color(0xFF8A5C1C);
+
+  /// Secondary accent, for fills.
+  ///
+  /// **Large or bold text only.** Nothing clears 4.5:1 against palm — white
+  /// measures 4.18 and deepwood 3.76, because palm sits in the middle of the
+  /// luminance range. 4.18 is over the 3:1 floor that a bold button label
+  /// needs and under the one body copy needs, so palm fills buttons and
+  /// [palmDeep] carries anything smaller.
+  static const palm = Color(0xFF3E8A63);
+  static const onPalm = Color(0xFFFFFFFF);
+
+  /// The same green, dark enough for body text: 6.47:1 with white on it, and
+  /// 5.75:1 when written in on ivory.
+  static const palmDeep = Color(0xFF1F6B44);
+  static const onPalmDeep = Color(0xFFFFFFFF);
+
+  /// **Favourites and rating stars only.** The one addition to the reverted
+  /// palette, and deliberately not a general-purpose accent: a heart and a
+  /// row of stars are the two things a customer looks for rather than reads.
+  static const hibiscus = Color(0xFFD6396B);
+
+  /// 4.51:1 — over the body floor, but only just, so hibiscus is not a
+  /// surface anything long is set on.
+  static const onHibiscus = Color(0xFFFFFFFF);
+
+  static const displayFont = 'Fraunces';
   static const bodyFont = 'Manrope';
   static const monoFont = 'IBM Plex Mono';
 }
@@ -107,27 +155,32 @@ class MerchantBaselineTokens {
 
 /// The colour half of the customer baseline, pure so it can be asserted
 /// without a font stack — the same split the rest of the theming uses.
+///
+/// Every `on` role is a named token rather than something Material derived.
+/// A scheme that infers its own foregrounds is how a dark-on-dark pairing
+/// gets shipped: nothing warns, because nothing was ever asked.
 ColorScheme customerBaselineColorScheme() => const ColorScheme.light(
-      primary: CustomerBaselineTokens.bissap,
-      onPrimary: CustomerBaselineTokens.onBissap,
-      primaryContainer: CustomerBaselineTokens.aubergine,
-      onPrimaryContainer: CustomerBaselineTokens.onAubergine,
-      secondary: CustomerBaselineTokens.gold,
-      onSecondary: CustomerBaselineTokens.onGold,
-      secondaryContainer: CustomerBaselineTokens.pruneClair,
-      onSecondaryContainer: CustomerBaselineTokens.onPruneClair,
-      tertiary: CustomerBaselineTokens.pruneClair,
-      onTertiary: CustomerBaselineTokens.onPruneClair,
-      surface: CustomerBaselineTokens.blush,
-      onSurface: CustomerBaselineTokens.onBlush,
-      // A shade off the surface, for a card that has to sit on a card.
-      surfaceContainerHighest: Color(0xFFF2E4DC),
-      // 5.85:1 on blush. Secondary copy is still copy.
-      onSurfaceVariant: Color(0xFF6E5866),
-      // 3.19:1 on blush, over the AA floor for a boundary — which is all an
-      // outlined chip is.
-      outline: Color(0xFF9A8290),
-      outlineVariant: Color(0xFFE4D2D9),
+      primary: CustomerBaselineTokens.ember,
+      onPrimary: CustomerBaselineTokens.onEmber,
+      primaryContainer: CustomerBaselineTokens.deepwood,
+      onPrimaryContainer: CustomerBaselineTokens.onDeepwood,
+      secondary: CustomerBaselineTokens.palm,
+      onSecondary: CustomerBaselineTokens.onPalm,
+      secondaryContainer: CustomerBaselineTokens.deepwoodSoft,
+      onSecondaryContainer: CustomerBaselineTokens.onDeepwood,
+      tertiary: CustomerBaselineTokens.palmDeep,
+      onTertiary: CustomerBaselineTokens.onPalmDeep,
+      tertiaryContainer: CustomerBaselineTokens.ivoryDim,
+      onTertiaryContainer: CustomerBaselineTokens.onIvory,
+      surface: CustomerBaselineTokens.ivory,
+      onSurface: CustomerBaselineTokens.onIvory,
+      surfaceContainerHighest: CustomerBaselineTokens.ivoryDim,
+      // 6.42:1 on ivory.
+      onSurfaceVariant: Color(0xFF4A5B51),
+      // 3.02:1 on ivory — the floor for a boundary, which is all an outlined
+      // chip is.
+      outline: Color(0xFF7F8F85),
+      outlineVariant: CustomerBaselineTokens.ivoryDim,
       error: Color(0xFF9A2B2B),
       onError: Color(0xFFFFFFFF),
       errorContainer: Color(0xFFF7DEDE),
@@ -267,21 +320,21 @@ ThemeData _baselineTheme({
   );
 }
 
-/// The customer app's baseline theme. Palette: Bissap Bloom.
+/// The customer app's baseline theme. Palette: Ember Vivid.
 ///
-/// The app bar wears aubergine: it is the top of a phone held in one hand at
-/// night, and the dark band is what makes the blush list below it read as the
+/// The app bar wears deepwood: it is the top of a phone held in one hand at
+/// night, and the dark band is what makes the ivory list below it read as the
 /// content rather than as more chrome.
 ThemeData customerBaselineTheme() => _baselineTheme(
       scheme: customerBaselineColorScheme(),
       displayFont: CustomerBaselineTokens.displayFont,
       bodyFont: CustomerBaselineTokens.bodyFont,
-      appBarBackground: CustomerBaselineTokens.aubergine,
-      appBarForeground: CustomerBaselineTokens.onAubergine,
-      railBackground: CustomerBaselineTokens.blush,
-      railIndicator: CustomerBaselineTokens.bissap,
-      railSelected: CustomerBaselineTokens.onBissap,
-      railUnselected: CustomerBaselineTokens.pruneClair,
+      appBarBackground: CustomerBaselineTokens.deepwood,
+      appBarForeground: CustomerBaselineTokens.onDeepwood,
+      railBackground: CustomerBaselineTokens.ivory,
+      railIndicator: CustomerBaselineTokens.ember,
+      railSelected: CustomerBaselineTokens.onEmber,
+      railUnselected: CustomerBaselineTokens.onIvory,
     );
 
 /// The merchant app's baseline theme. Palette: Indigo Ledger.
@@ -310,17 +363,22 @@ ThemeData merchantBaselineTheme() => _baselineTheme(
 // copy of it would be two functions with one behaviour.
 
 // ---------------------------------------------------------------------------
-// Contrast notes, measured rather than assumed. Tests assert all of these.
+// Contrast notes, measured rather than assumed. contrast_test.dart asserts
+// every one of these against the surface it is actually painted on.
 //
-// Two accents cannot carry small text on their own app's light surface, and
-// both have a stand-in that can:
+// Customer — Ember Vivid:
+//   onDeepwood on deepwood   13.97   chrome
+//   onIvory on ivory         15.34   cards
+//   onEmber on ember          5.40   primary fill
+//   onPalm on palm            4.18   large/bold labels only
+//   onPalmDeep on palmDeep    6.47   anything smaller
+//   onHibiscus on hibiscus    4.51   favourites and stars
+//   deepwood on the canvas   11.00   text painted straight on the ground
 //
-//   bissap on blush      4.33:1   fills and large text only → use pruneClair
-//   pruneClair on blush  8.01:1
-//   copper on parchment  2.90:1   fills only → use slateBlue
-//   slateBlue on parchment 6.27:1
+// Two accents cannot be written *in* on ivory, and have stand-ins that can:
+//   ember on ivory     2.38  ->  emberDim  5.14
+//   palm on ivory      3.72  ->  palmDeep  5.75
 //
-// This is why pruneClair and slateBlue are the secondary/tertiary roles in
-// their schemes rather than decoration: they are the readable half of each
-// palette, and a price or a link set in the primary accent would fail AA.
+// Merchant — Indigo Ledger: see the merchant tokens above, and note that
+// indigo is chrome only. Text is never left to inherit onto it.
 // ---------------------------------------------------------------------------

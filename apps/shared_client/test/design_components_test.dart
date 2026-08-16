@@ -174,7 +174,7 @@ void main() {
         return material.color;
       }
 
-      expect(fillUnder('Commandes'), CustomerBaselineTokens.bissap);
+      expect(fillUnder('Commandes'), CustomerBaselineTokens.ember);
       expect(fillUnder('Réservations'), Colors.transparent);
     });
 
@@ -197,7 +197,7 @@ void main() {
           .ancestor(
             of: find.text('Réservations'),
             matching: find.byWidgetPredicate(
-              (w) => w is Material && w.color == CustomerBaselineTokens.bissap,
+              (w) => w is Material && w.color == CustomerBaselineTokens.ember,
             ),
           )
           .first;
@@ -206,7 +206,7 @@ void main() {
             w is Container &&
             w.decoration is BoxDecoration &&
             (w.decoration! as BoxDecoration).color ==
-                CustomerBaselineTokens.pruneClair,
+                CustomerBaselineTokens.palmDeep,
       );
 
       // The accent Material is a descendant of the dark pill, so it paints

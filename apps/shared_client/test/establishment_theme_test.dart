@@ -246,11 +246,11 @@ void main() {
       }
     });
 
-    test('the two colliding names stay four different colours', () {
-      // The whole reason for the rename, stated as values. Nothing here may
-      // ever be equal to anything else here.
+    test('the names that still shade into each other stay distinct', () {
+      // Hibiscus is the customer app's new accent and is not the preset
+      // called Bissap; the merchant indigo is not the preset Indigo Soir.
       final colours = <String, Color>{
-        'customer baseline bissap': CustomerBaselineTokens.bissap,
+        'customer baseline hibiscus': CustomerBaselineTokens.hibiscus,
         'venue preset bissap': establishmentThemePresetFor('bissap').accent,
         'merchant baseline indigo': MerchantBaselineTokens.indigo,
         'venue preset indigo_soir':
@@ -269,15 +269,23 @@ void main() {
       expect(overCustomer.primary, overMerchant.primary);
     });
 
-    test('no preset accent is a baseline colour', () {
-      // Restated here, next to the scoping rules, because this is the file
-      // somebody reads when they wonder whether the systems overlap.
-      final baselineColours = <Color>{
-        CustomerBaselineTokens.aubergine,
-        CustomerBaselineTokens.bissap,
-        CustomerBaselineTokens.gold,
-        CustomerBaselineTokens.pruneClair,
-        CustomerBaselineTokens.blush,
+    test('sharing a colour is not sharing a mechanism', () {
+      // The customer baseline and the preset keyed 'ember' are the same
+      // orange, on purpose. What has to stay true is that a venue wearing a
+      // *different* preset still overrides the chrome.
+      expect(
+        CustomerBaselineTokens.ember,
+        establishmentThemePresetFor('ember').accent,
+      );
+
+      final overCustomer =
+          scoped(customerBaselineColorScheme(), 'palm_night').primary;
+      expect(overCustomer, establishmentThemePresetFor('palm_night').accent);
+      expect(overCustomer, isNot(CustomerBaselineTokens.ember));
+    });
+
+    test('no preset accent is a merchant baseline colour', () {
+      final merchantColours = <Color>{
         MerchantBaselineTokens.indigo,
         MerchantBaselineTokens.copper,
         MerchantBaselineTokens.slateBlue,
@@ -286,13 +294,13 @@ void main() {
       };
 
       for (final preset in establishmentThemePresets) {
-        expect(baselineColours, isNot(contains(preset.accent)));
+        expect(merchantColours, isNot(contains(preset.accent)));
       }
     });
   });
 
   group('nothing is still wearing Ember', () {
-    test('neither baseline shares a colour with the old house style', () {
+    test('the merchant baseline shares nothing with the house style', () {
       final ember = <Color>{
         SylibookingTokens.deepwood,
         SylibookingTokens.deepwoodSoft,
@@ -303,11 +311,6 @@ void main() {
       };
 
       for (final colour in <Color>[
-        CustomerBaselineTokens.aubergine,
-        CustomerBaselineTokens.bissap,
-        CustomerBaselineTokens.gold,
-        CustomerBaselineTokens.pruneClair,
-        CustomerBaselineTokens.blush,
         MerchantBaselineTokens.indigo,
         MerchantBaselineTokens.copper,
         MerchantBaselineTokens.slateBlue,
@@ -316,6 +319,12 @@ void main() {
       ]) {
         expect(ember, isNot(contains(colour)));
       }
+    });
+
+    test('and the customer baseline is the house style, deliberately', () {
+      expect(CustomerBaselineTokens.ember, SylibookingTokens.ember);
+      expect(CustomerBaselineTokens.deepwood, SylibookingTokens.deepwood);
+      expect(CustomerBaselineTokens.ivory, SylibookingTokens.ivory);
     });
 
     test('the ember preset is untouched, because it is a venue choice', () {

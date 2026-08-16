@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 /// A 1-5 rating, read-only.
 ///
@@ -30,7 +31,9 @@ class RatingStars extends StatelessWidget {
             Icon(
               star <= rounded ? Icons.star : Icons.star_border,
               size: size,
-              color: theme.colorScheme.tertiary,
+              // Hibiscus, not a scheme role. It is one of exactly two places
+              // this colour appears — see CustomerBaselineTokens.hibiscus.
+              color: CustomerBaselineTokens.hibiscus,
             ),
           if (showNumber) ...[
             const SizedBox(width: 6),
@@ -62,8 +65,6 @@ class RatingPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -74,7 +75,7 @@ class RatingPicker extends StatelessWidget {
             tooltip: '$star ${star == 1 ? "star" : "stars"}',
             icon: Icon(
               star <= value ? Icons.star : Icons.star_border,
-              color: theme.colorScheme.tertiary,
+              color: CustomerBaselineTokens.hibiscus,
             ),
           ),
       ],

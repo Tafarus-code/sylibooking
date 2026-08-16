@@ -2,9 +2,10 @@
 ///
 /// Half of this file exists for one reason: there are now two theming systems
 /// whose names nearly collide, and the tests that matter most are the ones
-/// proving they are different things. "Bissap Bloom" is the customer app's
-/// whole look; "bissap" is one accent a merchant may pick for their venue.
-/// Confusing them would recolour every venue in Guinea by accident.
+/// proving they are different things. "Ember Vivid" is the customer app's
+/// whole look; the preset keyed "ember" is one accent a merchant may pick for
+/// their venue, and it happens to share the house accent. Confusing the two
+/// systems would recolour every venue in Guinea by accident.
 ///
 /// The rest asserts the locked values and the contrast floors, because a
 /// palette signed off in a browser is not a palette until something measures
@@ -49,9 +50,9 @@ Map<String, dynamic> _baselines() {
   return json['app_baselines'] as Map<String, dynamic>;
 }
 
-/// google_fonts resolves 'Playfair Display' to a family with no space in it,
-/// so a `contains('Playfair Display')` would fail against a theme that is
-/// perfectly correct. Compare on the same footing the library uses.
+/// google_fonts drops spaces from family names, so a multi-word design name
+/// would fail a `contains` against a theme that is perfectly correct. Compare
+/// on the same footing the library uses.
 String _family(String name) => name.replaceAll(' ', '');
 
 void main() {
@@ -62,19 +63,24 @@ void main() {
       final customer = _baselines()['customer'] as Map<String, dynamic>;
 
       expect(CustomerBaselineTokens.paletteName, customer['palette_name']);
-      expect(_hex(CustomerBaselineTokens.aubergine), customer['aubergine']);
-      expect(_hex(CustomerBaselineTokens.bissap), customer['bissap']);
-      expect(_hex(CustomerBaselineTokens.gold), customer['gold']);
-      expect(_hex(CustomerBaselineTokens.pruneClair), customer['prune_clair']);
-      expect(_hex(CustomerBaselineTokens.blush), customer['blush']);
-      expect(_hex(CustomerBaselineTokens.onBissap), customer['on_bissap']);
-      expect(_hex(CustomerBaselineTokens.onGold), customer['on_gold']);
+      expect(_hex(CustomerBaselineTokens.deepwood), customer['deepwood']);
       expect(
-        _hex(CustomerBaselineTokens.onPruneClair),
-        customer['on_prune_clair'],
+        _hex(CustomerBaselineTokens.deepwoodSoft),
+        customer['deepwood_soft'],
       );
-      expect(_hex(CustomerBaselineTokens.onAubergine), customer['on_aubergine']);
-      expect(_hex(CustomerBaselineTokens.onBlush), customer['on_blush']);
+      expect(_hex(CustomerBaselineTokens.ember), customer['ember']);
+      expect(_hex(CustomerBaselineTokens.emberDim), customer['ember_dim']);
+      expect(_hex(CustomerBaselineTokens.palm), customer['palm']);
+      expect(_hex(CustomerBaselineTokens.palmDeep), customer['palm_deep']);
+      expect(_hex(CustomerBaselineTokens.ivory), customer['ivory']);
+      expect(_hex(CustomerBaselineTokens.ivoryDim), customer['ivory_dim']);
+      expect(_hex(CustomerBaselineTokens.hibiscus), customer['hibiscus']);
+      expect(_hex(CustomerBaselineTokens.onDeepwood), customer['on_deepwood']);
+      expect(_hex(CustomerBaselineTokens.onEmber), customer['on_ember']);
+      expect(_hex(CustomerBaselineTokens.onPalm), customer['on_palm']);
+      expect(_hex(CustomerBaselineTokens.onPalmDeep), customer['on_palm_deep']);
+      expect(_hex(CustomerBaselineTokens.onIvory), customer['on_ivory']);
+      expect(_hex(CustomerBaselineTokens.onHibiscus), customer['on_hibiscus']);
     });
 
     test('every merchant colour is the same on both sides', () {
@@ -111,12 +117,25 @@ void main() {
   });
 
   group('the locked palette values', () {
-    test('the customer palette is Bissap Bloom, exactly', () {
-      expect(_hex(CustomerBaselineTokens.aubergine), '#3B1230');
-      expect(_hex(CustomerBaselineTokens.bissap), '#D6296B');
-      expect(_hex(CustomerBaselineTokens.gold), '#E8B23D');
-      expect(_hex(CustomerBaselineTokens.pruneClair), '#7A2E5C');
-      expect(_hex(CustomerBaselineTokens.blush), '#FBF2EC');
+    test('the customer palette is Ember Vivid, exactly', () {
+      expect(_hex(CustomerBaselineTokens.deepwood), '#12271F');
+      expect(_hex(CustomerBaselineTokens.ember), '#D98E2B');
+      expect(_hex(CustomerBaselineTokens.palm), '#3E8A63');
+      expect(_hex(CustomerBaselineTokens.ivory), '#F7F1E4');
+      expect(_hex(CustomerBaselineTokens.hibiscus), '#D6396B');
+    });
+
+    test('and is the palette the app shipped with before Bissap Bloom', () {
+      // A revert, so the four reverted values are the house style's own. The
+      // preset keyed 'ember' shares the accent, which is the house colour
+      // being offered to venues rather than a collision.
+      expect(CustomerBaselineTokens.ember, SylibookingTokens.ember);
+      expect(CustomerBaselineTokens.deepwood, SylibookingTokens.deepwood);
+      expect(CustomerBaselineTokens.ivory, SylibookingTokens.ivory);
+      expect(
+        establishmentThemePresetFor('ember').accent,
+        CustomerBaselineTokens.ember,
+      );
     });
 
     test('the merchant palette is Indigo Ledger, exactly', () {
@@ -129,14 +148,15 @@ void main() {
   });
 
   group('the colour schemes carry the palette', () {
-    test('the customer scheme leads with bissap on blush', () {
+    test('the customer scheme leads with ember on ivory', () {
       final scheme = customerBaselineColorScheme();
 
-      expect(scheme.primary, CustomerBaselineTokens.bissap);
-      expect(scheme.onPrimary, CustomerBaselineTokens.onBissap);
-      expect(scheme.secondary, CustomerBaselineTokens.gold);
-      expect(scheme.surface, CustomerBaselineTokens.blush);
-      expect(scheme.onSurface, CustomerBaselineTokens.aubergine);
+      expect(scheme.primary, CustomerBaselineTokens.ember);
+      expect(scheme.onPrimary, CustomerBaselineTokens.onEmber);
+      expect(scheme.secondary, CustomerBaselineTokens.palm);
+      expect(scheme.onSecondary, CustomerBaselineTokens.onPalm);
+      expect(scheme.surface, CustomerBaselineTokens.ivory);
+      expect(scheme.onSurface, CustomerBaselineTokens.onIvory);
     });
 
     test('the merchant scheme leads with copper on parchment', () {
@@ -161,25 +181,25 @@ void main() {
   group('contrast, measured against the surface each colour sits on', () {
     test('every on-colour clears AA for normal text', () {
       final pairs = <String, List<Color>>{
-        'onBissap/bissap': [
-          CustomerBaselineTokens.onBissap,
-          CustomerBaselineTokens.bissap,
+        'onEmber/ember': [
+          CustomerBaselineTokens.onEmber,
+          CustomerBaselineTokens.ember,
         ],
-        'onGold/gold': [
-          CustomerBaselineTokens.onGold,
-          CustomerBaselineTokens.gold,
+        'onPalm/palm': [
+          CustomerBaselineTokens.onPalm,
+          CustomerBaselineTokens.palm,
         ],
-        'onPruneClair/pruneClair': [
-          CustomerBaselineTokens.onPruneClair,
-          CustomerBaselineTokens.pruneClair,
+        'onPalmDeep/palmDeep': [
+          CustomerBaselineTokens.onPalmDeep,
+          CustomerBaselineTokens.palmDeep,
         ],
-        'onBlush/blush': [
-          CustomerBaselineTokens.onBlush,
-          CustomerBaselineTokens.blush,
+        'onIvory/ivory': [
+          CustomerBaselineTokens.onIvory,
+          CustomerBaselineTokens.ivory,
         ],
-        'onAubergine/aubergine': [
-          CustomerBaselineTokens.onAubergine,
-          CustomerBaselineTokens.aubergine,
+        'onDeepwood/deepwood': [
+          CustomerBaselineTokens.onDeepwood,
+          CustomerBaselineTokens.deepwood,
         ],
         'onCopper/copper': [
           MerchantBaselineTokens.onCopper,
@@ -204,12 +224,37 @@ void main() {
       };
 
       pairs.forEach((label, colours) {
+        // Palm is the one stated exception, and it is stated in the tokens:
+        // nothing clears 4.5 against it, so it fills buttons with bold labels
+        // and palmDeep carries anything smaller. The next test pins the
+        // number so the exception cannot quietly widen.
+        final floor = label == 'onPalm/palm' ? 3.0 : 4.5;
         expect(
           _contrast(colours[0], colours[1]),
-          greaterThanOrEqualTo(4.5),
-          reason: '$label is under the AA floor for normal text',
+          greaterThanOrEqualTo(floor),
+          reason: '$label is under its AA floor',
         );
       });
+    });
+
+    test('palm carries bold labels only, and palmDeep everything else', () {
+      // The exception, measured. If a future change makes palm lighter or
+      // darker this either becomes unnecessary or becomes a real failure —
+      // both better than it silently drifting.
+      final onPalm = _contrast(
+        CustomerBaselineTokens.onPalm,
+        CustomerBaselineTokens.palm,
+      );
+      expect(onPalm, greaterThanOrEqualTo(3.0));
+      expect(onPalm, lessThan(4.5));
+
+      expect(
+        _contrast(
+          CustomerBaselineTokens.onPalmDeep,
+          CustomerBaselineTokens.palmDeep,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('on-copper is not indigo, which measures 4.46 and fails', () {
@@ -255,15 +300,15 @@ void main() {
       // the secondary role, which is why these are the values they are.
       expect(
         _contrast(
-          CustomerBaselineTokens.bissap,
-          CustomerBaselineTokens.blush,
+          CustomerBaselineTokens.ember,
+          CustomerBaselineTokens.ivory,
         ),
         lessThan(4.5),
       );
       expect(
         _contrast(
-          CustomerBaselineTokens.pruneClair,
-          CustomerBaselineTokens.blush,
+          CustomerBaselineTokens.palmDeep,
+          CustomerBaselineTokens.ivory,
         ),
         greaterThanOrEqualTo(4.5),
       );
@@ -285,12 +330,23 @@ void main() {
   });
 
   group('the two systems are different things', () {
-    test('the customer baseline is not the bissap venue preset', () {
-      final preset = establishmentThemePresetFor('bissap');
-
-      expect(CustomerBaselineTokens.bissap, isNot(preset.accent));
-      expect(_hex(CustomerBaselineTokens.bissap), '#D6296B');
-      expect(_hex(preset.accent), '#9D174D');
+    test('the customer baseline shares the house accent on purpose', () {
+      // Under Bissap Bloom this asserted the opposite, and had to: the two
+      // were different colours with nearly the same name. Reverted, the
+      // customer baseline *is* the house style, and the preset keyed 'ember'
+      // is that same colour offered to venues. Sharing a value is not sharing
+      // a mechanism, which is what the rest of this group checks.
+      expect(
+        CustomerBaselineTokens.ember,
+        establishmentThemePresetFor('ember').accent,
+      );
+      // And hibiscus is emphatically not the preset whose name suggests it.
+      expect(
+        CustomerBaselineTokens.hibiscus,
+        isNot(establishmentThemePresetFor('bissap').accent),
+      );
+      expect(_hex(CustomerBaselineTokens.hibiscus), '#D6396B');
+      expect(_hex(establishmentThemePresetFor('bissap').accent), '#9D174D');
     });
 
     test('the merchant baseline is not the indigo_soir venue preset', () {
@@ -301,25 +357,20 @@ void main() {
       expect(_hex(preset.accent), '#3730A3');
     });
 
-    test('no baseline colour is any venue preset accent', () {
-      // The strong form: not one value in either baseline collides with any
-      // of the five, so a wrong import cannot silently look right.
+    test('no merchant colour is any venue preset accent', () {
+      // Still the strong form for the merchant app, which shares nothing with
+      // the preset set. The customer app is exempt by design — its accent is
+      // the house colour, and 'ember' is that colour offered to venues.
       final accents =
           establishmentThemePresets.map((preset) => preset.accent).toSet();
-      final baseline = <Color>[
-        CustomerBaselineTokens.aubergine,
-        CustomerBaselineTokens.bissap,
-        CustomerBaselineTokens.gold,
-        CustomerBaselineTokens.pruneClair,
-        CustomerBaselineTokens.blush,
+
+      for (final colour in <Color>[
         MerchantBaselineTokens.indigo,
         MerchantBaselineTokens.copper,
         MerchantBaselineTokens.slateBlue,
         MerchantBaselineTokens.sage,
         MerchantBaselineTokens.parchment,
-      ];
-
-      for (final colour in baseline) {
+      ]) {
         expect(accents, isNot(contains(colour)));
       }
     });
@@ -373,12 +424,12 @@ void main() {
       return Theme.of(tester.element(find.text('Corps')));
     }
 
-    testWidgets('the customer baseline carries Playfair Display over Manrope',
+    testWidgets('the customer baseline carries Fraunces over Manrope',
         (tester) async {
       final theme = await render(tester, customerBaselineTheme());
 
-      expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
-      expect(theme.colorScheme.surface, CustomerBaselineTokens.blush);
+      expect(theme.colorScheme.primary, CustomerBaselineTokens.ember);
+      expect(theme.colorScheme.surface, CustomerBaselineTokens.ivory);
       expect(
         theme.textTheme.bodyMedium?.fontFamily,
         contains(_family(CustomerBaselineTokens.bodyFont)),
@@ -409,11 +460,11 @@ void main() {
       );
     });
 
-    testWidgets('neither baseline is the Ember house style any more',
+    testWidgets('the customer app is the house style and the merchant is not',
         (tester) async {
       final customer = await render(tester, customerBaselineTheme());
-      expect(customer.colorScheme.primary, isNot(SylibookingTokens.ember));
-      expect(customer.colorScheme.surface, isNot(SylibookingTokens.ivory));
+      expect(customer.colorScheme.primary, SylibookingTokens.ember);
+      expect(customer.colorScheme.surface, SylibookingTokens.ivory);
 
       final merchant = await render(tester, merchantBaselineTheme());
       expect(merchant.colorScheme.primary, isNot(SylibookingTokens.ember));
@@ -427,7 +478,7 @@ void main() {
       final customer = await render(tester, customerBaselineTheme());
       expect(
         customer.appBarTheme.backgroundColor,
-        CustomerBaselineTokens.aubergine,
+        CustomerBaselineTokens.deepwood,
       );
 
       final merchant = await render(tester, merchantBaselineTheme());

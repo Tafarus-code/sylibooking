@@ -165,12 +165,11 @@ void main() {
     test('black on white is 21, and a colour on itself is 1', () {
       expect(contrast(Colors.black, Colors.white), closeTo(21.0, 0.01));
       expect(contrast(Colors.white, Colors.white), closeTo(1.0, 0.001));
-      // The number the merchant app actually shipped at.
+      // The number the merchant app actually shipped at, twice: content ink
+      // the same family as the canvas behind it. The colours are gone; the
+      // arithmetic is kept, because the shape of the failure is what matters.
       expect(
-        contrast(
-          MerchantBaselineTokens.indigo,
-          const Color(0xFF151D38),
-        ),
+        contrast(const Color(0xFF1E2749), const Color(0xFF151D38)),
         closeTo(1.14, 0.01),
       );
     });
@@ -250,8 +249,8 @@ void main() {
     test('merchant — indigo is chrome, and never carries dark text', () {
       check((
         label: 'nav rail',
-        foreground: MerchantBaselineTokens.onIndigo,
-        background: MerchantBaselineTokens.indigo,
+        foreground: MerchantBaselineTokens.onDeepwood,
+        background: MerchantBaselineTokens.deepwood,
       ));
       // The bug this pins: the rail's selected *label* sits on the rail, not
       // inside the copper indicator, and it was given the indicator's
@@ -298,7 +297,7 @@ void main() {
       ]) {
         check((
           label: 'canvas $stop',
-          foreground: MerchantBaselineTokens.onIndigo,
+          foreground: MerchantBaselineTokens.onDeepwood,
           background: stop,
         ));
       }
@@ -334,7 +333,7 @@ void main() {
 
         for (final surface in [
           CustomerBaselineTokens.ivory,
-          MerchantBaselineTokens.parchment,
+          MerchantBaselineTokens.ivory,
         ]) {
           final ratio = contrast(StatusBadge.backgroundOf(tone), surface);
           expect(
@@ -387,7 +386,7 @@ void main() {
       }
       expect(
         MerchantBaselineTokens.ink,
-        isNot(MerchantBaselineTokens.indigo),
+        isNot(MerchantBaselineTokens.deepwood),
         reason: 'ink and chrome must stay separable',
       );
     });

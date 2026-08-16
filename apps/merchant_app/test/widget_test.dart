@@ -823,7 +823,7 @@ void main() {
       // The navigation is the app, not the venue.
       final scheme =
           Theme.of(tester.element(find.text('Payments'))).colorScheme;
-      expect(scheme.primary, MerchantBaselineTokens.copper);
+      expect(scheme.primary, MerchantBaselineTokens.ember);
       expect(
         scheme.primary,
         isNot(establishmentThemePresetFor('bissap').accent),
@@ -1008,26 +1008,31 @@ void main() {
       // The two apps deliberately no longer share one baseline: a customer
       // browsing lounges at night and a manager working a counter in daylight
       // are different rooms.
-      expect(theme.colorScheme.primary, MerchantBaselineTokens.copper);
-      expect(theme.colorScheme.surface, MerchantBaselineTokens.parchment);
+      expect(theme.colorScheme.primary, MerchantBaselineTokens.ember);
+      expect(theme.colorScheme.surface, MerchantBaselineTokens.ivory);
       // Ink. Indigo is chrome only now — it was `onSurface` in the release
       // that could not be read, which is how content came to be drawn on a
       // ground of its own colour.
       expect(theme.colorScheme.onSurface, MerchantBaselineTokens.ink);
     });
 
-    testWidgets('and is neither Ember nor the customer baseline',
-        (tester) async {
+    testWidgets('and is the Ember house style once again', (tester) async {
+      // Indigo Ledger sat here for two releases — the original and a repair —
+      // and neither could be read. This asserts the revert against the house
+      // tokens rather than against a restatement of them.
       final theme = await signedInTheme(tester);
 
-      expect(theme.colorScheme.primary, isNot(SylibookingTokens.ember));
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
+      // Sharing the house style with the customer app is deliberate; what
+      // separates the two is the secondary accent.
       expect(
-        theme.colorScheme.primary,
-        isNot(CustomerBaselineTokens.ember),
+        theme.colorScheme.secondary,
+        MerchantBaselineTokens.sarcelle,
       );
       expect(
-        theme.colorScheme.surface,
-        isNot(CustomerBaselineTokens.ivory),
+        theme.colorScheme.secondary,
+        isNot(customerBaselineColorScheme().secondary),
       );
     });
 
@@ -1071,7 +1076,7 @@ void main() {
           Theme.of(tester.element(find.text('Choose a venue'))).colorScheme;
       // One of these venues wears the preset keyed 'bissap'; the chrome is
       // the merchant baseline regardless.
-      expect(scheme.primary, MerchantBaselineTokens.copper);
+      expect(scheme.primary, MerchantBaselineTokens.ember);
     });
 
     testWidgets('the login screen is themed before any venue is known',
@@ -1086,7 +1091,7 @@ void main() {
 
       final scheme =
           Theme.of(tester.element(find.text('Sign in'))).colorScheme;
-      expect(scheme.primary, MerchantBaselineTokens.copper);
+      expect(scheme.primary, MerchantBaselineTokens.ember);
     });
   });
 
@@ -6509,10 +6514,10 @@ void main() {
       testWidgets('the palette reaches the desk on $name', (tester) async {
         final theme = await desk(tester, size: size);
 
-        expect(theme.colorScheme.primary, MerchantBaselineTokens.copper);
-        expect(theme.colorScheme.secondary, MerchantBaselineTokens.slateBlue);
-        expect(theme.colorScheme.tertiary, MerchantBaselineTokens.sage);
-        expect(theme.colorScheme.surface, MerchantBaselineTokens.parchment);
+        expect(theme.colorScheme.primary, MerchantBaselineTokens.ember);
+        expect(theme.colorScheme.secondary, MerchantBaselineTokens.sarcelle);
+        expect(theme.colorScheme.tertiary, MerchantBaselineTokens.palmDeep);
+        expect(theme.colorScheme.surface, MerchantBaselineTokens.ivory);
       });
 
       testWidgets('a field grid stays readable on $name', (tester) async {
@@ -6547,12 +6552,12 @@ void main() {
       final theme = await desk(tester, size: tabletSize);
       final rail = theme.navigationRailTheme;
 
-      expect(rail.backgroundColor, MerchantBaselineTokens.indigo);
-      expect(rail.indicatorColor, MerchantBaselineTokens.copper);
+      expect(rail.backgroundColor, MerchantBaselineTokens.deepwood);
+      expect(rail.indicatorColor, MerchantBaselineTokens.ember);
       expect(
         contrast(
-          MerchantBaselineTokens.parchment,
-          MerchantBaselineTokens.indigo,
+          MerchantBaselineTokens.ivory,
+          MerchantBaselineTokens.deepwood,
         ),
         greaterThanOrEqualTo(4.5),
       );
@@ -6566,7 +6571,7 @@ void main() {
       final merchant = merchantBaselineTheme().navigationRailTheme;
       final customer = customerBaselineTheme().navigationRailTheme;
 
-      expect(merchant.backgroundColor, MerchantBaselineTokens.indigo);
+      expect(merchant.backgroundColor, MerchantBaselineTokens.deepwood);
       expect(customer.backgroundColor, CustomerBaselineTokens.ivory);
       expect(customer.backgroundColor, isNot(merchant.backgroundColor));
     });
@@ -6612,11 +6617,11 @@ void main() {
       for (final tone in StatusTone.values) {
         expect(
           StatusBadge.foregroundOf(tone),
-          isNot(MerchantBaselineTokens.copper),
+          isNot(MerchantBaselineTokens.ember),
         );
         expect(
           StatusBadge.backgroundOf(tone),
-          isNot(MerchantBaselineTokens.parchment),
+          isNot(MerchantBaselineTokens.ivory),
         );
       }
     });
@@ -6630,7 +6635,7 @@ void main() {
       // straight into a Scaffold body drew at 1.14:1.
       final theme = await desk(tester);
 
-      expect(theme.scaffoldBackgroundColor, MerchantBaselineTokens.parchment);
+      expect(theme.scaffoldBackgroundColor, MerchantBaselineTokens.ivory);
       expect(theme.scaffoldBackgroundColor, isNot(Colors.transparent));
       expect(
         contrast(theme.colorScheme.onSurface, theme.scaffoldBackgroundColor),
@@ -6642,13 +6647,13 @@ void main() {
       final theme = await desk(tester);
 
       expect(theme.colorScheme.onSurface, MerchantBaselineTokens.ink);
-      expect(theme.colorScheme.onSurface, isNot(MerchantBaselineTokens.indigo));
+      expect(theme.colorScheme.onSurface, isNot(MerchantBaselineTokens.deepwood));
       // Where indigo does appear, what goes on it is stated and light.
-      expect(MerchantBaselineTokens.onIndigo, MerchantBaselineTokens.parchment);
+      expect(MerchantBaselineTokens.onDeepwood, MerchantBaselineTokens.ivory);
       expect(
         contrast(
-          MerchantBaselineTokens.onIndigo,
-          MerchantBaselineTokens.indigo,
+          MerchantBaselineTokens.onDeepwood,
+          MerchantBaselineTokens.deepwood,
         ),
         greaterThanOrEqualTo(4.5),
       );
@@ -6751,6 +6756,49 @@ void main() {
       });
     }
 
+    testWidgets('nothing in staff management is painted on its own colour',
+        (tester) async {
+      // A screen inside Manage rather than a tab, so the sweep above never
+      // opened it. Role pills live here, which are the one place this app
+      // paints small text on a coloured chip.
+      // Phone width: the tablet's split view puts two scrollables on screen
+      // at once, and scrolling to a tile becomes ambiguous. The screen being
+      // swept is the same either way.
+      final theme = await desk(tester, size: phoneSize);
+      await tester.tap(find.text('Manage').first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Who has access'), 200);
+      await tester.tap(find.text('Who has access'));
+      await tester.pumpAndSettle();
+
+      expect(
+        illegible(tester, theme.scaffoldBackgroundColor),
+        isEmpty,
+        reason: 'in staff management',
+      );
+    });
+
+    testWidgets('nor anything in the staff view on a phone', (tester) async {
+      // Different role, different width, and the layout that drops the rail
+      // for a bottom bar — none of which the tablet sweep exercises.
+      final theme = await desk(tester, size: phoneSize, role: 'staff');
+
+      expect(
+        illegible(tester, theme.scaffoldBackgroundColor),
+        isEmpty,
+        reason: 'on the staff phone view',
+      );
+
+      await tester.tap(find.text('Manage').first);
+      await tester.pumpAndSettle();
+
+      expect(
+        illegible(tester, theme.scaffoldBackgroundColor),
+        isEmpty,
+        reason: 'on the staff phone Manage hub',
+      );
+    });
+
     for (final (name, size) in <(String, Size)>[
       ('a phone', phoneSize),
       ('a tablet', tabletSize),
@@ -6805,7 +6853,7 @@ void main() {
       // Both halves stated, and the card's own colour is the scheme surface
       // rather than whatever sits behind it.
       expect(theme.cardTheme.color, scheme.surface);
-      expect(scheme.surface, MerchantBaselineTokens.parchment);
+      expect(scheme.surface, MerchantBaselineTokens.ivory);
       expect(scheme.onSurface, MerchantBaselineTokens.ink);
       expect(
         contrast(scheme.onSurface, scheme.surface),

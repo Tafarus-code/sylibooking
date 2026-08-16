@@ -245,12 +245,12 @@ class _ReservationsViewState extends State<ReservationsView> {
             style: ButtonStyle(
               backgroundColor: WidgetStateProperty.resolveWith(
                 (states) => states.contains(WidgetState.selected)
-                    ? MerchantBaselineTokens.copper
+                    ? MerchantBaselineTokens.ember
                     : Colors.transparent,
               ),
               foregroundColor: WidgetStateProperty.resolveWith(
                 (states) => states.contains(WidgetState.selected)
-                    ? MerchantBaselineTokens.onCopper
+                    ? MerchantBaselineTokens.onEmber
                     : MerchantBaselineTokens.ink,
               ),
             ),
@@ -414,7 +414,7 @@ class _ReservationsViewState extends State<ReservationsView> {
                   // parchment, including ember, which is the default every
                   // venue starts on. A date heading is the app's furniture,
                   // not the venue's branding.
-                  color: MerchantBaselineTokens.slateBlue,
+                  color: MerchantBaselineTokens.sarcelle,
                 ),
               ),
             );

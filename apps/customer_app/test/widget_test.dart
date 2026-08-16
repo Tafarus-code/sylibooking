@@ -1254,6 +1254,26 @@ void main() {
       expect(find.text('Make an account'), findsOneWidget);
     });
 
+    testWidgets('the sign-in form is translated too, buttons included',
+        (tester) async {
+      // Five labels on this form were written in English directly in the
+      // widget, while the catalogue already carried all five in both
+      // languages — so a French phone read a French screen with English
+      // buttons on it. Nothing failed: the keys existed, they were simply
+      // never called.
+      await openProfile(tester, language: 'fr');
+
+      // The form opens on its register side, so these are its two buttons.
+      // Their presence is what proves the form is on screen and reading from
+      // the catalogue rather than from the widget.
+      expect(find.text('Créer le compte'), findsWidgets);
+      expect(find.text("J'ai déjà un compte"), findsWidgets);
+      // And none of the English the widget used to carry directly.
+      expect(find.text('Create account'), findsNothing);
+      expect(find.text('I already have an account'), findsNothing);
+      expect(find.text('Sign in'), findsNothing);
+    });
+
     testWidgets('browse is translated, not only the profile tab',
         (tester) async {
       await openProfile(tester, language: 'fr');

@@ -236,6 +236,24 @@ class _ReservationsViewState extends State<ReservationsView> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: SegmentedButton<DateRange>(
+            // Stated rather than inherited. Left to Material's defaults this
+            // resolved its selected label to the *venue preset's* accent —
+            // these screens sit inside an EstablishmentThemeScope, and a
+            // preset seeds a whole scheme — which put ember on parchment at
+            // 2.37:1. Nothing about a date range belongs to a venue's
+            // branding, so both pairs are named here.
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? MerchantBaselineTokens.copper
+                    : Colors.transparent,
+              ),
+              foregroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? MerchantBaselineTokens.onCopper
+                    : MerchantBaselineTokens.ink,
+              ),
+            ),
             segments: [
               for (final range in DateRange.values)
                 ButtonSegment(
@@ -390,7 +408,13 @@ class _ReservationsViewState extends State<ReservationsView> {
               child: Text(
                 _dayLabel(row, l),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
+                  // Not colorScheme.primary. These screens sit inside an
+                  // EstablishmentThemeScope, so primary is *the venue's*
+                  // accent — and two of the five presets fail as body text on
+                  // parchment, including ember, which is the default every
+                  // venue starts on. A date heading is the app's furniture,
+                  // not the venue's branding.
+                  color: MerchantBaselineTokens.slateBlue,
                 ),
               ),
             );

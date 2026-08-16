@@ -482,10 +482,10 @@ class _SignedOutState extends State<_SignedOut> {
             onPressed: auth.busy ? null : _submit,
             child: Text(
               auth.busy
-                  ? 'Just a moment…'
+                  ? l.justAMoment
                   : _registering
-                      ? 'Create account'
-                      : 'Sign in',
+                      ? l.createAccount
+                      : l.signIn,
             ),
           ),
           const SizedBox(height: 8),
@@ -495,8 +495,8 @@ class _SignedOutState extends State<_SignedOut> {
                 : () => setState(() => _registering = !_registering),
             child: Text(
               _registering
-                  ? 'I already have an account'
-                  : 'I need an account',
+                  ? l.iAlreadyHaveAnAccount
+                  : l.iNeedAnAccount,
             ),
           ),
           if (!_registering)

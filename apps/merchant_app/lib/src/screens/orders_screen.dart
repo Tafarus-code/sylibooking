@@ -398,14 +398,14 @@ class OrderTicket extends StatelessWidget {
                   Icon(
                     Icons.event_seat_outlined,
                     size: 14,
-                    color: theme.colorScheme.primary,
+                    color: MerchantBaselineTokens.emberDim,
                   ),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
                       l.atTheirTable,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
+                        color: MerchantBaselineTokens.emberDim,
                       ),
                     ),
                   ),

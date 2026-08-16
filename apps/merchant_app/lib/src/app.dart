@@ -81,13 +81,10 @@ class _MerchantAppState extends State<MerchantApp> {
       builder: (context, _) => MaterialApp(
         onGenerateTitle: (context) => L.of(context).appTitle,
         debugShowCheckedModeBanner: false,
-        // The merchant app's own look — Indigo Ledger. The two apps no longer
-        // share one house style: a customer browsing lounges at night and a
-        // manager working a counter in daylight are different rooms, and the
-        // palettes now say so.
-        //
-        // Not one of the five venue presets, one of which is called "Indigo
-        // Soir" — see the note at the top of baseline_theme.dart.
+        // The merchant app's own look — Ember Professional. Both apps share
+        // the house style again after two attempts at giving this one a
+        // palette of its own; what separates them now is the secondary
+        // accent, sarcelle here against palm and hibiscus there.
         theme: merchantBaselineTheme(),
         locale: _locale.locale,
         supportedLocales: L.supportedLocales,

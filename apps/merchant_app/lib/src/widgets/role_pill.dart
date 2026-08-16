@@ -18,19 +18,20 @@ import '../labels.dart';
 /// and unremarkable state; staff takes the neutral stone of a thing that has
 /// not been acted on.
 ///
-/// Only the owner pill moved with the Indigo Ledger recolour — it was the
-/// ember family, and ember is no longer in this app. Manager and staff did
-/// not: their blue and stone are borrowed from the status vocabulary, which
-/// is fixed by design, and a role list read beside an order list should keep
-/// using one language for "settled" and "not yet touched".
+/// All three are back where they started. The owner pill moved into copper's
+/// family for Indigo Ledger and has moved back; manager and staff never moved,
+/// their blue and stone being borrowed from the status vocabulary, which is
+/// fixed by design — a role list read beside an order list should keep one
+/// language for "settled" and "not yet touched".
 class RolePill extends StatelessWidget {
   const RolePill({super.key, required this.role});
 
   final MerchantRole role;
 
   static const _palettes = <MerchantRole, (Color, Color)>{
-    // Copper's own tint, replacing the ember pair. 6.32:1 on its background.
-    MerchantRole.owner: (Color(0xFFF6E7D8), Color(0xFF7A4718)),
+    // Back to the ember pair, at 5.13:1. This spent two releases in copper's
+    // tint, which was the only value of that palette to reach a widget.
+    MerchantRole.owner: (Color(0xFFFBF0DC), Color(0xFF8A5C1C)),
     MerchantRole.manager: (Color(0xFFE3EAF2), Color(0xFF2F5B8A)),
     MerchantRole.staff: (Color(0xFFEDEAE0), Color(0xFF6B6656)),
   };

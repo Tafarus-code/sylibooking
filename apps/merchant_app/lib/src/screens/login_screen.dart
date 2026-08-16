@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_client/shared_client.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../auth_controller.dart';
@@ -57,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Icon(
                           Icons.storefront,
                           size: 56,
-                          color: theme.colorScheme.primary,
+                          color: MerchantBaselineTokens.emberDim,
                         ),
                         const SizedBox(height: 16),
                         Text(

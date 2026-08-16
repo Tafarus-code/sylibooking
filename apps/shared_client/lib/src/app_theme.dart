@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 ///
 /// **Superseded. No app code reads these any more** — each app has a baseline
 /// of its own, `CustomerBaselineTokens` (Ember Vivid) and
-/// `MerchantBaselineTokens` (Indigo Ledger) in `baseline_theme.dart`.
+/// `MerchantBaselineTokens` (Ember Professional) in `baseline_theme.dart`.
 ///
 /// Kept for two reasons, and worth deleting when neither holds:
 ///

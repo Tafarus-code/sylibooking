@@ -58,7 +58,7 @@ class ReservationCard extends StatelessWidget {
       shape: selected
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: theme.colorScheme.primary, width: 2),
+              side: BorderSide(color: MerchantBaselineTokens.emberDim, width: 2),
             )
           : null,
       child: InkWell(

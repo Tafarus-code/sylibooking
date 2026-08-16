@@ -5,8 +5,8 @@
 ///
 /// * A **baseline** is what an app looks like everywhere — its chrome, its
 ///   empty states, its settings screens. The customer app's is *Ember Vivid*,
-///   the merchant app's is *Indigo Ledger*. Neither is chosen by anybody at
-///   runtime; they are the products' faces.
+///   the merchant app's is *Ember Professional*. Neither is chosen by
+///   anybody at runtime; they are the products' faces.
 /// * An **establishment preset** is what one merchant picks for their own
 ///   venue's pages, from a fixed set of five. They live in
 ///   `establishment_theme.dart` as [EstablishmentThemePreset].
@@ -120,55 +120,68 @@ class CustomerBaselineTokens {
   static const monoFont = 'IBM Plex Mono';
 }
 
-/// The merchant app's own look. Palette: Indigo Ledger.
+/// The merchant app's own look. Palette: Ember Professional.
+///
+/// **A revert, and the second one.** Indigo Ledger went in, could not be
+/// read, was repaired, and is now gone entirely — no value, no font, no
+/// canvas of it survives in this codebase, and a test enforces that. This is
+/// the merchant direction that has shipped without a readability problem.
+///
+/// The shape it shares with the palette it replaces is the point worth
+/// stating: a dark canvas with light cards on it, which is exactly the
+/// arrangement that failed twice. The colours were never what made that
+/// fail. What failed was leaving foregrounds to be inferred, so every pair
+/// here is named beside the colour it sits on and measured in
+/// `contrast_test.dart`.
 class MerchantBaselineTokens {
   const MerchantBaselineTokens._();
 
-  static const paletteName = 'Indigo Ledger';
+  static const paletteName = 'Ember Professional';
 
-  /// Deep base. The navigation rail, and the ground the whole tablet sits on.
-  static const indigo = Color(0xFF1E2749);
+  // --- Chrome. Dark; light text on it, always stated. ---------------------
 
-  /// Primary accent: CTAs, the active rail item, the signature glow. Replaces
-  /// ember in that role.
-  static const copper = Color(0xFFC97C3D);
+  /// **Chrome only** — the canvas, the nav rail, the top bars. Never a
+  /// surface content stands on, and never the colour of ink.
+  static const deepwood = Color(0xFF12271F);
+  static const deepwoodSoft = Color(0xFF1B362A);
 
-  /// Secondary accent: secondary buttons and the counterpoint glow. Replaces
-  /// palm green in that role.
-  static const slateBlue = Color(0xFF3D5A80);
+  /// What goes on either of those, wherever they appear. 13.97:1.
+  static const onDeepwood = Color(0xFFF7F1E4);
 
-  /// Tertiary, used sparingly — a third data point on a chart, and no more.
-  static const sage = Color(0xFF7A9E6E);
+  // --- Content surfaces. Light; dark ink on them, always stated. ----------
 
-  /// Light content surface: cards and field grids.
-  static const parchment = Color(0xFFF5F1E8);
+  /// Cards, list rows, detail panels, field grids.
+  static const ivory = Color(0xFFF7F1E4);
+  static const ivoryDim = Color(0xFFCFC7B3);
 
-  /// Body ink. Everything written on [parchment] or on white, and the only
-  /// dark colour in this app that text is ever set in.
-  ///
-  /// Not [indigo]: indigo is chrome, and a colour that is both the ground
-  /// under the app and the ink on its cards is one rename away from being
-  /// painted on itself. Keeping them separate is what makes
-  /// `contrast_test.dart` able to say which is which. 15.44:1 on parchment.
-  static const ink = Color(0xFF1A1A1A);
+  /// Body ink, and the only dark colour in this app that text is set in.
+  /// 15.34:1 on ivory, 17.26:1 on white.
+  static const ink = Color(0xFF1B1B18);
+  static const onIvory = ink;
 
-  /// **Not [indigo].** Indigo measures 4.46:1 against copper — under the 4.5
-  /// floor for normal text, and copper is what carries button labels. This is
-  /// the deepest stop of the merchant background gradient, so it is already a
-  /// palette member rather than a colour invented to pass a test, and it
-  /// measures 5.60:1.
-  static const onCopper = Color(0xFF0E1428);
-  static const onSlateBlue = parchment;
-  static const onSage = indigo;
+  // --- Accents. -----------------------------------------------------------
 
-  /// What goes on indigo, wherever indigo appears — the rail, the canvas, a
-  /// dark banner. Never inherited: see the pairing rule in the library doc.
-  static const onIndigo = parchment;
+  /// Primary accent: CTAs, the active rail item, the signature glow.
+  static const ember = Color(0xFFD98E2B);
 
-  /// What goes on parchment and on white.
-  static const onParchment = ink;
+  /// 5.40:1 on ember. Not white, which measures 2.67 and fails outright.
+  static const onEmber = Color(0xFF3B2508);
 
-  static const displayFont = 'Sora';
+  /// Ember dark enough to be read as text on ivory: 5.14:1, where ember
+  /// itself measures 2.38 and cannot be written with at all.
+  static const emberDim = Color(0xFF8A5C1C);
+
+  /// Teal. **Data and secondary accent only** — a second series on a chart,
+  /// a secondary button — and not a general-purpose colour. 5.19:1 written
+  /// on ivory, so unlike ember it can carry text.
+  static const sarcelle = Color(0xFF2B6E76);
+  static const onSarcelle = Color(0xFFFFFFFF);
+
+  /// Deep palm, the counterpoint on the canvas and the confirming action.
+  static const palmDeep = Color(0xFF1F6B44);
+  static const onPalmDeep = Color(0xFFFFFFFF);
+
+  static const displayFont = 'Fraunces';
   static const bodyFont = 'Manrope';
   static const monoFont = 'IBM Plex Mono';
 }
@@ -208,30 +221,32 @@ ColorScheme customerBaselineColorScheme() => const ColorScheme.light(
     );
 
 /// The colour half of the merchant baseline.
+///
+/// Every `on` role is a named token. Material's own inference is what put
+/// dark text on a dark ground twice.
 ColorScheme merchantBaselineColorScheme() => const ColorScheme.light(
-      primary: MerchantBaselineTokens.copper,
-      onPrimary: MerchantBaselineTokens.onCopper,
-      primaryContainer: MerchantBaselineTokens.indigo,
-      onPrimaryContainer: MerchantBaselineTokens.onIndigo,
-      secondary: MerchantBaselineTokens.slateBlue,
-      onSecondary: MerchantBaselineTokens.onSlateBlue,
-      secondaryContainer: MerchantBaselineTokens.indigo,
-      onSecondaryContainer: MerchantBaselineTokens.onIndigo,
-      tertiary: MerchantBaselineTokens.sage,
-      onTertiary: MerchantBaselineTokens.onSage,
-      surface: MerchantBaselineTokens.parchment,
-      // Ink, not indigo. This is the value that renders on every card, list
-      // row and detail panel in the app, and indigo here is what made it
-      // possible for content to be painted on a ground of the same colour.
+      primary: MerchantBaselineTokens.ember,
+      onPrimary: MerchantBaselineTokens.onEmber,
+      primaryContainer: MerchantBaselineTokens.deepwood,
+      onPrimaryContainer: MerchantBaselineTokens.onDeepwood,
+      secondary: MerchantBaselineTokens.sarcelle,
+      onSecondary: MerchantBaselineTokens.onSarcelle,
+      secondaryContainer: MerchantBaselineTokens.deepwoodSoft,
+      onSecondaryContainer: MerchantBaselineTokens.onDeepwood,
+      tertiary: MerchantBaselineTokens.palmDeep,
+      onTertiary: MerchantBaselineTokens.onPalmDeep,
+      tertiaryContainer: MerchantBaselineTokens.ivoryDim,
+      onTertiaryContainer: MerchantBaselineTokens.ink,
+      surface: MerchantBaselineTokens.ivory,
+      // Ink, never the chrome colour. A palette where the ground and the ink
+      // are the same value is one rename away from painting one on the other.
       onSurface: MerchantBaselineTokens.ink,
-      surfaceContainerHighest: Color(0xFFE7E1D3),
-      // 5.65:1 on parchment.
-      onSurfaceVariant: Color(0xFF5A5F6E),
-      // 3.06:1 on parchment. The half-shade lighter this replaced measured
-      // 2.90:1, under the 3:1 floor — the same trap the house outline fell
-      // into once already.
-      outline: Color(0xFF868A96),
-      outlineVariant: Color(0xFFD8D3C4),
+      surfaceContainerHighest: MerchantBaselineTokens.ivoryDim,
+      // 6.42:1 on ivory.
+      onSurfaceVariant: Color(0xFF4A5B51),
+      // 3.02:1 on ivory — the floor for a boundary.
+      outline: Color(0xFF7F8F85),
+      outlineVariant: MerchantBaselineTokens.ivoryDim,
       error: Color(0xFF9A2B2B),
       onError: Color(0xFFFFFFFF),
       errorContainer: Color(0xFFF7DEDE),
@@ -275,17 +290,18 @@ NavigationRailThemeData customerBaselineRailTheme() => _railTheme(
       onBackgroundDim: const Color(0xFF4A5B51),
     );
 
-/// The merchant app's rail: indigo, with copper on the active item. The one
+/// The merchant app's rail: deepwood, with ember on the active item. The one
 /// permanently dark surface on the tablet, as the design document draws it.
 NavigationRailThemeData merchantBaselineRailTheme() => _railTheme(
-      background: MerchantBaselineTokens.indigo,
-      indicator: MerchantBaselineTokens.copper,
-      // 5.60:1 inside the pill.
-      onIndicator: MerchantBaselineTokens.onCopper,
-      // 12.92:1 on the rail. This is the value that was onCopper, at 1.25:1.
-      onBackground: MerchantBaselineTokens.parchment,
-      // 7.38:1 — dimmed enough to read as unselected, not to vanish.
-      onBackgroundDim: const Color(0xFFB9B8BB),
+      background: MerchantBaselineTokens.deepwood,
+      indicator: MerchantBaselineTokens.ember,
+      // 5.40:1 inside the pill.
+      onIndicator: MerchantBaselineTokens.onEmber,
+      // 13.97:1 on the rail. The label sits on the rail, not in the pill —
+      // giving it the pill's foreground is the bug that shipped once.
+      onBackground: MerchantBaselineTokens.onDeepwood,
+      // 7.66:1 — dimmed enough to read as unselected, not to vanish.
+      onBackgroundDim: const Color(0xFFB9B5A8),
     );
 
 /// What every Scaffold in the customer app stands on.
@@ -297,9 +313,11 @@ const customerBaselineContentGround = Colors.transparent;
 
 /// What every Scaffold in the merchant app stands on.
 ///
-/// Opaque parchment. This was transparent, and over an indigo canvas it is
-/// what made the app unreadable.
-const merchantBaselineContentGround = MerchantBaselineTokens.parchment;
+/// Opaque ivory. This was transparent once, over a dark canvas, which is what
+/// made the app unreadable — twice. Deepwood is chrome; content stands on
+/// light ground whatever is behind the screen, and this one value is what
+/// spares every screen from having to remember that for itself.
+const merchantBaselineContentGround = MerchantBaselineTokens.ivory;
 
 /// Display faces carry headlines and titles; the body face carries anything
 /// read at length. The same shape as the house pairing, with each app's own
@@ -438,21 +456,21 @@ ThemeData customerBaselineTheme() => _baselineTheme(
       contentGround: customerBaselineContentGround,
     );
 
-/// The merchant app's baseline theme. Palette: Indigo Ledger.
+/// The merchant app's baseline theme. Palette: Ember Professional.
 ///
 /// The header stays light: it sits beside a navigation rail that is already
-/// indigo, and two dark bands meeting reads as a mistake rather than as a
+/// deepwood, and two dark bands meeting reads as a mistake rather than a
 /// frame.
 ThemeData merchantBaselineTheme() => _baselineTheme(
       scheme: merchantBaselineColorScheme(),
       displayFont: MerchantBaselineTokens.displayFont,
       bodyFont: MerchantBaselineTokens.bodyFont,
-      appBarBackground: MerchantBaselineTokens.parchment,
-      appBarForeground: MerchantBaselineTokens.onParchment,
+      appBarBackground: MerchantBaselineTokens.ivory,
+      appBarForeground: MerchantBaselineTokens.ink,
       rail: merchantBaselineRailTheme(),
-      // Slate blue, at 6.27:1 on parchment. Copper is the fill colour and
-      // measures 2.90 as text on the same surface.
-      buttonLabel: MerchantBaselineTokens.slateBlue,
+      // Sarcelle, at 5.19:1 on ivory. Ember is the fill colour and measures
+      // 2.38 as text on the same surface, so it cannot carry a label.
+      buttonLabel: MerchantBaselineTokens.sarcelle,
       // Parchment, opaque. Indigo is chrome — the canvas, the rail, the dark
       // banner — and content stands on light ground whatever is behind it.
       // This one value is what makes every screen in the app legible without

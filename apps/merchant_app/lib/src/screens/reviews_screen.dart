@@ -308,7 +308,7 @@ class _ReviewCard extends StatelessWidget {
                   Icon(
                     star <= review.rating ? Icons.star : Icons.star_border,
                     size: 16,
-                    color: theme.colorScheme.primary,
+                    color: MerchantBaselineTokens.emberDim,
                   ),
                 const SizedBox(width: 8),
                 Expanded(

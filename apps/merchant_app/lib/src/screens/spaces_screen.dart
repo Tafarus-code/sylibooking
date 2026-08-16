@@ -258,7 +258,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
             child: Text(
               _typeLabel(l, type),
               style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
+                color: MerchantBaselineTokens.emberDim,
               ),
             ),
           ),

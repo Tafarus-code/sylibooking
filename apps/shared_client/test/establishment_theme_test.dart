@@ -225,7 +225,7 @@ void main() {
 
       scoped(baseline, 'bissap');
 
-      expect(baseline.primary, MerchantBaselineTokens.copper);
+      expect(baseline.primary, MerchantBaselineTokens.ember);
       expect(merchantBaselineColorScheme().primary, baseline.primary);
     });
 
@@ -252,7 +252,7 @@ void main() {
       final colours = <String, Color>{
         'customer baseline hibiscus': CustomerBaselineTokens.hibiscus,
         'venue preset bissap': establishmentThemePresetFor('bissap').accent,
-        'merchant baseline indigo': MerchantBaselineTokens.indigo,
+        'merchant baseline indigo': MerchantBaselineTokens.deepwood,
         'venue preset indigo_soir':
             establishmentThemePresetFor('indigo_soir').accent,
       };
@@ -284,47 +284,47 @@ void main() {
       expect(overCustomer, isNot(CustomerBaselineTokens.ember));
     });
 
-    test('no preset accent is a merchant baseline colour', () {
-      final merchantColours = <Color>{
-        MerchantBaselineTokens.indigo,
-        MerchantBaselineTokens.copper,
-        MerchantBaselineTokens.slateBlue,
-        MerchantBaselineTokens.sage,
-        MerchantBaselineTokens.parchment,
+    test('no preset accent is merchant chrome', () {
+      // Ember is excluded on purpose: it is the house accent and the 'ember'
+      // preset is that colour offered to venues. The rest of the chrome is
+      // the app's alone.
+      final chrome = <Color>{
+        MerchantBaselineTokens.deepwood,
+        MerchantBaselineTokens.sarcelle,
+        MerchantBaselineTokens.ivory,
+        MerchantBaselineTokens.ink,
       };
 
       for (final preset in establishmentThemePresets) {
-        expect(merchantColours, isNot(contains(preset.accent)));
+        expect(chrome, isNot(contains(preset.accent)));
       }
     });
   });
 
   group('nothing is still wearing Ember', () {
-    test('the merchant baseline shares nothing with the house style', () {
-      final ember = <Color>{
-        SylibookingTokens.deepwood,
-        SylibookingTokens.deepwoodSoft,
-        SylibookingTokens.ivory,
-        SylibookingTokens.ivoryDim,
-        SylibookingTokens.ember,
-        SylibookingTokens.emberBright,
-      };
-
-      for (final colour in <Color>[
-        MerchantBaselineTokens.indigo,
-        MerchantBaselineTokens.copper,
-        MerchantBaselineTokens.slateBlue,
-        MerchantBaselineTokens.sage,
-        MerchantBaselineTokens.parchment,
+    test('both baselines are the house style, deliberately', () {
+      // Two reverts brought both back. What each app adds on top is its own:
+      // sarcelle for the merchant's data, hibiscus for the customer's
+      // favourites.
+      for (final tokens in [
+        (
+          CustomerBaselineTokens.ember,
+          CustomerBaselineTokens.deepwood,
+          CustomerBaselineTokens.ivory,
+        ),
+        (
+          MerchantBaselineTokens.ember,
+          MerchantBaselineTokens.deepwood,
+          MerchantBaselineTokens.ivory,
+        ),
       ]) {
-        expect(ember, isNot(contains(colour)));
+        expect(tokens.$1, SylibookingTokens.ember);
+        expect(tokens.$2, SylibookingTokens.deepwood);
+        expect(tokens.$3, SylibookingTokens.ivory);
       }
-    });
 
-    test('and the customer baseline is the house style, deliberately', () {
-      expect(CustomerBaselineTokens.ember, SylibookingTokens.ember);
-      expect(CustomerBaselineTokens.deepwood, SylibookingTokens.deepwood);
-      expect(CustomerBaselineTokens.ivory, SylibookingTokens.ivory);
+      expect(MerchantBaselineTokens.sarcelle, isNot(SylibookingTokens.ember));
+      expect(CustomerBaselineTokens.hibiscus, isNot(SylibookingTokens.ember));
     });
 
     test('the ember preset is untouched, because it is a venue choice', () {

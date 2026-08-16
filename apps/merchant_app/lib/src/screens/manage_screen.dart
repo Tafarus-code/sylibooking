@@ -275,7 +275,7 @@ class _Entry extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: theme.colorScheme.primary, size: 20),
+            Icon(icon, color: MerchantBaselineTokens.emberDim, size: 20),
             const SizedBox(height: 8),
             Text(
               title,

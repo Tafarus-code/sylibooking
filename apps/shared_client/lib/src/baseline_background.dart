@@ -59,19 +59,31 @@ class CustomerBaselineBackground extends StatelessWidget {
       );
 }
 
-/// The merchant app's canvas. Palette: Indigo Ledger.
+/// The merchant app's canvas. Palette: Ember Professional.
 ///
-/// No blur ever goes over this one — see [FrostedPanel].
+/// Deepwood falling to near-black on the diagonal, an amber glow top right, a
+/// palm-green counterpoint bottom left, and a fine diagonal weave over it.
+/// The background that was approved before any indigo attempt.
+///
+/// **Dark, and nothing dark is ever painted on it.** That is not a property
+/// of these colours — the indigo canvas that replaced this one was the same
+/// shape, and what made it unreadable was content standing on it rather than
+/// on a surface of its own. [merchantBaselineContentGround] is what keeps
+/// that from being possible; this stays the ground for chrome.
 class MerchantBaselineBackground extends StatelessWidget {
   const MerchantBaselineBackground({super.key});
 
-  static const ground = Color(0xFF151D38);
+  static const ground = Color(0xFF0C1D16);
 
   static const gradientStops = <Color>[
-    Color(0xFF1E2749),
-    Color(0xFF151D38),
-    Color(0xFF0E1428),
+    Color(0xFF12271F),
+    Color(0xFF0C1D16),
+    Color(0xFF06110C),
   ];
+
+  /// The darkest thing the canvas can be, for anything measuring the worst
+  /// case rather than the average one.
+  static const darkestStop = Color(0xFF06110C);
 
   @override
   Widget build(BuildContext context) => const RepaintBoundary(
@@ -194,32 +206,31 @@ class _MerchantCanvasPainter extends CustomPainter {
       rect,
       Paint()
         ..shader = const LinearGradient(
-          // 165deg: the same near-vertical fall as the customer canvas, a
-          // little further off true.
-          begin: Alignment(-0.26, -1),
-          end: Alignment(0.26, 1),
+          // Diagonal: deepwood at the top left, near-black at the bottom
+          // right, which is the fall the original document draws.
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: MerchantBaselineBackground.gradientStops,
-          stops: [0.0, 0.6, 1.0],
+          stops: [0.0, 0.55, 1.0],
         ).createShader(rect),
     );
 
     _paintWeave(canvas, size);
 
     _paintGlows(canvas, size, const [
-      _Glow(0.50, 1.00, Color(0x147A9E6E), 0.40),
-      _Glow(0.06, 0.90, Color(0x383D5A80), 0.46),
-      _Glow(0.84, 0.10, Color(0x33C97C3D), 0.42),
+      // Palm counterpoint, bottom left.
+      _Glow(0.06, 0.92, Color(0x2B1F6B44), 0.44),
+      // Amber, top right, and the one the eye is meant to find.
+      _Glow(0.88, 0.08, Color(0x40D98E2B), 0.46),
     ]);
   }
 
-  /// The repeating 135° weave: one pixel on, seven off.
+  /// The fine diagonal weave: one pixel on, seven off, at 135°.
   void _paintWeave(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = const Color(0x04FFFFFF)
       ..strokeWidth = 1;
-    // 135deg lines run bottom-left to top-right, so the intercepts have to
-    // cover the diagonal rather than only the width.
-    const spacing = 8.0; // 1 on + 7 off
+    const spacing = 8.0;
     for (var offset = -size.height; offset < size.width; offset += spacing) {
       canvas.drawLine(
         Offset(offset, size.height),

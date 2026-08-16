@@ -223,7 +223,7 @@ class _Section extends StatelessWidget {
             Text(
               title,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
+                color: MerchantBaselineTokens.emberDim,
               ),
             ),
             const SizedBox(height: 8),

@@ -87,19 +87,19 @@ void main() {
       final merchant = _baselines()['merchant'] as Map<String, dynamic>;
 
       expect(MerchantBaselineTokens.paletteName, merchant['palette_name']);
-      expect(_hex(MerchantBaselineTokens.indigo), merchant['indigo']);
-      expect(_hex(MerchantBaselineTokens.copper), merchant['copper']);
-      expect(_hex(MerchantBaselineTokens.slateBlue), merchant['slate_blue']);
-      expect(_hex(MerchantBaselineTokens.sage), merchant['sage']);
-      expect(_hex(MerchantBaselineTokens.parchment), merchant['parchment']);
-      expect(_hex(MerchantBaselineTokens.onCopper), merchant['on_copper']);
+      expect(_hex(MerchantBaselineTokens.deepwood), merchant['deepwood']);
+      expect(_hex(MerchantBaselineTokens.ember), merchant['ember']);
+      expect(_hex(MerchantBaselineTokens.sarcelle), merchant['sarcelle']);
+      expect(_hex(MerchantBaselineTokens.palmDeep), merchant['palm_deep']);
+      expect(_hex(MerchantBaselineTokens.ivory), merchant['ivory']);
+      expect(_hex(MerchantBaselineTokens.onEmber), merchant['on_ember']);
       expect(
-        _hex(MerchantBaselineTokens.onSlateBlue),
-        merchant['on_slate_blue'],
+        _hex(MerchantBaselineTokens.onSarcelle),
+        merchant['on_sarcelle'],
       );
-      expect(_hex(MerchantBaselineTokens.onSage), merchant['on_sage']);
-      expect(_hex(MerchantBaselineTokens.onIndigo), merchant['on_indigo']);
-      expect(_hex(MerchantBaselineTokens.onParchment), merchant['on_parchment']);
+      expect(_hex(MerchantBaselineTokens.onPalmDeep), merchant['on_palm_deep']);
+      expect(_hex(MerchantBaselineTokens.onDeepwood), merchant['on_deepwood']);
+      expect(_hex(MerchantBaselineTokens.onIvory), merchant['on_ivory']);
     });
 
     test('both name their fonts identically on both sides', () {
@@ -138,12 +138,30 @@ void main() {
       );
     });
 
-    test('the merchant palette is Indigo Ledger, exactly', () {
-      expect(_hex(MerchantBaselineTokens.indigo), '#1E2749');
-      expect(_hex(MerchantBaselineTokens.copper), '#C97C3D');
-      expect(_hex(MerchantBaselineTokens.slateBlue), '#3D5A80');
-      expect(_hex(MerchantBaselineTokens.sage), '#7A9E6E');
-      expect(_hex(MerchantBaselineTokens.parchment), '#F5F1E8');
+    test('the merchant palette is Ember Professional, exactly', () {
+      expect(_hex(MerchantBaselineTokens.deepwood), '#12271F');
+      expect(_hex(MerchantBaselineTokens.ember), '#D98E2B');
+      expect(_hex(MerchantBaselineTokens.sarcelle), '#2B6E76');
+      expect(_hex(MerchantBaselineTokens.palmDeep), '#1F6B44');
+      expect(_hex(MerchantBaselineTokens.ivory), '#F7F1E4');
+      expect(_hex(MerchantBaselineTokens.ink), '#1B1B18');
+    });
+
+    test('and both apps are Ember-family again', () {
+      // Which is the point of two reverts, not an accident. The apps differ
+      // in their secondary accents — sarcelle here, palm and hibiscus there —
+      // and share the chrome, the surface and the type.
+      expect(MerchantBaselineTokens.ember, CustomerBaselineTokens.ember);
+      expect(MerchantBaselineTokens.deepwood, CustomerBaselineTokens.deepwood);
+      expect(MerchantBaselineTokens.ivory, CustomerBaselineTokens.ivory);
+      expect(
+        MerchantBaselineTokens.displayFont,
+        CustomerBaselineTokens.displayFont,
+      );
+      expect(
+        MerchantBaselineTokens.sarcelle,
+        isNot(CustomerBaselineTokens.palm),
+      );
     });
   });
 
@@ -162,21 +180,18 @@ void main() {
     test('the merchant scheme leads with copper on parchment', () {
       final scheme = merchantBaselineColorScheme();
 
-      expect(scheme.primary, MerchantBaselineTokens.copper);
-      expect(scheme.onPrimary, MerchantBaselineTokens.onCopper);
-      expect(scheme.secondary, MerchantBaselineTokens.slateBlue);
-      expect(scheme.tertiary, MerchantBaselineTokens.sage);
-      expect(scheme.surface, MerchantBaselineTokens.parchment);
+      expect(scheme.primary, MerchantBaselineTokens.ember);
+      expect(scheme.onPrimary, MerchantBaselineTokens.onEmber);
+      expect(scheme.secondary, MerchantBaselineTokens.sarcelle);
+      expect(scheme.tertiary, MerchantBaselineTokens.palmDeep);
+      expect(scheme.surface, MerchantBaselineTokens.ivory);
       // Ink, not indigo — see the token. Indigo is chrome; a colour that is
       // both the ground and the ink is how content got painted on itself.
       expect(scheme.onSurface, MerchantBaselineTokens.ink);
     });
 
-    test('copper replaces ember as the merchant signature', () {
-      expect(
-        merchantBaselineColorScheme().primary,
-        isNot(SylibookingTokens.ember),
-      );
+    test('ember is the merchant signature once more', () {
+      expect(merchantBaselineColorScheme().primary, SylibookingTokens.ember);
     });
   });
 
@@ -204,24 +219,24 @@ void main() {
           CustomerBaselineTokens.deepwood,
         ],
         'onCopper/copper': [
-          MerchantBaselineTokens.onCopper,
-          MerchantBaselineTokens.copper,
+          MerchantBaselineTokens.onEmber,
+          MerchantBaselineTokens.ember,
         ],
         'onSlateBlue/slateBlue': [
-          MerchantBaselineTokens.onSlateBlue,
-          MerchantBaselineTokens.slateBlue,
+          MerchantBaselineTokens.onSarcelle,
+          MerchantBaselineTokens.sarcelle,
         ],
         'onSage/sage': [
-          MerchantBaselineTokens.onSage,
-          MerchantBaselineTokens.sage,
+          MerchantBaselineTokens.onPalmDeep,
+          MerchantBaselineTokens.palmDeep,
         ],
         'onParchment/parchment': [
-          MerchantBaselineTokens.onParchment,
-          MerchantBaselineTokens.parchment,
+          MerchantBaselineTokens.onIvory,
+          MerchantBaselineTokens.ivory,
         ],
         'onIndigo/indigo': [
-          MerchantBaselineTokens.onIndigo,
-          MerchantBaselineTokens.indigo,
+          MerchantBaselineTokens.onDeepwood,
+          MerchantBaselineTokens.deepwood,
         ],
       };
 
@@ -259,17 +274,24 @@ void main() {
       );
     });
 
-    test('on-copper is not indigo, which measures 4.46 and fails', () {
-      // Named because indigo is the obvious choice and the wrong one, and a
-      // future tidy-up would reach for it.
+    test('ember is a fill, and cannot be written in on ivory', () {
+      // The constraint that survived every palette change: ember carries a
+      // label when it is the background and measures 2.38 when it is the
+      // text, so emberDim exists for the second case.
       expect(
         _contrast(
-          MerchantBaselineTokens.indigo,
-          MerchantBaselineTokens.copper,
+          MerchantBaselineTokens.ember,
+          MerchantBaselineTokens.ivory,
         ),
         lessThan(4.5),
       );
-      expect(MerchantBaselineTokens.onCopper, isNot(MerchantBaselineTokens.indigo));
+      expect(
+        _contrast(
+          MerchantBaselineTokens.emberDim,
+          MerchantBaselineTokens.ivory,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('secondary copy and boundaries clear their own floors', () {
@@ -316,15 +338,15 @@ void main() {
       );
       expect(
         _contrast(
-          MerchantBaselineTokens.copper,
-          MerchantBaselineTokens.parchment,
+          MerchantBaselineTokens.ember,
+          MerchantBaselineTokens.ivory,
         ),
         lessThan(4.5),
       );
       expect(
         _contrast(
-          MerchantBaselineTokens.slateBlue,
-          MerchantBaselineTokens.parchment,
+          MerchantBaselineTokens.sarcelle,
+          MerchantBaselineTokens.ivory,
         ),
         greaterThanOrEqualTo(4.5),
       );
@@ -351,44 +373,53 @@ void main() {
       expect(_hex(establishmentThemePresetFor('bissap').accent), '#9D174D');
     });
 
-    test('the merchant baseline is not the indigo_soir venue preset', () {
-      final preset = establishmentThemePresetFor('indigo_soir');
-
-      expect(MerchantBaselineTokens.indigo, isNot(preset.accent));
-      expect(_hex(MerchantBaselineTokens.indigo), '#1E2749');
-      expect(_hex(preset.accent), '#3730A3');
+    test('the merchant baseline shares the house accent, like the other', () {
+      // Both apps are the house style again, so both share the accent with
+      // the preset keyed 'ember'. Sharing a value is not sharing a mechanism.
+      expect(
+        MerchantBaselineTokens.ember,
+        establishmentThemePresetFor('ember').accent,
+      );
+      expect(
+        MerchantBaselineTokens.deepwood,
+        isNot(establishmentThemePresetFor('indigo_soir').accent),
+      );
     });
 
-    test('no merchant colour is any venue preset accent', () {
-      // Still the strong form for the merchant app, which shares nothing with
-      // the preset set. The customer app is exempt by design — its accent is
-      // the house colour, and 'ember' is that colour offered to venues.
+    test('only the shared house accent overlaps the preset set', () {
+      // Both baselines are Ember-family now, so ember appears on both sides
+      // by design. Everything else must still be the app's alone — a venue
+      // preset leaking into the chrome is the failure this guards.
       final accents =
           establishmentThemePresets.map((preset) => preset.accent).toSet();
 
       for (final colour in <Color>[
-        MerchantBaselineTokens.indigo,
-        MerchantBaselineTokens.copper,
-        MerchantBaselineTokens.slateBlue,
-        MerchantBaselineTokens.sage,
-        MerchantBaselineTokens.parchment,
+        MerchantBaselineTokens.deepwood,
+        MerchantBaselineTokens.sarcelle,
+        MerchantBaselineTokens.ivory,
+        MerchantBaselineTokens.ink,
+        CustomerBaselineTokens.hibiscus,
       ]) {
         expect(accents, isNot(contains(colour)));
       }
+      // The one deliberate overlap, named so it reads as a decision.
+      expect(accents, contains(MerchantBaselineTokens.ember));
     });
 
-    test('the two baselines are distinct from each other', () {
+    test('the two baselines differ where they are meant to', () {
+      // They share the house chrome, surface, accent and type on purpose;
+      // what separates them is the secondary accent each reaches for.
+      expect(
+        customerBaselineColorScheme().secondary,
+        isNot(merchantBaselineColorScheme().secondary),
+      );
+      expect(
+        merchantBaselineColorScheme().secondary,
+        MerchantBaselineTokens.sarcelle,
+      );
       expect(
         customerBaselineColorScheme().primary,
-        isNot(merchantBaselineColorScheme().primary),
-      );
-      expect(
-        customerBaselineColorScheme().surface,
-        isNot(merchantBaselineColorScheme().surface),
-      );
-      expect(
-        CustomerBaselineTokens.displayFont,
-        isNot(MerchantBaselineTokens.displayFont),
+        merchantBaselineColorScheme().primary,
       );
     });
 
@@ -446,12 +477,12 @@ void main() {
       );
     });
 
-    testWidgets('the merchant baseline carries Sora over Manrope',
+    testWidgets('the merchant baseline carries Fraunces over Manrope',
         (tester) async {
       final theme = await render(tester, merchantBaselineTheme());
 
-      expect(theme.colorScheme.primary, MerchantBaselineTokens.copper);
-      expect(theme.colorScheme.surface, MerchantBaselineTokens.parchment);
+      expect(theme.colorScheme.primary, MerchantBaselineTokens.ember);
+      expect(theme.colorScheme.surface, MerchantBaselineTokens.ivory);
       expect(
         theme.textTheme.bodyMedium?.fontFamily,
         contains(_family(MerchantBaselineTokens.bodyFont)),
@@ -462,15 +493,14 @@ void main() {
       );
     });
 
-    testWidgets('the customer app is the house style and the merchant is not',
-        (tester) async {
+    testWidgets('both apps are the house style again', (tester) async {
       final customer = await render(tester, customerBaselineTheme());
       expect(customer.colorScheme.primary, SylibookingTokens.ember);
       expect(customer.colorScheme.surface, SylibookingTokens.ivory);
 
       final merchant = await render(tester, merchantBaselineTheme());
-      expect(merchant.colorScheme.primary, isNot(SylibookingTokens.ember));
-      expect(merchant.colorScheme.surface, isNot(SylibookingTokens.ivory));
+      expect(merchant.colorScheme.primary, SylibookingTokens.ember);
+      expect(merchant.colorScheme.surface, SylibookingTokens.ivory);
     });
 
     testWidgets('the app bars differ, and each for its own reason',
@@ -486,7 +516,7 @@ void main() {
       final merchant = await render(tester, merchantBaselineTheme());
       expect(
         merchant.appBarTheme.backgroundColor,
-        MerchantBaselineTokens.parchment,
+        MerchantBaselineTokens.ivory,
       );
     });
   });

@@ -111,37 +111,52 @@
       }
     },
     "merchant": {
-      "palette_name": "Indigo Ledger",
-      "indigo": "#1E2749",
-      "copper": "#C97C3D",
-      "slate_blue": "#3D5A80",
-      "sage": "#7A9E6E",
-      "parchment": "#F5F1E8",
-      "_on_copper_comment": [
-        "Not Indigo, which measures 4.46:1 against Copper — under the 4.5",
-        "floor for normal text, and Copper carries button labels. This is the",
-        "deepest stop of the merchant background gradient, already a palette",
-        "member, and measures 5.60:1."
+      "palette_name": "Ember Professional",
+      "_note": [
+        "A REVERT, and the second one. Indigo Ledger went in, could not be read,",
+        "was repaired, and is now gone entirely — no value, no font and no canvas",
+        "of it survives, and a test enforces that.",
+        "",
+        "The shape this shares with the palette it replaces is worth stating: a",
+        "dark canvas with light cards on it, which is the arrangement that failed",
+        "twice. The colours were never what made it fail — leaving foregrounds to",
+        "be inferred was. Every pair below is named.",
+        "",
+        "DERIVED, NOT TRANSCRIBED: sylibooking-merchant-v3.html and",
+        "sylibooking-merchant-background.html were not in the repository when this",
+        "was written. The five colours and the fonts came from the brief verbatim;",
+        "the canvas layers were reconstructed from its description and the",
+        "design-v2 CSS variables. Correct them here and the app follows."
       ],
-      "on_copper": "#0E1428",
-      "on_slate_blue": "#F5F1E8",
-      "on_sage": "#1E2749",
-      "on_indigo": "#F5F1E8",
-      "on_parchment": "#1A1A1A",
-      "display_font": "Sora",
+      "deepwood": "#12271F",
+      "deepwood_soft": "#1B362A",
+      "ember": "#D98E2B",
+      "ember_dim": "#8A5C1C",
+      "sarcelle": "#2B6E76",
+      "palm_deep": "#1F6B44",
+      "ivory": "#F7F1E4",
+      "ivory_dim": "#CFC7B3",
+      "ink": "#1B1B18",
+      "on_deepwood": "#F7F1E4",
+      "on_ember": "#3B2508",
+      "on_sarcelle": "#FFFFFF",
+      "on_palm_deep": "#FFFFFF",
+      "on_ivory": "#1B1B18",
+      "display_font": "Fraunces",
       "body_font": "Manrope",
       "mono_font": "IBM Plex Mono",
-      "ink": "#1A1A1A",
-      "_chrome_note": [
-        "Indigo is CHROME ONLY — the canvas, the nav rail, a dark banner. Text on",
-        "it is always parchment, stated at the point of use, never inherited.",
-        "Content stands on parchment with ink on it, whatever is behind the screen.",
-        "",
-        "The unreadable release had this the other way round: the Scaffold was",
-        "transparent over the dark canvas while on_parchment was indigo, so any",
-        "screen putting a list straight into a Scaffold body drew dark text on dark",
-        "ground at 1.14:1."
-      ]
+      "canvas": {
+        "_note": "Deepwood to near-black on the diagonal. Layers bottom to top.",
+        "ground": "#0C1D16",
+        "gradient": [
+          "#12271F",
+          "#0C1D16",
+          "#06110C"
+        ],
+        "weave": "#FFFFFF",
+        "glow_ember": "#D98E2B",
+        "glow_palm": "#1F6B44"
+      }
     }
   },
   "presets": [

@@ -1010,7 +1010,10 @@ void main() {
       // are different rooms.
       expect(theme.colorScheme.primary, MerchantBaselineTokens.copper);
       expect(theme.colorScheme.surface, MerchantBaselineTokens.parchment);
-      expect(theme.colorScheme.onSurface, MerchantBaselineTokens.indigo);
+      // Ink. Indigo is chrome only now — it was `onSurface` in the release
+      // that could not be read, which is how content came to be drawn on a
+      // ground of its own colour.
+      expect(theme.colorScheme.onSurface, MerchantBaselineTokens.ink);
     });
 
     testWidgets('and is neither Ember nor the customer baseline',
@@ -6616,6 +6619,194 @@ void main() {
           isNot(MerchantBaselineTokens.parchment),
         );
       }
+    });
+
+    testWidgets('the ground under every screen is parchment, not the canvas',
+        (tester) async {
+      // **The regression test for the release that could not be read.**
+      //
+      // This was Colors.transparent, so the dark canvas showed through every
+      // Scaffold while onSurface was dark too. Any screen putting a list
+      // straight into a Scaffold body drew at 1.14:1.
+      final theme = await desk(tester);
+
+      expect(theme.scaffoldBackgroundColor, MerchantBaselineTokens.parchment);
+      expect(theme.scaffoldBackgroundColor, isNot(Colors.transparent));
+      expect(
+        contrast(theme.colorScheme.onSurface, theme.scaffoldBackgroundColor),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    testWidgets('indigo is chrome, and never the ink', (tester) async {
+      final theme = await desk(tester);
+
+      expect(theme.colorScheme.onSurface, MerchantBaselineTokens.ink);
+      expect(theme.colorScheme.onSurface, isNot(MerchantBaselineTokens.indigo));
+      // Where indigo does appear, what goes on it is stated and light.
+      expect(MerchantBaselineTokens.onIndigo, MerchantBaselineTokens.parchment);
+      expect(
+        contrast(
+          MerchantBaselineTokens.onIndigo,
+          MerchantBaselineTokens.indigo,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    /// The colour actually painted behind [element].
+    ///
+    /// Walks up to the nearest ancestor that fills an opaque colour — a
+    /// Material, a ColoredBox, a Container or DecoratedBox with a solid
+    /// BoxDecoration — and falls back to the page ground when nothing does.
+    /// Without this a rail label reads as parchment-on-parchment, because the
+    /// page is parchment and the rail it actually sits on is indigo.
+    Color backgroundBehind(Element element, Color ground) {
+      Color? found;
+
+      element.visitAncestorElements((ancestor) {
+        final widget = ancestor.widget;
+        Color? candidate;
+
+        if (widget is Material) {
+          candidate = widget.color;
+        } else if (widget is ColoredBox) {
+          candidate = widget.color;
+        } else if (widget is DecoratedBox) {
+          final decoration = widget.decoration;
+          if (decoration is BoxDecoration) candidate = decoration.color;
+        } else if (widget is Container) {
+          final decoration = widget.decoration;
+          if (decoration is BoxDecoration) candidate = decoration.color;
+        }
+
+        // Opaque only. A translucent veil lets what is under it through, and
+        // guessing at the composite would make this test lie either way.
+        if (candidate != null && candidate.a == 1.0) {
+          found = candidate;
+          return false;
+        }
+        return true;
+      });
+
+      return found ?? ground;
+    }
+
+    /// Every paragraph on screen, measured against what is behind it.
+    ///
+    /// Returns the failures rather than asserting, so one helper can sweep
+    /// tab after tab and each caller can say which tab it was looking at.
+    List<String> illegible(WidgetTester tester, Color ground) {
+      final found = <String>[];
+      for (final element in find.byType(Text).evaluate()) {
+        final paragraph = element.renderObject;
+        if (paragraph is! RenderParagraph) continue;
+
+        final colour = paragraph.text.style?.color;
+        if (colour == null || colour.a == 0) continue;
+
+        final label = (element.widget as Text).data ?? '';
+        if (label.trim().isEmpty) continue;
+
+        final behind = backgroundBehind(element, ground);
+        final ratio = contrast(colour, behind);
+        if (ratio < 3.0) {
+          found.add('"$label" ${ratio.toStringAsFixed(2)}:1');
+        }
+      }
+      return found;
+    }
+
+    for (final tab in ['Reservations', 'Kitchen', 'Payments', 'Manage']) {
+      testWidgets('nothing on $tab is painted on its own colour',
+          (tester) async {
+        // The audit, as a test. Every tab, not only the one that was
+        // visibly broken — a colour that renders acceptably on the screen
+        // somebody happened to open is the same bug as one that does not.
+        final theme = await desk(tester, size: tabletSize);
+        // .first: the rail label and the screen's own heading can both carry
+        // the tab's name, and either one navigates.
+        await tester.tap(find.text(tab).first);
+        await tester.pumpAndSettle();
+
+        expect(
+          illegible(tester, theme.scaffoldBackgroundColor),
+          isEmpty,
+          reason: 'on $tab',
+        );
+      });
+    }
+
+    for (final (name, size) in <(String, Size)>[
+      ('a phone', phoneSize),
+      ('a tablet', tabletSize),
+    ]) {
+      testWidgets('every word actually rendered is legible on $name',
+          (tester) async {
+        // The strong form, and the one that would have caught this before it
+        // shipped: walk the tree, take each paragraph's *resolved* colour —
+        // inherited or stated, this is what the pixels get — and measure it
+        // against whatever is actually painted behind it.
+        final theme = await desk(tester, size: size);
+        final ground = theme.scaffoldBackgroundColor;
+
+        final unreadable = <String>[];
+        for (final element in find.byType(Text).evaluate()) {
+          final paragraph = element.renderObject;
+          if (paragraph is! RenderParagraph) continue;
+
+          final colour = paragraph.text.style?.color;
+          if (colour == null || colour.a == 0) continue;
+
+          final label = (element.widget as Text).data ?? '';
+          if (label.trim().isEmpty) continue;
+
+          final behind = backgroundBehind(element, ground);
+          final ratio = contrast(colour, behind);
+
+          // 3:1 is the floor being asserted here rather than 4.5, because
+          // this sweep cannot tell a 20px heading from 12px body copy, and a
+          // heading is legitimately allowed the lower bar. The named pairs
+          // above hold the 4.5 line for body text; this one is the net that
+          // catches a colour landing on its own background.
+          if (ratio < 3.0) {
+            unreadable.add('"$label" ${ratio.toStringAsFixed(2)}:1');
+          }
+        }
+
+        expect(
+          unreadable,
+          isEmpty,
+          reason: 'unreadable against what is painted behind them: '
+              '${unreadable.take(8).join(", ")}',
+        );
+      });
+    }
+
+    testWidgets('a card puts dark ink on its own light surface',
+        (tester) async {
+      final theme = await desk(tester);
+      final scheme = theme.colorScheme;
+
+      // Both halves stated, and the card's own colour is the scheme surface
+      // rather than whatever sits behind it.
+      expect(theme.cardTheme.color, scheme.surface);
+      expect(scheme.surface, MerchantBaselineTokens.parchment);
+      expect(scheme.onSurface, MerchantBaselineTokens.ink);
+      expect(
+        contrast(scheme.onSurface, scheme.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
+    testWidgets('the canvas is still there, as the chrome ground',
+        (tester) async {
+      // Kept rather than removed: the brief is that indigo is chrome, not
+      // that the canvas was the fault. It paints behind the app; what
+      // changed is that content no longer stands on it.
+      await desk(tester, size: tabletSize);
+
+      expect(find.byType(MerchantBaselineBackground), findsOneWidget);
     });
 
     testWidgets('the recolour did not hand staff a tile they had not earned',

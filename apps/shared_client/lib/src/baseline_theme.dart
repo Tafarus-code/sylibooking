@@ -137,6 +137,15 @@ class MerchantBaselineTokens {
   /// Light content surface: cards and field grids.
   static const parchment = Color(0xFFF5F1E8);
 
+  /// Body ink. Everything written on [parchment] or on white, and the only
+  /// dark colour in this app that text is ever set in.
+  ///
+  /// Not [indigo]: indigo is chrome, and a colour that is both the ground
+  /// under the app and the ink on its cards is one rename away from being
+  /// painted on itself. Keeping them separate is what makes
+  /// `contrast_test.dart` able to say which is which. 15.44:1 on parchment.
+  static const ink = Color(0xFF1A1A1A);
+
   /// **Not [indigo].** Indigo measures 4.46:1 against copper — under the 4.5
   /// floor for normal text, and copper is what carries button labels. This is
   /// the deepest stop of the merchant background gradient, so it is already a
@@ -145,8 +154,13 @@ class MerchantBaselineTokens {
   static const onCopper = Color(0xFF0E1428);
   static const onSlateBlue = parchment;
   static const onSage = indigo;
+
+  /// What goes on indigo, wherever indigo appears — the rail, the canvas, a
+  /// dark banner. Never inherited: see the pairing rule in the library doc.
   static const onIndigo = parchment;
-  static const onParchment = indigo;
+
+  /// What goes on parchment and on white.
+  static const onParchment = ink;
 
   static const displayFont = 'Sora';
   static const bodyFont = 'Manrope';
@@ -200,7 +214,10 @@ ColorScheme merchantBaselineColorScheme() => const ColorScheme.light(
       tertiary: MerchantBaselineTokens.sage,
       onTertiary: MerchantBaselineTokens.onSage,
       surface: MerchantBaselineTokens.parchment,
-      onSurface: MerchantBaselineTokens.onParchment,
+      // Ink, not indigo. This is the value that renders on every card, list
+      // row and detail panel in the app, and indigo here is what made it
+      // possible for content to be painted on a ground of the same colour.
+      onSurface: MerchantBaselineTokens.ink,
       surfaceContainerHighest: Color(0xFFE7E1D3),
       // 5.65:1 on parchment.
       onSurfaceVariant: Color(0xFF5A5F6E),
@@ -245,8 +262,17 @@ ThemeData _baselineTheme({
   required Color appBarForeground,
   required Color railBackground,
   required Color railIndicator,
-  required Color railSelected,
-  required Color railUnselected,
+
+  /// Goes inside the indicator pill: the selected icon, and nothing else.
+  required Color railOnIndicator,
+
+  /// Goes on the rail itself: both labels, selected and not.
+  required Color railOnBackground,
+  required Color railOnBackgroundDim,
+
+  /// What every Scaffold in the app stands on. Opaque, and light in both
+  /// apps — see the note at `scaffoldBackgroundColor` below.
+  required Color contentGround,
 }) {
   final base = ThemeData(colorScheme: scheme, useMaterial3: true);
 
@@ -256,11 +282,19 @@ ThemeData _baselineTheme({
       displayFont: displayFont,
       bodyFont: bodyFont,
     ),
-    // Deliberately transparent rather than the surface colour: the painted
-    // canvas goes behind the Scaffold, and a solid scaffold would hide it.
-    // Slices B and C put that canvas in; until then this reads as the
-    // surface anyway, because nothing is painted behind it yet.
-    scaffoldBackgroundColor: Colors.transparent,
+    // **The root cause of the unreadable merchant screens, fixed here.**
+    //
+    // This was transparent in both apps so the painted canvas would show
+    // through every Scaffold. Over a light canvas that is harmless. Over the
+    // merchant's dark one it meant every screen that puts a list or a column
+    // straight into a Scaffold body — which is most of them — drew text in
+    // the scheme's dark `onSurface` on a dark ground: 1.14:1, and 1.00:1
+    // where the gradient met `onSurface` exactly.
+    //
+    // Each app now names its content ground instead. Nothing inherits its
+    // way onto a canvas any more, on either side, and the canvas is what
+    // sits behind the chrome rather than behind the content.
+    scaffoldBackgroundColor: contentGround,
     appBarTheme: AppBarTheme(
       backgroundColor: appBarBackground,
       foregroundColor: appBarForeground,
@@ -288,16 +322,25 @@ ThemeData _baselineTheme({
     // on the active item, as the design document draws it; the customer's is
     // the ordinary light surface, since a customer only ever sees a rail on a
     // tablet and it is not the spine of their app.
+    // The icon and the label do not sit on the same thing, and treating
+    // them as if they did is how the merchant rail shipped with an
+    // unreadable selected item. The *icon* is inside the indicator pill, so
+    // it takes the pill's foreground; the *label* sits below it on the rail
+    // itself, so it takes the rail's. Written as two pairs because they are
+    // two pairs — the previous version gave the label the pill's foreground,
+    // which put near-black on indigo at 1.25:1.
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: railBackground,
       indicatorColor: railIndicator,
-      selectedIconTheme: IconThemeData(color: railSelected),
-      unselectedIconTheme: IconThemeData(color: railUnselected),
+      selectedIconTheme: IconThemeData(color: railOnIndicator),
+      unselectedIconTheme: IconThemeData(color: railOnBackground),
       selectedLabelTextStyle: TextStyle(
-        color: railSelected,
+        color: railOnBackground,
         fontWeight: FontWeight.w600,
       ),
-      unselectedLabelTextStyle: TextStyle(color: railUnselected),
+      unselectedLabelTextStyle: TextStyle(
+        color: railOnBackgroundDim,
+      ),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: Colors.transparent,
@@ -333,8 +376,12 @@ ThemeData customerBaselineTheme() => _baselineTheme(
       appBarForeground: CustomerBaselineTokens.onDeepwood,
       railBackground: CustomerBaselineTokens.ivory,
       railIndicator: CustomerBaselineTokens.ember,
-      railSelected: CustomerBaselineTokens.onEmber,
-      railUnselected: CustomerBaselineTokens.onIvory,
+      railOnIndicator: CustomerBaselineTokens.onEmber,
+      railOnBackground: CustomerBaselineTokens.onIvory,
+      railOnBackgroundDim: Color(0xFF4A5B51),
+      // The golden-hour canvas is light, so this app can afford to let it
+      // through and does: the ground is the canvas, and the cards sit on it.
+      contentGround: Colors.transparent,
     );
 
 /// The merchant app's baseline theme. Palette: Indigo Ledger.
@@ -353,8 +400,17 @@ ThemeData merchantBaselineTheme() => _baselineTheme(
       // dark surface on the tablet.
       railBackground: MerchantBaselineTokens.indigo,
       railIndicator: MerchantBaselineTokens.copper,
-      railSelected: MerchantBaselineTokens.onCopper,
-      railUnselected: MerchantBaselineTokens.parchment,
+      // 5.60:1 inside the pill.
+      railOnIndicator: MerchantBaselineTokens.onCopper,
+      // 12.92:1 on the rail. This is the value that was onCopper, at 1.25:1.
+      railOnBackground: MerchantBaselineTokens.parchment,
+      // 7.38:1 — dimmed enough to read as unselected, not enough to vanish.
+      railOnBackgroundDim: Color(0xFFB9B8BB),
+      // Parchment, opaque. Indigo is chrome — the canvas, the rail, the dark
+      // banner — and content stands on light ground whatever is behind it.
+      // This one value is what makes every screen in the app legible without
+      // each of them having to remember to say so.
+      contentGround: MerchantBaselineTokens.parchment,
     );
 
 // Money is set by `sylibookingPriceStyle` in app_theme.dart, and stays

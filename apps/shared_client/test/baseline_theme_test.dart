@@ -167,7 +167,9 @@ void main() {
       expect(scheme.secondary, MerchantBaselineTokens.slateBlue);
       expect(scheme.tertiary, MerchantBaselineTokens.sage);
       expect(scheme.surface, MerchantBaselineTokens.parchment);
-      expect(scheme.onSurface, MerchantBaselineTokens.indigo);
+      // Ink, not indigo — see the token. Indigo is chrome; a colour that is
+      // both the ground and the ink is how content got painted on itself.
+      expect(scheme.onSurface, MerchantBaselineTokens.ink);
     });
 
     test('copper replaces ember as the merchant signature', () {

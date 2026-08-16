@@ -127,10 +127,21 @@
       "on_slate_blue": "#F5F1E8",
       "on_sage": "#1E2749",
       "on_indigo": "#F5F1E8",
-      "on_parchment": "#1E2749",
+      "on_parchment": "#1A1A1A",
       "display_font": "Sora",
       "body_font": "Manrope",
-      "mono_font": "IBM Plex Mono"
+      "mono_font": "IBM Plex Mono",
+      "ink": "#1A1A1A",
+      "_chrome_note": [
+        "Indigo is CHROME ONLY — the canvas, the nav rail, a dark banner. Text on",
+        "it is always parchment, stated at the point of use, never inherited.",
+        "Content stands on parchment with ink on it, whatever is behind the screen.",
+        "",
+        "The unreadable release had this the other way round: the Scaffold was",
+        "transparent over the dark canvas while on_parchment was indigo, so any",
+        "screen putting a list straight into a Scaffold body drew dark text on dark",
+        "ground at 1.14:1."
+      ]
     }
   },
   "presets": [

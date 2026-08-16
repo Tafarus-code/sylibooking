@@ -85,6 +85,12 @@ class CustomerBaselineTokens {
   /// itself measures 2.38 and cannot be written with at all.
   static const emberDim = Color(0xFF8A5C1C);
 
+  /// Darker again, for a label that sits on the *canvas* rather than on a
+  /// card. The golden hour bottoms out at #DDC594, where emberDim manages
+  /// only 3.44:1 — fine for a heading, not for a button somebody has to
+  /// read and tap. 4.93:1 at that worst stop, 7.36:1 on ivory.
+  static const emberInk = Color(0xFF6B4712);
+
   /// Secondary accent, for fills.
   ///
   /// **Large or bold text only.** Nothing clears 4.5:1 against palm — white
@@ -232,6 +238,69 @@ ColorScheme merchantBaselineColorScheme() => const ColorScheme.light(
       onErrorContainer: Color(0xFF5A1414),
     );
 
+/// The rail's colours, pure, for the same reason the colour schemes are.
+///
+/// The icon and the label do not sit on the same thing, and treating them as
+/// if they did is how the merchant rail shipped with an unreadable selected
+/// item. The *icon* is inside the indicator pill, so it takes the pill's
+/// foreground; the *label* sits below it on the rail itself, so it takes the
+/// rail's. Two pairs, written as two pairs — the version this replaced gave
+/// the label the pill's foreground, which put near-black on indigo at 1.25:1.
+NavigationRailThemeData _railTheme({
+  required Color background,
+  required Color indicator,
+  required Color onIndicator,
+  required Color onBackground,
+  required Color onBackgroundDim,
+}) =>
+    NavigationRailThemeData(
+      backgroundColor: background,
+      indicatorColor: indicator,
+      selectedIconTheme: IconThemeData(color: onIndicator),
+      unselectedIconTheme: IconThemeData(color: onBackground),
+      selectedLabelTextStyle: TextStyle(
+        color: onBackground,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelTextStyle: TextStyle(color: onBackgroundDim),
+    );
+
+/// The customer app's rail. Light, because a customer only meets a rail on a
+/// tablet and it is not the spine of their app.
+NavigationRailThemeData customerBaselineRailTheme() => _railTheme(
+      background: CustomerBaselineTokens.ivory,
+      indicator: CustomerBaselineTokens.ember,
+      onIndicator: CustomerBaselineTokens.onEmber,
+      onBackground: CustomerBaselineTokens.onIvory,
+      onBackgroundDim: const Color(0xFF4A5B51),
+    );
+
+/// The merchant app's rail: indigo, with copper on the active item. The one
+/// permanently dark surface on the tablet, as the design document draws it.
+NavigationRailThemeData merchantBaselineRailTheme() => _railTheme(
+      background: MerchantBaselineTokens.indigo,
+      indicator: MerchantBaselineTokens.copper,
+      // 5.60:1 inside the pill.
+      onIndicator: MerchantBaselineTokens.onCopper,
+      // 12.92:1 on the rail. This is the value that was onCopper, at 1.25:1.
+      onBackground: MerchantBaselineTokens.parchment,
+      // 7.38:1 — dimmed enough to read as unselected, not to vanish.
+      onBackgroundDim: const Color(0xFFB9B8BB),
+    );
+
+/// What every Scaffold in the customer app stands on.
+///
+/// Transparent, and allowed to be: that canvas is light, so the app's dark
+/// ink reads on it. `contrast_test.dart` measures the permission rather than
+/// granting it.
+const customerBaselineContentGround = Colors.transparent;
+
+/// What every Scaffold in the merchant app stands on.
+///
+/// Opaque parchment. This was transparent, and over an indigo canvas it is
+/// what made the app unreadable.
+const merchantBaselineContentGround = MerchantBaselineTokens.parchment;
+
 /// Display faces carry headlines and titles; the body face carries anything
 /// read at length. The same shape as the house pairing, with each app's own
 /// families.
@@ -260,19 +329,15 @@ ThemeData _baselineTheme({
   required String bodyFont,
   required Color appBarBackground,
   required Color appBarForeground,
-  required Color railBackground,
-  required Color railIndicator,
+  required NavigationRailThemeData rail,
 
-  /// Goes inside the indicator pill: the selected icon, and nothing else.
-  required Color railOnIndicator,
-
-  /// Goes on the rail itself: both labels, selected and not.
-  required Color railOnBackground,
-  required Color railOnBackgroundDim,
-
-  /// What every Scaffold in the app stands on. Opaque, and light in both
-  /// apps — see the note at `scaffoldBackgroundColor` below.
+  /// What every Scaffold in the app stands on — see the note at
+  /// `scaffoldBackgroundColor` below.
   required Color contentGround,
+
+  /// What a text or outlined button writes its label in. Not the accent:
+  /// see the note at `textButtonTheme` below.
+  required Color buttonLabel,
 }) {
   final base = ThemeData(colorScheme: scheme, useMaterial3: true);
 
@@ -322,26 +387,7 @@ ThemeData _baselineTheme({
     // on the active item, as the design document draws it; the customer's is
     // the ordinary light surface, since a customer only ever sees a rail on a
     // tablet and it is not the spine of their app.
-    // The icon and the label do not sit on the same thing, and treating
-    // them as if they did is how the merchant rail shipped with an
-    // unreadable selected item. The *icon* is inside the indicator pill, so
-    // it takes the pill's foreground; the *label* sits below it on the rail
-    // itself, so it takes the rail's. Written as two pairs because they are
-    // two pairs — the previous version gave the label the pill's foreground,
-    // which put near-black on indigo at 1.25:1.
-    navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: railBackground,
-      indicatorColor: railIndicator,
-      selectedIconTheme: IconThemeData(color: railOnIndicator),
-      unselectedIconTheme: IconThemeData(color: railOnBackground),
-      selectedLabelTextStyle: TextStyle(
-        color: railOnBackground,
-        fontWeight: FontWeight.w600,
-      ),
-      unselectedLabelTextStyle: TextStyle(
-        color: railOnBackgroundDim,
-      ),
-    ),
+    navigationRailTheme: rail,
     chipTheme: ChipThemeData(
       backgroundColor: Colors.transparent,
       side: BorderSide(color: scheme.outline),
@@ -360,6 +406,17 @@ ThemeData _baselineTheme({
       ),
     ),
     dividerTheme: DividerThemeData(color: scheme.outlineVariant),
+    // A text button's label defaults to colorScheme.primary — an accent
+    // picked to be filled, not written with. Ember measured 1.59:1 on the
+    // customer canvas and copper 2.90:1 on parchment, both of which shipped.
+    // Stated here so a button is legible wherever it is put.
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: buttonLabel),
+    ),
+    // The same reasoning for the outlined variant, which also takes primary.
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: buttonLabel),
+    ),
   );
 }
 
@@ -374,14 +431,11 @@ ThemeData customerBaselineTheme() => _baselineTheme(
       bodyFont: CustomerBaselineTokens.bodyFont,
       appBarBackground: CustomerBaselineTokens.deepwood,
       appBarForeground: CustomerBaselineTokens.onDeepwood,
-      railBackground: CustomerBaselineTokens.ivory,
-      railIndicator: CustomerBaselineTokens.ember,
-      railOnIndicator: CustomerBaselineTokens.onEmber,
-      railOnBackground: CustomerBaselineTokens.onIvory,
-      railOnBackgroundDim: Color(0xFF4A5B51),
+      rail: customerBaselineRailTheme(),
+      buttonLabel: CustomerBaselineTokens.emberInk,
       // The golden-hour canvas is light, so this app can afford to let it
       // through and does: the ground is the canvas, and the cards sit on it.
-      contentGround: Colors.transparent,
+      contentGround: customerBaselineContentGround,
     );
 
 /// The merchant app's baseline theme. Palette: Indigo Ledger.
@@ -395,22 +449,15 @@ ThemeData merchantBaselineTheme() => _baselineTheme(
       bodyFont: MerchantBaselineTokens.bodyFont,
       appBarBackground: MerchantBaselineTokens.parchment,
       appBarForeground: MerchantBaselineTokens.onParchment,
-      // Indigo, with copper on the active item: the rail is the spine of the
-      // merchant app, and the design document draws it as the one permanently
-      // dark surface on the tablet.
-      railBackground: MerchantBaselineTokens.indigo,
-      railIndicator: MerchantBaselineTokens.copper,
-      // 5.60:1 inside the pill.
-      railOnIndicator: MerchantBaselineTokens.onCopper,
-      // 12.92:1 on the rail. This is the value that was onCopper, at 1.25:1.
-      railOnBackground: MerchantBaselineTokens.parchment,
-      // 7.38:1 — dimmed enough to read as unselected, not enough to vanish.
-      railOnBackgroundDim: Color(0xFFB9B8BB),
+      rail: merchantBaselineRailTheme(),
+      // Slate blue, at 6.27:1 on parchment. Copper is the fill colour and
+      // measures 2.90 as text on the same surface.
+      buttonLabel: MerchantBaselineTokens.slateBlue,
       // Parchment, opaque. Indigo is chrome — the canvas, the rail, the dark
       // banner — and content stands on light ground whatever is behind it.
       // This one value is what makes every screen in the app legible without
       // each of them having to remember to say so.
-      contentGround: MerchantBaselineTokens.parchment,
+      contentGround: merchantBaselineContentGround,
     );
 
 // Money is set by `sylibookingPriceStyle` in app_theme.dart, and stays

@@ -86,7 +86,7 @@ class _CustomerAppState extends State<CustomerApp> {
       builder: (context, _) => MaterialApp(
         onGenerateTitle: (context) => L.of(context).appTitle,
         debugShowCheckedModeBanner: false,
-        // The customer app's own look — Bissap Bloom. Establishment branding
+        // The customer app's own look — Ember Vivid. Establishment branding
         // is layered on top of this by EstablishmentThemeScope, and only on a
         // venue's own screens.
         //

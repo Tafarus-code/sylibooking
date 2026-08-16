@@ -2243,23 +2243,24 @@ void main() {
       return Theme.of(tester.element(find.text('Find a table')));
     }
 
-    testWidgets('browse chrome is Bissap Bloom, not a Material default',
+    testWidgets('browse chrome is Ember Vivid, not a Material default',
         (tester) async {
       final theme = await browseTheme(tester);
 
-      expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
-      expect(theme.colorScheme.onPrimary, CustomerBaselineTokens.onBissap);
-      expect(theme.colorScheme.surface, CustomerBaselineTokens.blush);
-      expect(theme.colorScheme.onSurface, CustomerBaselineTokens.aubergine);
+      expect(theme.colorScheme.primary, CustomerBaselineTokens.ember);
+      expect(theme.colorScheme.onPrimary, CustomerBaselineTokens.onEmber);
+      expect(theme.colorScheme.surface, CustomerBaselineTokens.ivory);
+      expect(theme.colorScheme.onSurface, CustomerBaselineTokens.onIvory);
     });
 
-    testWidgets('and is no longer the Ember house style', (tester) async {
-      // Named, because Ember is what every screenshot and every earlier test
-      // in this file was written against.
+    testWidgets('and is the Ember house style once again', (tester) async {
+      // Bissap Bloom sat here for one release and could not be read. This is
+      // the revert, asserted against the tokens the house style has always
+      // used rather than against a restatement of them.
       final theme = await browseTheme(tester);
 
-      expect(theme.colorScheme.primary, isNot(SylibookingTokens.ember));
-      expect(theme.colorScheme.surface, isNot(SylibookingTokens.ivory));
+      expect(theme.colorScheme.primary, SylibookingTokens.ember);
+      expect(theme.colorScheme.surface, SylibookingTokens.ivory);
     });
 
     testWidgets('body copy is set in the house body face', (tester) async {
@@ -2275,11 +2276,9 @@ void main() {
     testWidgets('headings are set in the house display face', (tester) async {
       final theme = await browseTheme(tester);
 
-      // google_fonts drops the space: 'Playfair Display' resolves to a
-      // family called PlayfairDisplay, so comparing against the design name
-      // verbatim would fail on a theme that is perfectly correct.
-      const display = 'PlayfairDisplay';
-      expect(CustomerBaselineTokens.displayFont.replaceAll(' ', ''), display);
+      // Back to Fraunces. Single word, so no space to lose.
+      const display = 'Fraunces';
+      expect(CustomerBaselineTokens.displayFont, display);
       expect(theme.textTheme.headlineSmall?.fontFamily, contains(display));
       expect(theme.textTheme.titleLarge?.fontFamily, contains(display));
     });
@@ -2295,7 +2294,7 @@ void main() {
       // 'bissap' is a venue's hibiscus red (#9D174D), and the chrome around
       // it is the customer baseline's own bissap (#D6296B). Two different
       // colours, two different systems, one word.
-      expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
+      expect(theme.colorScheme.primary, CustomerBaselineTokens.ember);
       expect(
         theme.colorScheme.primary,
         isNot(establishmentThemePresetFor('bissap').accent),
@@ -2366,7 +2365,7 @@ void main() {
       final scheme = Theme.of(tester.element(find.text('Browse'))).colorScheme;
       // Same collision as above, the other way round: the venue wears the
       // preset keyed 'indigo_soir', and the bar stays the customer baseline.
-      expect(scheme.primary, CustomerBaselineTokens.bissap);
+      expect(scheme.primary, CustomerBaselineTokens.ember);
       expect(
         scheme.primary,
         isNot(establishmentThemePresetFor('indigo_soir').accent),
@@ -5468,7 +5467,7 @@ void main() {
   });
 
   // ==========================================================================
-  // Bissap Bloom — the palette, the canvas, and whether anything can be read
+  // Ember Vivid — the palette, the canvas, and whether anything can be read
   // against it.
   //
   // This background has darkened once already in this project's history, and
@@ -5476,7 +5475,7 @@ void main() {
   // everything rendered, and some of it could not be read. So these measure
   // rather than look.
   // ==========================================================================
-  group('the customer app wears Bissap Bloom', () {
+  group('the customer app wears Ember Vivid', () {
     double luminance(Color colour) {
       double linearise(double channel) => channel <= 0.03928
           ? channel / 12.92
@@ -5513,9 +5512,9 @@ void main() {
       testWidgets('the palette reaches the cards on $name', (tester) async {
         final theme = await open(tester, size: size);
 
-        expect(theme.colorScheme.primary, CustomerBaselineTokens.bissap);
-        expect(theme.colorScheme.surface, CustomerBaselineTokens.blush);
-        expect(theme.colorScheme.onSurface, CustomerBaselineTokens.aubergine);
+        expect(theme.colorScheme.primary, CustomerBaselineTokens.ember);
+        expect(theme.colorScheme.surface, CustomerBaselineTokens.ivory);
+        expect(theme.colorScheme.onSurface, CustomerBaselineTokens.onIvory);
       });
 
       testWidgets('body copy stays legible on a card on $name',
@@ -5579,12 +5578,12 @@ void main() {
       // checked — legibility has to hold at either end of it.
       await open(tester);
 
-      const onCanvas = CustomerBaselineTokens.aubergine;
+      const onCanvas = CustomerBaselineTokens.deepwood;
       for (final stop in CustomerBaselineBackground.gradientStops) {
         expect(
           contrast(onCanvas, stop),
           greaterThanOrEqualTo(4.5),
-          reason: 'aubergine copy is unreadable on canvas stop $stop',
+          reason: 'deepwood copy is unreadable on canvas stop $stop',
         );
       }
       expect(
@@ -5649,8 +5648,8 @@ void main() {
         contains(openGreen),
         reason: 'the open/closed dot was recoloured with the palette',
       );
-      // And it is not any Bissap Bloom colour that happens to look similar.
-      expect(painted, isNot(contains(CustomerBaselineTokens.bissap)));
+      // And it is not any Ember Vivid colour that happens to look similar.
+      expect(painted, isNot(contains(CustomerBaselineTokens.ember)));
     });
   });
 }

@@ -49,7 +49,7 @@ class SegmentedToggle extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(dense ? 2 : 4),
         decoration: BoxDecoration(
-          color: CustomerBaselineTokens.pruneClair,
+          color: CustomerBaselineTokens.palmDeep,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -98,7 +98,7 @@ class _Option extends StatelessWidget {
       // the tap ripple.
       child: Material(
         color:
-            selected ? CustomerBaselineTokens.bissap : Colors.transparent,
+            selected ? CustomerBaselineTokens.ember : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -121,8 +121,8 @@ class _Option extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: selected
-                        ? CustomerBaselineTokens.onBissap
-                        : CustomerBaselineTokens.blush,
+                        ? CustomerBaselineTokens.onEmber
+                        : CustomerBaselineTokens.ivory,
                   ),
                 ),
               ),

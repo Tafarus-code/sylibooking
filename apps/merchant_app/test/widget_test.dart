@@ -1020,11 +1020,11 @@ void main() {
       expect(theme.colorScheme.primary, isNot(SylibookingTokens.ember));
       expect(
         theme.colorScheme.primary,
-        isNot(CustomerBaselineTokens.bissap),
+        isNot(CustomerBaselineTokens.ember),
       );
       expect(
         theme.colorScheme.surface,
-        isNot(CustomerBaselineTokens.blush),
+        isNot(CustomerBaselineTokens.ivory),
       );
     });
 
@@ -1035,8 +1035,8 @@ void main() {
         theme.textTheme.bodyMedium?.fontFamily,
         contains(MerchantBaselineTokens.bodyFont),
       );
-      // Sora, where the customer app takes Playfair Display. Manrope is the
-      // one face the two still share.
+      // Sora, where the customer app takes Fraunces. Manrope is the one face
+      // the two still share.
       expect(
         theme.textTheme.titleLarge?.fontFamily,
         contains(MerchantBaselineTokens.displayFont),
@@ -6564,7 +6564,7 @@ void main() {
       final customer = customerBaselineTheme().navigationRailTheme;
 
       expect(merchant.backgroundColor, MerchantBaselineTokens.indigo);
-      expect(customer.backgroundColor, CustomerBaselineTokens.blush);
+      expect(customer.backgroundColor, CustomerBaselineTokens.ivory);
       expect(customer.backgroundColor, isNot(merchant.backgroundColor));
     });
 

@@ -62,8 +62,8 @@ class BrowseHeader extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    CustomerBaselineTokens.gold.withValues(alpha: 0.22),
-                    CustomerBaselineTokens.gold.withValues(alpha: 0.0),
+                    CustomerBaselineTokens.palm.withValues(alpha: 0.22),
+                    CustomerBaselineTokens.palm.withValues(alpha: 0.0),
                   ],
                 ),
               ),

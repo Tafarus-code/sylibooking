@@ -209,7 +209,10 @@ class _HeartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => IconButton(
         icon: Icon(saved ? Icons.favorite : Icons.favorite_border),
-        color: Colors.white,
+        // Filled hibiscus when saved, white when not: the heart sits on an
+        // arbitrary photograph, so the unsaved state stays white for the same
+        // reason the badges do, and only the saved one takes the accent.
+        color: saved ? CustomerBaselineTokens.hibiscus : Colors.white,
         // Both states named: "Saved" alone would leave a screen reader unable
         // to tell what the tap will do.
         tooltip: saved

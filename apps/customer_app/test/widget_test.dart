@@ -11,6 +11,7 @@ import 'package:customer_app/src/screens/photo_viewer_screen.dart';
 import 'package:customer_app/src/widgets/establishment_card.dart';
 import 'package:customer_app/src/widgets/menu_section.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -5532,6 +5533,95 @@ void main() {
           contrast(scheme.onSurfaceVariant, scheme.surface),
           greaterThanOrEqualTo(4.5),
         );
+      });
+    }
+
+    /// The colour actually painted behind [element].
+    ///
+    /// Walks up to the nearest ancestor that fills an opaque colour and falls
+    /// back to the page ground. Without this a card's text is measured
+    /// against the canvas rather than against the card.
+    Color backgroundBehind(Element element, Color ground) {
+      // Innermost first. Translucent layers are kept and folded together at
+      // the end; the walk stops at the first opaque one, because nothing
+      // above that is visible.
+      final layers = <Color>[];
+
+      element.visitAncestorElements((ancestor) {
+        final widget = ancestor.widget;
+        Color? candidate;
+
+        if (widget is Material) {
+          candidate = widget.color;
+        } else if (widget is ColoredBox) {
+          candidate = widget.color;
+        } else if (widget is DecoratedBox) {
+          final decoration = widget.decoration;
+          if (decoration is BoxDecoration) candidate = decoration.color;
+        } else if (widget is Container) {
+          final decoration = widget.decoration;
+          if (decoration is BoxDecoration) candidate = decoration.color;
+        }
+
+        if (candidate == null || candidate.a == 0) return true;
+        layers.add(candidate);
+        return candidate.a < 1.0;
+      });
+
+      // Outermost inwards, so each layer lands on what is already behind it.
+      var result = layers.isNotEmpty && layers.last.a == 1.0 ? layers.last : ground;
+      for (final layer in layers.reversed.skip(
+        layers.isNotEmpty && layers.last.a == 1.0 ? 1 : 0,
+      )) {
+        final alpha = layer.a;
+        double blend(double over, double under) =>
+            over * alpha + under * (1 - alpha);
+        result = Color.from(
+          alpha: 1,
+          red: blend(layer.r, result.r),
+          green: blend(layer.g, result.g),
+          blue: blend(layer.b, result.b),
+        );
+      }
+      return result;
+    }
+
+    List<String> illegible(WidgetTester tester, Color ground) {
+      final found = <String>[];
+      for (final element in find.byType(Text).evaluate()) {
+        final paragraph = element.renderObject;
+        if (paragraph is! RenderParagraph) continue;
+
+        final colour = paragraph.text.style?.color;
+        if (colour == null || colour.a == 0) continue;
+
+        final label = (element.widget as Text).data ?? '';
+        if (label.trim().isEmpty) continue;
+
+        final ratio = contrast(colour, backgroundBehind(element, ground));
+        if (ratio < 3.0) found.add('"$label" ${ratio.toStringAsFixed(2)}:1');
+      }
+      return found;
+    }
+
+    for (final tab in ['Browse', 'Bookings', 'Favourites', 'Profile']) {
+      testWidgets('nothing on $tab is painted on its own colour',
+          (tester) async {
+        // The customer app is the one that did *not* break, which is the
+        // reason to check it: it had the same arrangement as the merchant app
+        // and was saved only by its canvas being light. Prevention, not
+        // repair.
+        final theme = await open(tester);
+        await tester.tap(find.text(tab).first);
+        await tester.pumpAndSettle();
+
+        // Transparent ground means the canvas is the ground, so the darkest
+        // stop of it is what text has to survive.
+        final ground = theme.scaffoldBackgroundColor == Colors.transparent
+            ? CustomerBaselineBackground.darkestStop
+            : theme.scaffoldBackgroundColor;
+
+        expect(illegible(tester, ground), isEmpty, reason: 'on $tab');
       });
     }
 

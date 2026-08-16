@@ -65,7 +65,11 @@ const Map<StatusTone, _Palette> _palettes = {
   StatusTone.orderCompleted: _settled,
   StatusTone.cash: (
     background: Color(0xFFF3EEE0),
-    foreground: Color(0xFF8A6D2A),
+    // A half-shade darker than the design file's amber, which measured
+    // 4.21:1 — under AA for a 9px label, and the only tone in this set that
+    // was. Same colour, same meaning, still nothing to do with either app's
+    // palette; it is now 4.60:1, in line with the other five.
+    foreground: Color(0xFF836727),
   ),
   StatusTone.unpaid: _owed,
   StatusTone.noShow: _owed,

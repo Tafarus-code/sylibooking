@@ -6662,7 +6662,10 @@ void main() {
     /// Without this a rail label reads as parchment-on-parchment, because the
     /// page is parchment and the rail it actually sits on is indigo.
     Color backgroundBehind(Element element, Color ground) {
-      Color? found;
+      // Innermost first. Translucent layers are kept and folded together at
+      // the end; the walk stops at the first opaque one, because nothing
+      // above that is visible.
+      final layers = <Color>[];
 
       element.visitAncestorElements((ancestor) {
         final widget = ancestor.widget;
@@ -6680,16 +6683,27 @@ void main() {
           if (decoration is BoxDecoration) candidate = decoration.color;
         }
 
-        // Opaque only. A translucent veil lets what is under it through, and
-        // guessing at the composite would make this test lie either way.
-        if (candidate != null && candidate.a == 1.0) {
-          found = candidate;
-          return false;
-        }
-        return true;
+        if (candidate == null || candidate.a == 0) return true;
+        layers.add(candidate);
+        return candidate.a < 1.0;
       });
 
-      return found ?? ground;
+      // Outermost inwards, so each layer lands on what is already behind it.
+      var result = layers.isNotEmpty && layers.last.a == 1.0 ? layers.last : ground;
+      for (final layer in layers.reversed.skip(
+        layers.isNotEmpty && layers.last.a == 1.0 ? 1 : 0,
+      )) {
+        final alpha = layer.a;
+        double blend(double over, double under) =>
+            over * alpha + under * (1 - alpha);
+        result = Color.from(
+          alpha: 1,
+          red: blend(layer.r, result.r),
+          green: blend(layer.g, result.g),
+          blue: blend(layer.b, result.b),
+        );
+      }
+      return result;
     }
 
     /// Every paragraph on screen, measured against what is behind it.

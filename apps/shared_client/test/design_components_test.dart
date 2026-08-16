@@ -19,7 +19,10 @@ const expected = <StatusTone, (int, int)>{
   StatusTone.confirmed: (0xFFE3F2E9, 0xFF1F6B44),
   StatusTone.orderReady: (0xFFE3F2E9, 0xFF1F6B44),
   StatusTone.orderCompleted: (0xFFE3F2E9, 0xFF1F6B44),
-  StatusTone.cash: (0xFFF3EEE0, 0xFF8A6D2A),
+  // Half a shade darker than the design file's amber, which measured 4.21:1
+  // and was the one tone in this set under AA for a 9px label. Same colour,
+  // same meaning; see status_badge.dart.
+  StatusTone.cash: (0xFFF3EEE0, 0xFF836727),
   StatusTone.unpaid: (0xFFFBEAE8, 0xFFA8453A),
   StatusTone.noShow: (0xFFFBEAE8, 0xFFA8453A),
   StatusTone.orderPlaced: (0xFFEDEAE0, 0xFF6B6656),

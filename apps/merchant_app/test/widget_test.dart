@@ -1002,7 +1002,8 @@ void main() {
       return Theme.of(tester.element(find.text('Reservations').first));
     }
 
-    testWidgets('the merchant app runs on Indigo Ledger', (tester) async {
+    testWidgets('the merchant app runs on Ember Professional',
+        (tester) async {
       final theme = await signedInTheme(tester);
 
       // The two apps deliberately no longer share one baseline: a customer
@@ -1043,8 +1044,8 @@ void main() {
         theme.textTheme.bodyMedium?.fontFamily,
         contains(MerchantBaselineTokens.bodyFont),
       );
-      // Sora, where the customer app takes Fraunces. Manrope is the one face
-      // the two still share.
+      // Fraunces in both apps again — Sora went with Indigo Ledger. Manrope
+      // and IBM Plex Mono never moved at all.
       expect(
         theme.textTheme.titleLarge?.fontFamily,
         contains(MerchantBaselineTokens.displayFont),
@@ -6457,11 +6458,15 @@ void main() {
   });
 
   // ==========================================================================
-  // Indigo Ledger — the palette at both widths, and the two things a recolour
-  // must not be allowed to take with it: the status vocabulary, and who can
-  // see which tile.
+  // Ember Professional — the palette at both widths, and the two things a
+  // recolour must not be allowed to take with it: the status vocabulary, and
+  // who can see which tile.
+  //
+  // This is the second revert. Indigo Ledger shipped, was repaired, and still
+  // could not be read; what these hold onto is not a colour but the rule that
+  // every foreground is named beside the thing it sits on.
   // ==========================================================================
-  group('the merchant app wears Indigo Ledger', () {
+  group('the merchant app wears Ember Professional', () {
     double luminance(Color colour) {
       double linearise(double channel) => channel <= 0.03928
           ? channel / 12.92

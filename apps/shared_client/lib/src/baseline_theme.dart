@@ -5,8 +5,8 @@
 ///
 /// * A **baseline** is what an app looks like everywhere — its chrome, its
 ///   empty states, its settings screens. The customer app's is *Ember Vivid*,
-///   the merchant app's is *Indigo Ledger*. Neither is chosen by anybody at
-///   runtime; they are the products' faces.
+///   the merchant app's is *Ember Professional*. Neither is chosen by
+///   anybody at runtime; they are the products' faces.
 /// * An **establishment preset** is what one merchant picks for their own
 ///   venue's pages, from a fixed set of five. They live in
 ///   `establishment_theme.dart` as [EstablishmentThemePreset].

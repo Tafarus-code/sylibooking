@@ -289,7 +289,7 @@ class _HoursScreenState extends State<HoursScreen> {
                   child: Text(
                     l.runsPastMidnight,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
+                      color: MerchantBaselineTokens.emberDim,
                     ),
                   ),
                 ),

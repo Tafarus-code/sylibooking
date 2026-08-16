@@ -165,12 +165,17 @@ void main() {
     test('black on white is 21, and a colour on itself is 1', () {
       expect(contrast(Colors.black, Colors.white), closeTo(21.0, 0.01));
       expect(contrast(Colors.white, Colors.white), closeTo(1.0, 0.001));
-      // The number the merchant app actually shipped at, twice: content ink
-      // the same family as the canvas behind it. The colours are gone; the
-      // arithmetic is kept, because the shape of the failure is what matters.
+      // The shape of the failure that shipped twice, stated in the palette
+      // that replaced it: chrome written on the canvas behind it measures
+      // 1.22:1 here, much as it measured 1.14:1 there. Which is why deepwood
+      // is chrome and ink is ink, and why merchantBaselineContentGround is
+      // opaque.
       expect(
-        contrast(const Color(0xFF1E2749), const Color(0xFF151D38)),
-        closeTo(1.14, 0.01),
+        contrast(
+          MerchantBaselineTokens.deepwood,
+          MerchantBaselineBackground.darkestStop,
+        ),
+        closeTo(1.22, 0.01),
       );
     });
 

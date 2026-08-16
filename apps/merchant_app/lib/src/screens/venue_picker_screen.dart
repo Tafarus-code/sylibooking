@@ -83,14 +83,14 @@ class VenuePickerScreen extends StatelessWidget {
                     Text(
                       venue.role.name(l),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
+                        color: MerchantBaselineTokens.emberDim,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
                 trailing: venue.id == auth.selectedVenueId
-                    ? Icon(Icons.check, color: theme.colorScheme.primary)
+                    ? Icon(Icons.check, color: MerchantBaselineTokens.emberDim)
                     : const Icon(Icons.chevron_right),
                 onTap: () => auth.selectVenue(venue),
               ),

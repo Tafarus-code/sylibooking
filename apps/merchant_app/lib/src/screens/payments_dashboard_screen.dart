@@ -433,7 +433,7 @@ class _PaymentsDashboardScreenState extends State<PaymentsDashboardScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                  Icon(Icons.check_circle, color: MerchantBaselineTokens.emberDim),
                   const SizedBox(width: 12),
                   Expanded(child: Text(l.nothingOutstanding)),
                 ],
@@ -617,7 +617,7 @@ class _SectionLabel extends StatelessWidget {
         child: Text(
           text,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
+                color: MerchantBaselineTokens.emberDim,
               ),
         ),
       );

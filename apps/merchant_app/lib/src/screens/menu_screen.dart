@@ -272,7 +272,7 @@ class _MenuScreenState extends State<MenuScreen> {
             child: Text(
               entry.key,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
+                color: MerchantBaselineTokens.emberDim,
               ),
             ),
           ),

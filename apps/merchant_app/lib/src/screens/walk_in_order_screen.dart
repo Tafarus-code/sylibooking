@@ -295,7 +295,7 @@ class _WalkInOrderScreenState extends State<WalkInOrderScreen> {
             child: Text(
               entry.key,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
+                color: MerchantBaselineTokens.emberDim,
               ),
             ),
           ),
